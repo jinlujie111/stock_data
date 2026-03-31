@@ -1,0 +1,42 @@
+.page {
+  padding: 24rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+.hint {
+  color: #888;
+  margin-bottom: 16rpx;
+}
+.err {
+  color: #c0392b;
+  margin-bottom: 16rpx;
+}
+.meta {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+}
+.list {
+  max-height: calc(100vh - 120rpx);
+}
+.row {
+  padding: 20rpx 0;
+  border-bottom: 1px solid #eee;
+}
+.name {
+  font-size: 30rpx;
+  font-weight: 600;
+  display: block;
+}
+.sub {
+  font-size: 24rpx;
+  color: #888;
+  display: block;
+  margin-top: 8rpx;
+}
+.flow {
+  font-size: 26rpx;
+  color: #2c3e50;
+  display: block;
+  margin-top: 8rpx;
+}

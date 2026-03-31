@@ -1,0 +1,8 @@
+{
+  "pages": ["pages/index/index"],
+  "window": {
+    "navigationBarTitleText": "行业资金流",
+    "navigationBarBackgroundColor": "#1a1a2e",
+    "navigationBarTextStyle": "white"
+  }
+}

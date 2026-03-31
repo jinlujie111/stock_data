@@ -1,0 +1,14 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="hint">加载中…</view>
+  <view wx:if="{{errMsg}}" class="err">{{errMsg}}</view>
+  <view class="meta" wx:if="{{tradeDate}}">数据日期：{{tradeDate}}</view>
+  <scroll-view scroll-y class="list">
+    <view class="row" wx:for="{{rows}}" wx:key="id">
+      <text class="name">{{item.industry_name}}</text>
+      <text class="sub">{{item.period_type}} · 排名 {{item.ranking_no}}</text>
+      <text class="flow" wx:if="{{item.main_net_inflow != null}}">
+        主力净流入 {{item.main_net_inflow}} 亿
+      </text>
+    </view>
+  </scroll-view>
+</view>
