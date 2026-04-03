@@ -5,7 +5,8 @@
 其他脚本请从此模块读取，避免在代码里硬编码账号密码。
 环境变量可覆盖同名项（便于部署）：MYSQL_HOST、MYSQL_PORT、MYSQL_USER、MYSQL_PASSWORD、
 MYSQL_DATABASE、TUSHARE_TOKEN、INDUSTRY_FLOW_TABLE、INDUSTRY_VALUATION_TABLE、
-INDUSTRY_FINANCIAL_TABLE、INDUSTRY_FINANCIAL_DATA_TABLE。
+INDUSTRY_FINANCIAL_TABLE、INDUSTRY_FINANCIAL_DATA_TABLE、INDUSTRY_ASSOCIATION_SHIPMENT_TABLE、INDUSTRY_ORDER_VOLUME_TABLE、INDUSTRY_CONTRACT_LIAB_YOY_TABLE、STOCK_FINANCIAL_REPORT_TABLE、
+SW_INDUSTRY_INFO_TABLE、SW_INDUSTRY_CONSTITUENT_TABLE。
 """
 import os
 import urllib.parse
@@ -33,6 +34,32 @@ INDUSTRY_FINANCIAL_TABLE = os.getenv("INDUSTRY_FINANCIAL_TABLE", "industry_finan
 # 行业财务数据快照表（成分聚合，legulegu cons）
 INDUSTRY_FINANCIAL_DATA_TABLE = os.getenv(
     "INDUSTRY_FINANCIAL_DATA_TABLE", "industry_financial_data_di"
+)
+
+# 行业协会产销/出货类统计（乘联会等）
+INDUSTRY_ASSOCIATION_SHIPMENT_TABLE = os.getenv(
+    "INDUSTRY_ASSOCIATION_SHIPMENT_TABLE", "industry_association_shipment_di"
+)
+
+# 行业订单量代理（合同负债合计等）
+INDUSTRY_ORDER_VOLUME_TABLE = os.getenv(
+    "INDUSTRY_ORDER_VOLUME_TABLE", "industry_order_volume_di"
+)
+
+# 行业合同负债同比增速（THS 负债表样本）
+INDUSTRY_CONTRACT_LIAB_YOY_TABLE = os.getenv(
+    "INDUSTRY_CONTRACT_LIAB_YOY_TABLE", "industry_contract_liab_yoy_di"
+)
+
+# 全市场股票财务报告/指标明细（多数据源聚合，见 financial_sync）
+STOCK_FINANCIAL_REPORT_TABLE = os.getenv(
+    "STOCK_FINANCIAL_REPORT_TABLE", "stock_financial_report_di"
+)
+
+# 申万行业信息 / 成分股（乐咕，见 industry_sw_universe_etl.py）
+SW_INDUSTRY_INFO_TABLE = os.getenv("SW_INDUSTRY_INFO_TABLE", "sw_industry_info_di")
+SW_INDUSTRY_CONSTITUENT_TABLE = os.getenv(
+    "SW_INDUSTRY_CONSTITUENT_TABLE", "sw_industry_constituent_di"
 )
 
 # 与历史脚本一致：默认使用 mysqlconnector 驱动

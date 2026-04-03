@@ -6,7 +6,15 @@ setlocal
 cd /d "%~dp0industry_indicator"
 
 echo.
-echo ========== [1/4] run_industry_fund_flow.py ==========
+echo ========== [1/8] run_industry_sw_universe.py (SW industry+constituents) ==========
+python run_industry_sw_universe.py
+if errorlevel 1 (
+  echo ERROR: industry SW universe step failed.
+  exit /b 1
+)
+
+echo.
+echo ========== [2/8] run_industry_fund_flow.py ==========
 python run_industry_fund_flow.py
 if errorlevel 1 (
   echo ERROR: fund flow step failed.
@@ -14,7 +22,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo ========== [2/4] run_industry_valuation.py --all-levels ==========
+echo ========== [3/8] run_industry_valuation.py --all-levels ==========
 python run_industry_valuation.py --all-levels
 if errorlevel 1 (
   echo ERROR: valuation step failed.
@@ -22,7 +30,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo ========== [3/4] run_industry_financial_data.py (SW3 cons snapshot) ==========
+echo ========== [4/8] run_industry_financial_data.py (SW3 cons snapshot) ==========
 python run_industry_financial_data.py
 if errorlevel 1 (
   echo ERROR: industry financial data step failed.
@@ -30,10 +38,34 @@ if errorlevel 1 (
 )
 
 echo.
-echo ========== [4/4] run_industry_financial_indicator.py (full, AkShare, may take long) ==========
+echo ========== [5/8] run_industry_financial_indicator.py (full, AkShare, may take long) ==========
 python run_industry_financial_indicator.py
 if errorlevel 1 (
   echo ERROR: financial indicator step failed.
+  exit /b 1
+)
+
+echo.
+echo ========== [6/8] run_industry_order_volume.py (contract liab sum, THS, slow) ==========
+python run_industry_order_volume.py
+if errorlevel 1 (
+  echo ERROR: industry order volume step failed.
+  exit /b 1
+)
+
+echo.
+echo ========== [7/8] run_industry_contract_liab_yoy.py (contract liab YoY, THS, slow) ==========
+python run_industry_contract_liab_yoy.py
+if errorlevel 1 (
+  echo ERROR: industry contract liab yoy step failed.
+  exit /b 1
+)
+
+echo.
+echo ========== [8/8] run_industry_association_shipment.py (CPCA shipment YoY) ==========
+python run_industry_association_shipment.py
+if errorlevel 1 (
+  echo ERROR: industry association shipment step failed.
   exit /b 1
 )
 
