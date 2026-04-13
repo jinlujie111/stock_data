@@ -199,7 +199,7 @@ def create_app() -> Flask:
             f"SELECT id, trade_date, period_type, ranking_no, industry_code, industry_name, "
             f"industry_index_value, industry_change_pct, main_net_inflow, "
             f"super_large_net_inflow, large_net_inflow, company_count, "
-            f"top_stock_name, top_stock_change_pct, current_price, raw_json, "
+            f"top_stock_name, top_stock_change_pct, current_price, industry_turnover, raw_json, "
             f"created_at, updated_at FROM `{tbl}` WHERE {where} "
             f"ORDER BY period_type, ranking_no IS NULL, ranking_no ASC LIMIT %s"
         )

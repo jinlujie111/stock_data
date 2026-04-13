@@ -33,11 +33,32 @@ CREATE TABLE IF NOT EXISTS industry_fund_flow_di (
     top_stock_name VARCHAR(128) NULL COMMENT '领涨股名称',
     top_stock_change_pct DECIMAL(20, 6) NULL COMMENT '领涨股涨跌幅(%)',
     current_price DECIMAL(20, 6) NULL COMMENT '当前价(即时口径可用)',
+    industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：东财板块日K折算；同花顺源无此列时按板块名匹配东财',
     raw_json JSON NOT NULL COMMENT '原始数据JSON',
     created_at DATETIME NOT NULL COMMENT '创建时间',
     updated_at DATETIME NOT NULL COMMENT '更新时间',
     UNIQUE KEY uniq_industry_fund_flow (trade_date, period_type, industry_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流日报';
+
+CREATE TABLE IF NOT EXISTS stock_fund_flow_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
+    trade_date DATE NOT NULL COMMENT '数据日期(入库业务日)',
+    period_type VARCHAR(32) NOT NULL COMMENT '周期: 即时/3日排行/5日排行/10日排行/20日排行',
+    ranking_no INT NULL COMMENT '排名(同花顺序号)',
+    stock_code VARCHAR(16) NOT NULL COMMENT '股票代码(6位)',
+    stock_name VARCHAR(64) NOT NULL COMMENT '股票简称',
+    latest_price DECIMAL(20, 6) NULL COMMENT '最新价',
+    change_pct DECIMAL(20, 6) NULL COMMENT '涨跌幅或阶段涨跌幅(%)',
+    turnover_rate DECIMAL(20, 6) NULL COMMENT '换手率或连续换手率(%)',
+    inflow_amt DECIMAL(20, 6) NULL COMMENT '流入资金(亿元)，即时口径',
+    outflow_amt DECIMAL(20, 6) NULL COMMENT '流出资金(亿元)，即时口径',
+    net_amt DECIMAL(20, 6) NULL COMMENT '净额或资金流入净额(亿元)',
+    turnover_amt DECIMAL(20, 6) NULL COMMENT '成交额(亿元)，仅即时口径有',
+    raw_json JSON NOT NULL COMMENT '原始行JSON',
+    created_at DATETIME NOT NULL COMMENT '创建时间',
+    updated_at DATETIME NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uniq_stock_fund_flow (trade_date, period_type, stock_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个股资金流向日报(同花顺)';
 
 -- ============================================================================
 -- 【行业衍生财务指标】计算逻辑（表 industry_financial_indicator_di）

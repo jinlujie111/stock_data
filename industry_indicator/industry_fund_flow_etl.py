@@ -116,6 +116,7 @@ def _create_table_if_not_exists(conn: pymysql.connections.Connection, table_name
         top_stock_name VARCHAR(128) NULL COMMENT '领涨股名称',
         top_stock_change_pct DECIMAL(20, 6) NULL COMMENT '领涨股涨跌幅(%)',
         current_price DECIMAL(20, 6) NULL COMMENT '当前价(即时口径可用)',
+        industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：东财板块日K折算；同花顺源无此列时按板块名匹配东财',
         raw_json JSON NOT NULL COMMENT '原始数据JSON',
         created_at DATETIME NOT NULL COMMENT '创建时间',
         updated_at DATETIME NOT NULL COMMENT '更新时间',
@@ -128,21 +129,27 @@ def _create_table_if_not_exists(conn: pymysql.connections.Connection, table_name
 
 
 def _ensure_table_columns(conn: pymysql.connections.Connection, table_name: str) -> None:
-    """新表使用 industry_code；旧表若仍为 board_code 则重命名，数据保留。"""
+    """新表使用 industry_code；旧表若仍为 board_code 则重命名；补齐 industry_turnover。"""
     with conn.cursor() as cursor:
         cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE 'industry_code';")
-        if cursor.fetchone():
-            return
-        cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE 'board_code';")
-        if cursor.fetchone():
+        if not cursor.fetchone():
+            cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE 'board_code';")
+            if cursor.fetchone():
+                cursor.execute(
+                    f"ALTER TABLE {table_name} CHANGE COLUMN board_code industry_code "
+                    "VARCHAR(32) NULL COMMENT '行业代码';"
+                )
+            else:
+                cursor.execute(
+                    f"ALTER TABLE {table_name} ADD COLUMN industry_code VARCHAR(32) NULL "
+                    "COMMENT '行业代码' AFTER ranking_no;"
+                )
+        cursor.execute(f"SHOW COLUMNS FROM {table_name} LIKE 'industry_turnover';")
+        if not cursor.fetchone():
             cursor.execute(
-                f"ALTER TABLE {table_name} CHANGE COLUMN board_code industry_code "
-                "VARCHAR(32) NULL COMMENT '行业代码';"
-            )
-        else:
-            cursor.execute(
-                f"ALTER TABLE {table_name} ADD COLUMN industry_code VARCHAR(32) NULL "
-                "COMMENT '行业代码' AFTER ranking_no;"
+                f"ALTER TABLE {table_name} ADD COLUMN industry_turnover DECIMAL(20, 6) NULL "
+                "COMMENT '行业成交额(亿元)：东财板块日K折算；同花顺源无此列时按板块名匹配东财' "
+                "AFTER current_price;"
             )
     conn.commit()
 
@@ -164,6 +171,7 @@ def _normalize_row_by_position(row: pd.Series) -> dict:
             "industry_index_value": None,
             "company_count": None,
             "current_price": None,
+            "industry_turnover": None,
         }
 
     return {
@@ -179,6 +187,7 @@ def _normalize_row_by_position(row: pd.Series) -> dict:
         "top_stock_name": None if len(vals) <= 8 or pd.isna(vals[8]) else str(vals[8]),
         "top_stock_change_pct": _safe_float(vals[9]) if len(vals) > 9 else None,
         "current_price": _safe_float(vals[10]) if len(vals) > 10 else None,
+        "industry_turnover": None,
     }
 
 
@@ -190,6 +199,52 @@ def _normalize_period(period: str) -> str:
 def _norm_name(text: str) -> str:
     # 对行业名做轻量标准化，提升名称匹配行业代码成功率。
     return re.sub(r"[\s\-_/（）()]+", "", text).lower()
+
+
+def _turnover_yi_from_df_row(row: pd.Series, colnames: Iterable[str]) -> float | None:
+    """若接口返回带「成交额」等列，按亿元口径解析（与同花顺流入资金等单位一致）。"""
+    cols = set(colnames)
+    for key in ("成交额", "行业成交额", "成交額", "成交金额"):
+        if key in cols:
+            return _safe_float(row.get(key))
+    return None
+
+
+def _build_em_industry_turnover_yi_map(trade_date: str) -> dict[str, float]:
+    """东财行业板块日 K 当日成交额 → 标准化板块名 -> 亿元（源数据为元）。"""
+    compact = trade_date.replace("-", "")
+    out: dict[str, float] = {}
+    try:
+        listing = ak.stock_board_industry_name_em()
+    except Exception as exc:  # noqa: BLE001
+        LOG.warning("东财行业列表拉取失败，跳过成交额填充: %s", exc)
+        return out
+    if listing is None or listing.empty:
+        return out
+    if not {"板块名称", "板块代码"}.issubset(listing.columns):
+        return out
+    for _, brow in listing.iterrows():
+        name = str(brow.get("板块名称", "")).strip()
+        code = str(brow.get("板块代码", "")).strip()
+        if not name or not code:
+            continue
+        try:
+            kdf = ak.stock_board_industry_hist_em(
+                symbol=code,
+                start_date=compact,
+                end_date=compact,
+                period="日k",
+                adjust="",
+            )
+        except Exception as exc:  # noqa: BLE001
+            LOG.debug("板块 %s 日K成交额拉取失败: %s", name, exc)
+            continue
+        if kdf is None or kdf.empty or "成交额" not in kdf.columns:
+            continue
+        amt = _safe_float(kdf.iloc[-1]["成交额"])
+        if amt is not None:
+            out[_norm_name(name)] = amt / 1e8
+    return out
 
 
 def _build_industry_code_map() -> dict[str, str]:
@@ -213,6 +268,7 @@ def _normalize_records(
     trade_date: str,
     df: pd.DataFrame,
     industry_code_map: dict[str, str],
+    em_turnover_by_norm_name: dict[str, float] | None = None,
 ) -> list[tuple]:
     if df is None or df.empty:
         return []
@@ -234,6 +290,10 @@ def _normalize_records(
             mapped["industry_code"] = industry_code_map.get(_norm_name(mapped["industry_name"]))
         if not mapped["industry_name"]:
             continue
+        to_yi = _turnover_yi_from_df_row(row, df.columns)
+        if to_yi is None and em_turnover_by_norm_name and mapped["industry_name"]:
+            to_yi = em_turnover_by_norm_name.get(_norm_name(mapped["industry_name"]))
+        mapped["industry_turnover"] = to_yi
         records.append(
             (
                 trade_date,
@@ -250,6 +310,7 @@ def _normalize_records(
                 mapped["top_stock_name"],
                 mapped["top_stock_change_pct"],
                 mapped["current_price"],
+                mapped["industry_turnover"],
                 json.dumps({k: (None if pd.isna(v) else v) for k, v in row.items()}, ensure_ascii=False, default=str),
                 now,
                 now,
@@ -267,9 +328,9 @@ def _upsert_rows(conn: pymysql.connections.Connection, table_name: str, rows: It
     INSERT INTO {table_name} (
         trade_date, period_type, ranking_no, industry_code, industry_name, industry_index_value, industry_change_pct,
         main_net_inflow, super_large_net_inflow, large_net_inflow, company_count, top_stock_name,
-        top_stock_change_pct, current_price, raw_json, created_at, updated_at
+        top_stock_change_pct, current_price, industry_turnover, raw_json, created_at, updated_at
     )
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS JSON), %s, %s)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CAST(%s AS JSON), %s, %s)
     ON DUPLICATE KEY UPDATE
         ranking_no = VALUES(ranking_no),
         industry_code = VALUES(industry_code),
@@ -282,6 +343,7 @@ def _upsert_rows(conn: pymysql.connections.Connection, table_name: str, rows: It
         top_stock_name = VALUES(top_stock_name),
         top_stock_change_pct = VALUES(top_stock_change_pct),
         current_price = VALUES(current_price),
+        industry_turnover = VALUES(industry_turnover),
         raw_json = VALUES(raw_json),
         updated_at = VALUES(updated_at);
     """
@@ -317,6 +379,7 @@ def run(
     _create_table_if_not_exists(conn, table_name)
     _ensure_table_columns(conn, table_name)
     industry_code_map = _build_industry_code_map()
+    em_turnover_map = _build_em_industry_turnover_yi_map(run_date)
 
     total = 0
     for period in periods:
@@ -327,6 +390,7 @@ def run(
                 trade_date=run_date,
                 df=df,
                 industry_code_map=industry_code_map,
+                em_turnover_by_norm_name=em_turnover_map,
             )
             cnt = _upsert_rows(conn, table_name, rows)
             total += cnt
@@ -382,6 +446,8 @@ def run_historical_em_range(
     """
     start_d = datetime.strptime(start_iso, "%Y-%m-%d").date()
     end_d = datetime.strptime(end_iso, "%Y-%m-%d").date()
+    start_compact = start_d.strftime("%Y%m%d")
+    end_compact = end_d.strftime("%Y%m%d")
 
     conn = pymysql.connect(
         host=host,
@@ -418,6 +484,30 @@ def run_historical_em_range(
         df["_d"] = pd.to_datetime(df["日期"], errors="coerce").dt.date
         mask = (df["_d"] >= start_d) & (df["_d"] <= end_d)
         sub = df.loc[mask]
+
+        turnover_by_date: dict[str, float] = {}
+        try:
+            kdf = ak.stock_board_industry_hist_em(
+                symbol=name,
+                start_date=start_compact,
+                end_date=end_compact,
+                period="日k",
+                adjust="",
+            )
+            if kdf is not None and not kdf.empty and "成交额" in kdf.columns:
+                kdf = kdf.copy()
+                kdf["_kd"] = pd.to_datetime(kdf["日期"], errors="coerce").dt.date
+                for _, kr in kdf.iterrows():
+                    kd = kr["_kd"]
+                    if not isinstance(kd, date) or kd < start_d or kd > end_d:
+                        continue
+                    kds = kd.strftime("%Y-%m-%d")
+                    v = _safe_float(kr.get("成交额"))
+                    if v is not None:
+                        turnover_by_date[kds] = v / 1e8
+        except Exception as exc:  # noqa: BLE001
+            LOG.debug("行业 %s 东财板块日K成交额(区间)失败: %s", name, exc)
+
         for _, row in sub.iterrows():
             d = row["_d"]
             if not isinstance(d, date):
@@ -431,6 +521,7 @@ def run_historical_em_range(
                     "industry_name": name,
                     "industry_code": code_map.get(name),
                     "row": row,
+                    "industry_turnover_yi": turnover_by_date.get(ds),
                 }
             )
 
@@ -469,6 +560,7 @@ def run_historical_em_range(
                     None,
                     None,
                     None,
+                    it.get("industry_turnover_yi"),
                     json.dumps(raw, ensure_ascii=False, default=str),
                     now,
                     now,
