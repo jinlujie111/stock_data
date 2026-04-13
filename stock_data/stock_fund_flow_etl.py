@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import sys
 from datetime import datetime
@@ -78,15 +79,51 @@ def _mysql_defaults_from_config():
 def _safe_float(value: object) -> float | None:
     if value is None:
         return None
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return None
     if isinstance(value, str):
-        text = value.strip().replace(",", "").replace("%", "")
+        text = value.strip().replace(",", "").replace("，", "").replace("%", "")
         if text in {"", "--", "nan", "None"}:
             return None
         value = text
     try:
-        return float(value)  # type: ignore[arg-type]
+        out = float(value)  # type: ignore[arg-type]
+        if math.isnan(out) or math.isinf(out):
+            return None
+        return out
     except (TypeError, ValueError):
         return None
+
+
+def _parse_amount_yi(value: object) -> float | None:
+    """
+    同花顺资金列常见格式：「12.19亿」「6419.00万」「-1.51亿」→ 统一为 float 亿元。
+    已是纯数字时按亿元数值直接解析。
+    """
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        x = float(value)
+        if math.isnan(x) or math.isinf(x):
+            return None
+        return x
+    s = str(value).strip().replace(",", "").replace("，", "")
+    if not s or s in {"--", "nan", "None"}:
+        return None
+    sign = 1.0
+    if s[0] == "-":
+        sign = -1.0
+        s = s[1:].strip()
+    elif s[0] == "+":
+        s = s[1:].strip()
+    if s.endswith("亿"):
+        num = _safe_float(s[:-1])
+        return None if num is None else sign * num
+    if s.endswith("万"):
+        num = _safe_float(s[:-1])
+        return None if num is None else sign * (num / 10000.0)
+    num = _safe_float(s)
+    return None if num is None else sign * num
 
 
 def _safe_int(value: object) -> int | None:
@@ -159,10 +196,10 @@ def _row_to_fields(row: pd.Series, period_type: str) -> dict | None:
             "latest_price": _safe_float(row.get("最新价")),
             "change_pct": _safe_float(row.get("涨跌幅")),
             "turnover_rate": _safe_float(row.get("换手率")),
-            "inflow_amt": _safe_float(row.get("流入资金")),
-            "outflow_amt": _safe_float(row.get("流出资金")),
-            "net_amt": _safe_float(row.get("净额")),
-            "turnover_amt": _safe_float(row.get("成交额")),
+            "inflow_amt": _parse_amount_yi(row.get("流入资金")),
+            "outflow_amt": _parse_amount_yi(row.get("流出资金")),
+            "net_amt": _parse_amount_yi(row.get("净额")),
+            "turnover_amt": _parse_amount_yi(row.get("成交额")),
         }
 
     return {
@@ -174,7 +211,7 @@ def _row_to_fields(row: pd.Series, period_type: str) -> dict | None:
         "turnover_rate": _safe_float(row.get("连续换手率")),
         "inflow_amt": None,
         "outflow_amt": None,
-        "net_amt": _safe_float(row.get("资金流入净额")),
+        "net_amt": _parse_amount_yi(row.get("资金流入净额")),
         "turnover_amt": None,
     }
 
