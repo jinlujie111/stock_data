@@ -313,3 +313,70 @@ CREATE TABLE IF NOT EXISTS sw_industry_constituent_di (
     UNIQUE KEY uniq_sw_cons (source, trade_date, level, industry_code, stock_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业成分股';
 
+-- ============================================================================
+-- 【行业资金流衍生指标】计算方法（表 industry_fund_flow_derivative_di）
+-- 实现脚本：industry_indicator/industry_fund_flow_derivative_etl.py
+--
+-- 1) 行业资金趋势强度（Trend Score）
+--    公式：Trend = MA(主力净流入, 5) / MA(主力净流入, 20)
+--    说明：5日移动平均与20日移动平均的比值，反映短期资金趋势相对于中期趋势的强度
+--
+-- 2) 资金连续流入天数（Persistence）
+--    公式：连续N天主净流入 > 0
+--    说明：统计行业连续出现主力资金净流入的天数
+--
+-- 3) 资金强度（Flow Intensity）
+--    公式：主力净流入 / 行业成交额
+--    说明：主力资金流入相对于行业总成交额的占比，反映资金流入的强度
+--
+-- 4) 背离指标（Divergence）
+--    规则：
+--    - 主力净流入、价格上涨 → 正常上涨
+--    - 主力净流入、价格下跌 → 低吸机会
+--    - 主力净流出、价格上涨 → 出货信号
+--    - 主力净流出、价格下跌 → 下跌趋势
+--
+-- 5) 排名相关指标
+--    - 连续Top3天数：行业连续进入资金净流入Top3的天数
+--    - Top5占比：当日资金净流入Top5行业的总流入占所有行业总流入的比例
+--    - 排名变化（ΔRank）：当日排名与前一交易日排名的变化
+--
+-- 6) 龙头资金集中度
+--    公式：Top5市值股票资金流入 / 行业总流入
+--    说明：反映行业资金是否主要集中在龙头股
+--
+-- 7) 龙头资金流入占比
+--    说明：龙头股资金流入占行业总资金流入的比例
+--
+-- 8) 资金加速度
+--    公式：ΔFlow = 今日流入 - 昨日流入
+--    说明：资金流入的变化率，反映资金流入的速度变化
+--
+-- 9) 跨周期资金
+--    说明：判断日/周/月是否同时出现资金流入
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS industry_fund_flow_derivative_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
+    source VARCHAR(64) NOT NULL COMMENT '数据来源',
+    trade_date DATE NOT NULL COMMENT '数据日期',
+    industry_code VARCHAR(32) NULL COMMENT '行业代码',
+    industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
+    trend_score DECIMAL(20, 6) NULL COMMENT '行业资金趋势强度: MA(主力净流入, 5) / MA(主力净流入, 20)',
+    persistence_days INT NULL COMMENT '资金连续流入天数: 连续N天主净流入 > 0',
+    flow_intensity DECIMAL(20, 6) NULL COMMENT '资金强度: 主力净流入 / 行业成交额',
+    divergence VARCHAR(32) NULL COMMENT '背离指标: 正常上涨/低吸机会/出货信号/下跌趋势',
+    consecutive_top3_days INT NULL COMMENT '连续Top3天数',
+    top5_ratio DECIMAL(20, 6) NULL COMMENT 'Top5占比',
+    rank_change INT NULL COMMENT '排名变化(ΔRank)',
+    leading_fund_concentration DECIMAL(20, 6) NULL COMMENT '龙头资金集中度: Top5市值股票资金流入 / 行业总流入',
+    leading_fund_ratio DECIMAL(20, 6) NULL COMMENT '龙头资金流入占比',
+    fund_acceleration DECIMAL(20, 6) NULL COMMENT '资金加速度: 今日流入 - 昨日流入',
+    cross_period_flow VARCHAR(32) NULL COMMENT '跨周期资金: 日/周/月同时流入',
+    raw_json JSON NOT NULL COMMENT '原始数据JSON',
+    created_at DATETIME NOT NULL COMMENT '创建时间',
+    updated_at DATETIME NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uniq_industry_derivative (trade_date, industry_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流衍生指标日报';
+
+

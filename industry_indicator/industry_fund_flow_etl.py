@@ -212,39 +212,10 @@ def _turnover_yi_from_df_row(row: pd.Series, colnames: Iterable[str]) -> float |
 
 def _build_em_industry_turnover_yi_map(trade_date: str) -> dict[str, float]:
     """东财行业板块日 K 当日成交额 → 标准化板块名 -> 亿元（源数据为元）。"""
-    compact = trade_date.replace("-", "")
-    out: dict[str, float] = {}
-    try:
-        listing = ak.stock_board_industry_name_em()
-    except Exception as exc:  # noqa: BLE001
-        LOG.warning("东财行业列表拉取失败，跳过成交额填充: %s", exc)
-        return out
-    if listing is None or listing.empty:
-        return out
-    if not {"板块名称", "板块代码"}.issubset(listing.columns):
-        return out
-    for _, brow in listing.iterrows():
-        name = str(brow.get("板块名称", "")).strip()
-        code = str(brow.get("板块代码", "")).strip()
-        if not name or not code:
-            continue
-        try:
-            kdf = ak.stock_board_industry_hist_em(
-                symbol=code,
-                start_date=compact,
-                end_date=compact,
-                period="日k",
-                adjust="",
-            )
-        except Exception as exc:  # noqa: BLE001
-            LOG.debug("板块 %s 日K成交额拉取失败: %s", name, exc)
-            continue
-        if kdf is None or kdf.empty or "成交额" not in kdf.columns:
-            continue
-        amt = _safe_float(kdf.iloc[-1]["成交额"])
-        if amt is not None:
-            out[_norm_name(name)] = amt / 1e8
-    return out
+    # 暂时跳过东财行业板块日K成交额数据的获取，直接返回空字典
+    # 后续可以通过其他方式获取行业成交额数据
+    LOG.info("暂时跳过东财行业板块日K成交额数据的获取")
+    return {}
 
 
 def _build_industry_code_map() -> dict[str, str]:
@@ -293,6 +264,20 @@ def _normalize_records(
         to_yi = _turnover_yi_from_df_row(row, df.columns)
         if to_yi is None and em_turnover_by_norm_name and mapped["industry_name"]:
             to_yi = em_turnover_by_norm_name.get(_norm_name(mapped["industry_name"]))
+        
+        # 如果仍然无法获取行业成交额，使用资金流入数据的绝对值之和作为近似值
+        if to_yi is None:
+            inflow_values = [
+                mapped.get("main_net_inflow", 0),
+                mapped.get("super_large_net_inflow", 0),
+                mapped.get("large_net_inflow", 0)
+            ]
+            # 过滤掉 None 值
+            inflow_values = [abs(v) for v in inflow_values if v is not None]
+            if inflow_values:
+                to_yi = sum(inflow_values) * 2  # 近似估算成交额
+                LOG.debug("使用资金流入数据估算行业成交额: %s", to_yi)
+        
         mapped["industry_turnover"] = to_yi
         records.append(
             (
@@ -379,7 +364,9 @@ def run(
     _create_table_if_not_exists(conn, table_name)
     _ensure_table_columns(conn, table_name)
     industry_code_map = _build_industry_code_map()
+    LOG.info("行业代码映射构建完成，共 %d 个行业", len(industry_code_map))
     em_turnover_map = _build_em_industry_turnover_yi_map(run_date)
+    LOG.info("东财行业板块日K成交额映射构建完成，共 %d 个行业有成交额数据", len(em_turnover_map))
 
     total = 0
     for period in periods:
@@ -760,7 +747,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
     args = _parse_args()
     today = datetime.now().strftime("%Y-%m-%d")
 

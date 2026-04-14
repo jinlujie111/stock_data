@@ -85,6 +85,14 @@ if errorlevel 1 (
 )
 
 echo.
+echo ========== [10/10] run_industry_fund_flow_derivative.py (industry fund flow derivatives) ==========
+python run_industry_fund_flow_derivative.py
+if errorlevel 1 (
+  echo ERROR: industry fund flow derivative step failed.
+  exit /b 1
+)
+
+echo.
 echo All batch jobs finished OK.
 
 REM Optional: start HTTP API in a NEW window. Uncomment (path must not need extra quotes):
