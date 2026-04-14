@@ -252,19 +252,20 @@ def _report_col(df: pd.DataFrame) -> str | None:
 
 
 def _create_table_if_not_exists(conn: pymysql.connections.Connection, table_name: str) -> None:
+    """使用 mysql_tables/schema.sql 中定义的表结构"""
     ddl = f"""
     CREATE TABLE IF NOT EXISTS `{table_name}` (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
-        source VARCHAR(64) NOT NULL COMMENT 'tushare_fina_indicator/akshare_em_main等',
-        ts_code VARCHAR(16) NOT NULL,
+        source VARCHAR(64) NOT NULL COMMENT '数据源标识,见本文件说明块',
+        ts_code VARCHAR(16) NOT NULL COMMENT 'Tushare 风格代码如 600519.SH',
         stock_name VARCHAR(128) NULL,
         report_date DATE NOT NULL COMMENT '报告期截止日',
-        data_kind VARCHAR(48) NOT NULL COMMENT '指标类型: fina_indicator/main/balance/profit/cash',
-        raw_json JSON NOT NULL COMMENT '该期完整字段',
+        data_kind VARCHAR(48) NOT NULL COMMENT 'fina_indicator/main_indicator/三大表等',
+        raw_json JSON NOT NULL COMMENT '该期接口返回行序列化',
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         UNIQUE KEY uniq_sfr (source, ts_code, report_date, data_kind)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股财务数据多源明细,见 financial_sync/schema.sql';
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股财务多源明细';
     """
     with conn.cursor() as cur:
         cur.execute(ddl)

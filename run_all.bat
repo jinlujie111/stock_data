@@ -93,6 +93,16 @@ if errorlevel 1 (
 )
 
 echo.
+echo ========== [11/11] financial_sync/run_stock_financial_full.py (stock financial data) ==========
+cd /d "%ROOT%financial_sync"
+python run_stock_financial_full.py
+if errorlevel 1 (
+  echo ERROR: stock financial data step failed.
+  exit /b 1
+)
+cd /d "%IND%"
+
+echo.
 echo All batch jobs finished OK.
 
 REM Optional: start HTTP API in a NEW window. Uncomment (path must not need extra quotes):
