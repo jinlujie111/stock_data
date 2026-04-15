@@ -8,7 +8,7 @@
   - akshare_em：东方财富 datacenter 主要指标 + 可选三大表（按股票逐只请求，较慢）
   - auto：先尝试 tushare 单股探测，无权限则走 akshare_em
 
-表结构与说明见同目录 schema.sql。
+表结构与说明见 mysql_tables/schema.sql。
 """
 from __future__ import annotations
 
