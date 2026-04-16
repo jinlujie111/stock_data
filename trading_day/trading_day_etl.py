@@ -43,12 +43,37 @@ class TradingDayETL:
     
     def is_trading_day(self, date):
         """判断是否为交易日"""
-        # 这里简化处理，实际应该从数据源获取
         # 周末不是交易日
         if date.weekday() in (5, 6):
             return False
-        # 这里可以添加节假日判断
-        # 暂时返回True，后续可以接入节假日数据
+        
+        # 节假日列表
+        holidays = [
+            # 2026年节假日
+            datetime(2026, 1, 1).date(),  # 元旦
+            datetime(2026, 2, 1).date(),  # 春节
+            datetime(2026, 2, 2).date(),
+            datetime(2026, 2, 3).date(),
+            datetime(2026, 2, 4).date(),
+            datetime(2026, 2, 5).date(),
+            datetime(2026, 4, 6).date(),  # 清明节
+            datetime(2026, 5, 1).date(),  # 劳动节
+            datetime(2026, 5, 2).date(),
+            datetime(2026, 5, 3).date(),
+            datetime(2026, 6, 19).date(),  # 端午节
+            datetime(2026, 9, 25).date(),  # 中秋节
+            datetime(2026, 10, 1).date(),  # 国庆节
+            datetime(2026, 10, 2).date(),
+            datetime(2026, 10, 3).date(),
+            datetime(2026, 10, 4).date(),
+            datetime(2026, 10, 5).date(),
+        ]
+        
+        # 检查是否为节假日
+        if date in holidays:
+            return False
+        
+        # 其他日期默认为交易日
         return True
     
     def generate_trading_days(self, start_date, end_date):
