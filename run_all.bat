@@ -103,6 +103,16 @@ if errorlevel 1 (
 cd /d "%IND%"
 
 echo.
+echo ========== [12/12] trading_day/run_trading_day.py (trading day dimension) ==========
+cd /d "%ROOT%trading_day"
+python run_trading_day.py
+if errorlevel 1 (
+  echo ERROR: trading day dimension step failed.
+  exit /b 1
+)
+cd /d "%IND%"
+
+echo.
 echo All batch jobs finished OK.
 
 REM Optional: start HTTP API in a NEW window. Uncomment (path must not need extra quotes):

@@ -411,3 +411,25 @@ CREATE TABLE IF NOT EXISTS stock_financial_report_di (
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uniq_sfr (source, ts_code, report_date, data_kind)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股财务多源明细';
+
+-- ============================================================================
+-- 交易日维度表 trading_day_di
+-- 脚本：trading_day/trading_day_etl.py
+--
+-- 设计说明：
+--   存储历史和未来的交易日信息，用于数据处理时判断日期是否为交易日。
+--   包含日期、是否交易日、星期、月份、季度、年份等维度信息。
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS trading_day_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
+    date DATE NOT NULL COMMENT '日期',
+    is_trading_day INT NOT NULL COMMENT '是否交易日: 1=是, 0=否',
+    week INT NULL COMMENT '星期: 1=周一, 7=周日',
+    month INT NULL COMMENT '月份',
+    quarter INT NULL COMMENT '季度',
+    year INT NULL COMMENT '年份',
+    created_at DATETIME NOT NULL COMMENT '创建时间',
+    updated_at DATETIME NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uniq_date (date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
