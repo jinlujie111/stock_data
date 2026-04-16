@@ -22,7 +22,7 @@ class TradingDayETL:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS trading_day_di (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
-                    date DATE NOT NULL COMMENT '日期',
+                    trade_date DATE NOT NULL COMMENT '日期',
                     is_trading_day INT NOT NULL COMMENT '是否交易日: 1=是, 0=否',
                     week INT NULL COMMENT '星期: 1=周一, 7=周日',
                     month INT NULL COMMENT '月份',
@@ -30,7 +30,7 @@ class TradingDayETL:
                     year INT NULL COMMENT '年份',
                     created_at DATETIME NOT NULL COMMENT '创建时间',
                     updated_at DATETIME NOT NULL COMMENT '更新时间',
-                    UNIQUE KEY uniq_date (date)
+                    UNIQUE KEY uniq_trade_date (trade_date)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
             """))
             conn.commit()
@@ -38,7 +38,7 @@ class TradingDayETL:
     def get_existing_dates(self):
         """获取已存在的日期"""
         with self.engine.connect() as conn:
-            result = conn.execute(text("SELECT date FROM trading_day_di"))
+            result = conn.execute(text("SELECT trade_date FROM trading_day_di"))
             return {row[0] for row in result.fetchall()}
     
     def is_trading_day(self, date):
@@ -71,7 +71,7 @@ class TradingDayETL:
             year = date_obj.year
             
             record = {
-                'date': date_obj,
+                'trade_date': date_obj,
                 'is_trading_day': is_trading,
                 'week': week,
                 'month': month,
@@ -92,9 +92,9 @@ class TradingDayETL:
         with self.engine.connect() as conn:
             insert_sql = text("""
                 INSERT IGNORE INTO trading_day_di (
-                    date, is_trading_day, week, month, quarter, year, created_at, updated_at
+                    trade_date, is_trading_day, week, month, quarter, year, created_at, updated_at
                 ) VALUES (
-                    :date, :is_trading_day, :week, :month, :quarter, :year, :created_at, :updated_at
+                    :trade_date, :is_trading_day, :week, :month, :quarter, :year, :created_at, :updated_at
                 )
             """)
             conn.execute(insert_sql, records)
