@@ -210,12 +210,133 @@ def _turnover_yi_from_df_row(row: pd.Series, colnames: Iterable[str]) -> float |
     return None
 
 
+def _build_ths_industry_turnover_yi_map() -> dict[str, float]:
+    """同花顺行业板块成交额 → 标准化板块名 -> 亿元。"""
+    result: dict[str, float] = {}
+    try:
+        LOG.info("开始从同花顺获取行业板块成交额数据")
+        
+        # 获取同花顺行业板块汇总数据
+        summary_df = ak.stock_board_industry_summary_ths()
+        if summary_df is None or summary_df.empty:
+            LOG.warning("无法获取同花顺行业板块汇总数据")
+            return result
+        
+        LOG.info("成功获取同花顺行业板块汇总数据，共 %d 个行业", len(summary_df))
+        
+        # 检查列名
+        LOG.debug("行业板块汇总数据列名: %s", summary_df.columns)
+        
+        # 遍历行业，获取成交额数据
+        count = 0
+        for _, row in summary_df.iterrows():
+            industry_name = row.get("板块")
+            if not industry_name:
+                continue
+            
+            try:
+                LOG.debug("尝试获取行业 %s 的成交额数据", industry_name)
+                # 获取总成交额数据
+                turnover = _safe_float(row.get("总成交额"))
+                if turnover is not None:
+                    # 转换为亿元（数据单位是亿元）
+                    result[_norm_name(industry_name)] = turnover
+                    count += 1
+                    LOG.debug("成功获取行业 %s 的成交额数据: %.2f 亿元", industry_name, turnover)
+                else:
+                    LOG.debug("行业 %s 没有成交额数据", industry_name)
+            except Exception as exc:  # noqa: BLE001
+                LOG.debug("获取行业 %s 成交额失败: %s", industry_name, exc)
+                continue
+        
+        LOG.info("成功获取 %d 个行业的成交额数据", count)
+    except Exception as exc:  # noqa: BLE001
+        LOG.warning("获取同花顺行业板块成交额数据失败: %s", exc)
+    
+    return result
+
+
 def _build_em_industry_turnover_yi_map(trade_date: str) -> dict[str, float]:
     """东财行业板块日 K 当日成交额 → 标准化板块名 -> 亿元（源数据为元）。"""
-    # 暂时跳过东财行业板块日K成交额数据的获取，直接返回空字典
-    # 后续可以通过其他方式获取行业成交额数据
-    LOG.info("暂时跳过东财行业板块日K成交额数据的获取")
-    return {}
+    result: dict[str, float] = {}
+    try:
+        LOG.info("开始获取东财行业板块日K成交额数据")
+        
+        # 尝试从同花顺获取行业成交额数据
+        result = _build_ths_industry_turnover_yi_map()
+        if result:
+            LOG.info("成功从同花顺获取行业成交额数据")
+            return result
+        
+        # 如果无法从同花顺获取数据，使用资金流入数据估算
+        LOG.info("无法从同花顺获取行业成交额数据，将使用资金流入数据估算")
+        return result
+        
+        # 以下是原始的获取逻辑，暂时注释掉
+        """
+        # 尝试获取东方财富行业板块列表
+        sector_map = _em_sector_name_to_code()
+        
+        # 如果无法获取东财行业列表，尝试使用同花顺的行业列表
+        if not sector_map:
+            LOG.warning("无法获取东财行业列表，尝试使用同花顺行业列表")
+            try:
+                # 获取同花顺行业列表
+                LOG.info("尝试获取同花顺行业列表")
+                df = ak.stock_fund_flow_industry(symbol="即时")
+                if df is not None and not df.empty and "行业名称" in df.columns:
+                    sector_map = {name: "" for name in df["行业名称"].unique()}
+                    LOG.info("成功获取同花顺行业列表，共 %d 个行业", len(sector_map))
+                else:
+                    LOG.warning("同花顺行业列表数据为空")
+                    return result
+            except Exception as exc:
+                LOG.warning("无法获取同花顺行业列表: %s", exc)
+                return result
+        else:
+            LOG.info("成功获取东财行业列表，共 %d 个行业", len(sector_map))
+        
+        # 构建日期参数
+        date_obj = datetime.strptime(trade_date, "%Y-%m-%d")
+        start_date = date_obj.strftime("%Y%m%d")
+        end_date = start_date
+        LOG.info("构建日期参数: start_date=%s, end_date=%s", start_date, end_date)
+        
+        # 遍历行业，获取成交额数据
+        LOG.info("开始遍历行业，获取成交额数据")
+        count = 0
+        # 只获取前10个行业的数据，避免请求过多导致超时
+        for industry_name in list(sector_map.keys())[:10]:
+            try:
+                LOG.debug("尝试获取行业 %s 的成交额数据", industry_name)
+                kdf = ak.stock_board_industry_hist_em(
+                    symbol=industry_name,
+                    start_date=start_date,
+                    end_date=end_date,
+                    period="日k",
+                    adjust="",
+                )
+                if kdf is not None and not kdf.empty and "成交额" in kdf.columns:
+                    # 取最后一行的成交额
+                    last_row = kdf.iloc[-1]
+                    turnover = _safe_float(last_row.get("成交额"))
+                    if turnover is not None:
+                        # 转换为亿元
+                        result[_norm_name(industry_name)] = turnover / 1e8
+                        count += 1
+                        LOG.debug("成功获取行业 %s 的成交额数据: %.2f 亿元", industry_name, turnover / 1e8)
+                else:
+                    LOG.debug("行业 %s 没有成交额数据", industry_name)
+            except Exception as exc:  # noqa: BLE001
+                LOG.debug("获取行业 %s 成交额失败: %s", industry_name, exc)
+                continue
+        
+        LOG.info("成功获取 %d 个行业的成交额数据", count)
+        """
+    except Exception as exc:  # noqa: BLE001
+        LOG.warning("获取东财行业板块日K成交额数据失败: %s", exc)
+    
+    return result
 
 
 def _build_industry_code_map() -> dict[str, str]:
