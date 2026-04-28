@@ -1,116 +1,19 @@
 @echo off
 REM Master runner: repo root = %~dp0
-REM Industry jobs: industry_indicator\run_*.py
-REM Stock fund flow: stock_data\run_stock_fund_flow.py (sibling package under repo root)
+REM 执行 main.py 来运行所有数据处理任务
 REM ASCII-only REM lines (cmd.exe may mangle UTF-8).
 REM MySQL: industry_indicator/config.py
 setlocal
 set "ROOT=%~dp0"
-set "IND=%ROOT%industry_indicator"
-set "STOCKJOB=%ROOT%stock_data"
-cd /d "%IND%"
+cd /d "%ROOT%"
 
 echo.
-echo ========== [1/9] run_industry_sw_universe.py (SW industry+constituents) ==========
-python run_industry_sw_universe.py
+echo ========== 执行 run_main_python.py (所有数据处理任务) ==========
+python run_main_python.py
 if errorlevel 1 (
-  echo ERROR: industry SW universe step failed.
+  echo ERROR: 数据处理任务执行失败.
   exit /b 1
 )
-
-echo.
-echo ========== [2/9] run_industry_fund_flow.py ==========
-python run_industry_fund_flow.py
-if errorlevel 1 (
-  echo ERROR: industry fund flow step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [3/9] stock_data\run_stock_fund_flow.py (per-stock THS fund flow) ==========
-cd /d "%STOCKJOB%"
-python run_stock_fund_flow.py
-if errorlevel 1 (
-  echo ERROR: stock fund flow step failed.
-  exit /b 1
-)
-cd /d "%IND%"
-
-echo.
-echo ========== [4/9] run_industry_valuation.py --all-levels ==========
-python run_industry_valuation.py --all-levels
-if errorlevel 1 (
-  echo ERROR: valuation step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [5/9] run_industry_financial_data.py (SW3 cons snapshot) ==========
-python run_industry_financial_data.py
-if errorlevel 1 (
-  echo ERROR: industry financial data step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [6/9] run_industry_financial_indicator.py (full, AkShare, may take long) ==========
-python run_industry_financial_indicator.py
-if errorlevel 1 (
-  echo ERROR: financial indicator step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [7/9] run_industry_order_volume.py (contract liab sum, THS, slow) ==========
-python run_industry_order_volume.py
-if errorlevel 1 (
-  echo ERROR: industry order volume step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [8/9] run_industry_contract_liab_yoy.py (contract liab YoY, THS, slow) ==========
-python run_industry_contract_liab_yoy.py
-if errorlevel 1 (
-  echo ERROR: industry contract liab yoy step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [9/9] run_industry_association_shipment.py (CPCA shipment YoY) ==========
-python run_industry_association_shipment.py
-if errorlevel 1 (
-  echo ERROR: industry association shipment step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [10/10] run_industry_fund_flow_derivative.py (industry fund flow derivatives) ==========
-python run_industry_fund_flow_derivative.py
-if errorlevel 1 (
-  echo ERROR: industry fund flow derivative step failed.
-  exit /b 1
-)
-
-echo.
-echo ========== [11/11] financial_sync/run_stock_financial_full.py (stock financial data) ==========
-cd /d "%ROOT%financial_sync"
-python run_stock_financial_full.py
-if errorlevel 1 (
-  echo ERROR: stock financial data step failed.
-  exit /b 1
-)
-cd /d "%IND%"
-
-echo.
-echo ========== [12/12] trading_day/run_trading_day.py (trading day dimension) ==========
-cd /d "%ROOT%trading_day"
-python run_trading_day.py
-if errorlevel 1 (
-  echo ERROR: trading day dimension step failed.
-  exit /b 1
-)
-cd /d "%IND%"
 
 echo.
 echo All batch jobs finished OK.

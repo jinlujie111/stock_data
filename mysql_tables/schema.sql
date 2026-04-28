@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS industry_fund_flow_di (
     top_stock_name VARCHAR(128) NULL COMMENT '领涨股名称',
     top_stock_change_pct DECIMAL(20, 6) NULL COMMENT '领涨股涨跌幅(%)',
     current_price DECIMAL(20, 6) NULL COMMENT '当前价(即时口径可用)',
-    industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：东财板块日K折算；同花顺源无此列时按板块名匹配东财',
+    industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：从 ths_industry_di 表的 amount 字段获取，单位为亿元（源数据为万元）',
     raw_json JSON NOT NULL COMMENT '原始数据JSON',
     created_at DATETIME NOT NULL COMMENT '创建时间',
     updated_at DATETIME NOT NULL COMMENT '更新时间',
@@ -433,3 +433,37 @@ CREATE TABLE IF NOT EXISTS trading_day_di (
     updated_at DATETIME NOT NULL COMMENT '更新时间',
     UNIQUE KEY uniq_trade_date (trade_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
+
+-- ============================================================================
+-- 【同花顺行业数据】计算方法（表 ths_industry_di）
+-- 实现脚本：industry_indicator/ths_industry_etl.py
+--
+-- 1) 行业代码（industry_code）
+--    说明：如果同花顺API返回行业代码则使用，否则生成THS_开头的行业代码
+--
+-- 2) 行业名称（industry_name）
+--    说明：同花顺API返回的行业名称
+--
+-- 3) 成交量（volume）
+--    说明：同花顺API返回的行业成交量，单位为手
+--
+-- 4) 成交额（amount）
+--    说明：同花顺API返回的行业成交额，单位为万元
+--
+-- 5) 涨跌幅（change_pct）
+--    说明：同花顺API返回的行业涨跌幅，单位为%
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ths_industry_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
+    trade_date DATE NOT NULL COMMENT '数据日期',
+    industry_code VARCHAR(32) NOT NULL COMMENT '行业代码',
+    industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
+    volume DECIMAL(20, 2) NULL COMMENT '成交量（手）',
+    amount DECIMAL(20, 2) NULL COMMENT '成交额（万元）',
+    change_pct DECIMAL(10, 4) NULL COMMENT '涨跌幅（%）',
+    raw_json JSON NOT NULL COMMENT '原始数据JSON',
+    created_at DATETIME NOT NULL COMMENT '创建时间',
+    updated_at DATETIME NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uniq_ths_industry (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺行业数据日报';

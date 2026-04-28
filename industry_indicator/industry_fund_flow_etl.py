@@ -210,66 +210,72 @@ def _turnover_yi_from_df_row(row: pd.Series, colnames: Iterable[str]) -> float |
     return None
 
 
-def _build_ths_industry_turnover_yi_map() -> dict[str, float]:
-    """同花顺行业板块成交额 → 标准化板块名 -> 亿元。"""
+def _build_ths_industry_turnover_yi_map(conn, trade_date: str) -> dict[str, float]:
+    """从 ths_industry_di 表获取行业成交额 → 标准化板块名 -> 亿元。"""
     result: dict[str, float] = {}
     try:
-        LOG.info("开始从同花顺获取行业板块成交额数据")
+        LOG.info("开始从 ths_industry_di 表获取行业成交额数据")
         
-        # 获取同花顺行业板块汇总数据
-        summary_df = ak.stock_board_industry_summary_ths()
-        if summary_df is None or summary_df.empty:
-            LOG.warning("无法获取同花顺行业板块汇总数据")
+        # 从数据库中查询 ths_industry_di 表的行业成交额数据
+        sql = """
+        SELECT industry_name, amount 
+        FROM ths_industry_di 
+        WHERE trade_date = %s
+        """
+        
+        with conn.cursor() as cursor:
+            cursor.execute(sql, (trade_date,))
+            rows = cursor.fetchall()
+        
+        if not rows:
+            LOG.warning("ths_industry_di 表中没有 %s 的行业成交额数据", trade_date)
             return result
         
-        LOG.info("成功获取同花顺行业板块汇总数据，共 %d 个行业", len(summary_df))
-        
-        # 检查列名
-        LOG.debug("行业板块汇总数据列名: %s", summary_df.columns)
+        LOG.info("成功从 ths_industry_di 表获取 %d 个行业的成交额数据", len(rows))
         
         # 遍历行业，获取成交额数据
         count = 0
-        for _, row in summary_df.iterrows():
-            industry_name = row.get("板块")
+        for row in rows:
+            industry_name, amount = row
             if not industry_name:
                 continue
             
             try:
-                LOG.debug("尝试获取行业 %s 的成交额数据", industry_name)
-                # 获取总成交额数据
-                turnover = _safe_float(row.get("总成交额"))
+                LOG.debug("处理行业 %s 的成交额数据", industry_name)
+                # 将万元转换为亿元
+                turnover = _safe_float(amount)
                 if turnover is not None:
-                    # 转换为亿元（数据单位是亿元）
-                    result[_norm_name(industry_name)] = turnover
+                    # 转换为亿元（数据单位是万元）
+                    result[_norm_name(industry_name)] = turnover / 10000  # 万元转亿元
                     count += 1
-                    LOG.debug("成功获取行业 %s 的成交额数据: %.2f 亿元", industry_name, turnover)
+                    LOG.debug("成功处理行业 %s 的成交额数据: %.2f 亿元", industry_name, turnover / 10000)
                 else:
                     LOG.debug("行业 %s 没有成交额数据", industry_name)
             except Exception as exc:  # noqa: BLE001
-                LOG.debug("获取行业 %s 成交额失败: %s", industry_name, exc)
+                LOG.debug("处理行业 %s 成交额失败: %s", industry_name, exc)
                 continue
         
-        LOG.info("成功获取 %d 个行业的成交额数据", count)
+        LOG.info("成功处理 %d 个行业的成交额数据", count)
     except Exception as exc:  # noqa: BLE001
-        LOG.warning("获取同花顺行业板块成交额数据失败: %s", exc)
+        LOG.warning("从 ths_industry_di 表获取行业成交额数据失败: %s", exc)
     
     return result
 
 
-def _build_em_industry_turnover_yi_map(trade_date: str) -> dict[str, float]:
+def _build_em_industry_turnover_yi_map(conn, trade_date: str) -> dict[str, float]:
     """东财行业板块日 K 当日成交额 → 标准化板块名 -> 亿元（源数据为元）。"""
     result: dict[str, float] = {}
     try:
         LOG.info("开始获取东财行业板块日K成交额数据")
         
-        # 尝试从同花顺获取行业成交额数据
-        result = _build_ths_industry_turnover_yi_map()
+        # 尝试从 ths_industry_di 表获取行业成交额数据
+        result = _build_ths_industry_turnover_yi_map(conn, trade_date)
         if result:
-            LOG.info("成功从同花顺获取行业成交额数据")
+            LOG.info("成功从 ths_industry_di 表获取行业成交额数据")
             return result
         
-        # 如果无法从同花顺获取数据，使用资金流入数据估算
-        LOG.info("无法从同花顺获取行业成交额数据，将使用资金流入数据估算")
+        # 如果无法从 ths_industry_di 表获取数据，使用资金流入数据估算
+        LOG.info("无法从 ths_industry_di 表获取行业成交额数据，将使用资金流入数据估算")
         return result
         
         # 以下是原始的获取逻辑，暂时注释掉
@@ -486,7 +492,7 @@ def run(
     _ensure_table_columns(conn, table_name)
     industry_code_map = _build_industry_code_map()
     LOG.info("行业代码映射构建完成，共 %d 个行业", len(industry_code_map))
-    em_turnover_map = _build_em_industry_turnover_yi_map(run_date)
+    em_turnover_map = _build_em_industry_turnover_yi_map(conn, run_date)
     LOG.info("东财行业板块日K成交额映射构建完成，共 %d 个行业有成交额数据", len(em_turnover_map))
 
     total = 0
