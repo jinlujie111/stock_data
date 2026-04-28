@@ -1,0 +1,20 @@
+"""用途：统一 API 返回结构。"""
+from typing import Any, Generic, Optional, TypeVar
+
+from pydantic import BaseModel
+
+T = TypeVar("T")
+
+
+class ApiResponse(BaseModel, Generic[T]):
+    code: int = 0
+    message: str = "ok"
+    data: Optional[T] = None
+
+
+def ok(data: Any = None, message: str = "ok") -> dict:
+    return {"code": 0, "message": message, "data": data}
+
+
+def err(code: int, message: str, data: Any = None) -> dict:
+    return {"code": code, "message": message, "data": data}

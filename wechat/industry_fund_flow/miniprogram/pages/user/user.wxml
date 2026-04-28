@@ -1,0 +1,10 @@
+<view class="card" wx:if="{{user}}">
+  <view>昵称：{{user.nickname || '未设置'}}</view>
+  <view class="muted">VIP：{{user.is_vip ? '是' : '否'}}</view>
+  <view class="muted" wx:if="{{user.vip_expire_at}}">到期：{{user.vip_expire_at}}</view>
+  <button class="btn btn-danger" style="margin-top:24rpx;" bindtap="logout">退出</button>
+</view>
+<view wx:else class="card">
+  <button class="btn btn-primary" bindtap="mockLogin">模拟登录（dev_local_user）</button>
+  <view class="muted" style="margin-top:16rpx;">生产环境请使用 wx.login + code 交换 token</view>
+</view>

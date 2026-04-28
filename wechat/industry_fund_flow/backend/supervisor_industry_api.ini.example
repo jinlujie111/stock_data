@@ -1,0 +1,8 @@
+; 复制到 /etc/supervisor/conf.d/industry-api.conf
+[program:industry-api]
+directory=/opt/industry_fund_flow/backend
+command=/opt/industry_fund_flow/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/industry-api.err.log
+stdout_logfile=/var/log/industry-api.out.log

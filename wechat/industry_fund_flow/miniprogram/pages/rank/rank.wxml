@@ -1,0 +1,50 @@
+<view>
+  <view class="tab-bar">
+    <text class="tag {{tab===0?'tag-on':''}}" data-tab="0" bindtap="onChangeTab">净流入</text>
+    <text class="tag {{tab===1?'tag-on':''}}" data-tab="1" bindtap="onChangeTab">连续吸筹</text>
+    <text class="tag {{tab===2?'tag-on':''}}" data-tab="2" bindtap="onChangeTab">出货预警</text>
+  </view>
+
+  <view wx:if="{{tab===0}}" class="card">
+    <view
+      class="cell"
+      wx:for="{{inflow}}"
+      wx:key="industry_name"
+      data-name="{{item.industry_name}}"
+      bindtap="openDetail"
+    >
+      <view class="cell-row">
+        <text class="cell-title">{{item.industry_name}}</text>
+        <text class="cell-value">{{item.main_net_inflow}} ›</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{tab===1}}" class="card">
+    <view
+      class="cell"
+      wx:for="{{acc}}"
+      wx:key="industry_name"
+      data-name="{{item.industry_name}}"
+      bindtap="openDetail"
+    >
+      <view class="cell-row">
+        <text class="cell-title">{{item.industry_name}}</text>
+        <text class="cell-value">{{item.main_net_inflow}} ›</text>
+      </view>
+      <view class="cell-label">连续{{item.streak_days}}日净流入</view>
+    </view>
+  </view>
+
+  <view wx:if="{{tab===2}}" class="card">
+    <view class="cell" wx:for="{{exit}}" wx:key="industry_name">
+      <view class="cell-row">
+        <text class="cell-title">{{item.industry_name}}</text>
+        <text class="cell-value">{{item.main_net_inflow}}</text>
+      </view>
+      <view class="cell-label">{{item.reason}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-wrap">加载中…</view>
+</view>

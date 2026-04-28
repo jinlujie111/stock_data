@@ -1,0 +1,27 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/rank/rank",
+    "pages/detail/detail",
+    "pages/vip/vip",
+    "pages/user/user"
+  ],
+  "window": {
+    "navigationBarTitleText": "主力资金监控",
+    "navigationBarBackgroundColor": "#0b1220",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0b1220"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "tabBar": {
+    "color": "#8fa3bf",
+    "selectedColor": "#4fd1c5",
+    "backgroundColor": "#0b1220",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "概览" },
+      { "pagePath": "pages/rank/rank", "text": "榜单" },
+      { "pagePath": "pages/user/user", "text": "我的" }
+    ]
+  }
+}

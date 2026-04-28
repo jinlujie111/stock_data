@@ -40,6 +40,69 @@ CREATE TABLE IF NOT EXISTS industry_fund_flow_di (
     UNIQUE KEY uniq_industry_fund_flow (trade_date, period_type, industry_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流日报';
 
+-- ============================================================================
+-- 【市场日度快照】market_daily_di — 小程序/API 仪表盘：总成交额、涨跌家数、风险提示
+-- 写入：wechat 后端定时任务 market_snapshot_job；或手工 INSERT
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS market_daily_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date DATE NOT NULL,
+    total_turnover_yi DECIMAL(20, 4) NULL COMMENT 'A股总成交额(亿元，口径可配置)',
+    sh_up INT NULL,
+    sh_down INT NULL,
+    sz_up INT NULL,
+    sz_down INT NULL,
+    up_count INT NULL COMMENT '上涨家数合计',
+    down_count INT NULL COMMENT '下跌家数合计',
+    risk_note VARCHAR(512) NULL COMMENT '风险提示文案',
+    raw_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_mkt_date (trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='市场日度快照';
+
+-- ============================================================================
+-- 【行业评分与次日潜伏】industry_score_di — 评分引擎写入，供 /rank/latent 等接口
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS industry_score_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date DATE NOT NULL,
+    industry_name VARCHAR(128) NOT NULL,
+    industry_code VARCHAR(32) NULL,
+    score_rank_today DECIMAL(10, 6) NULL COMMENT '今日净流入排名得分0-100',
+    score_sum5 DECIMAL(10, 6) NULL COMMENT '5日累计净流入得分',
+    score_turnover_amp DECIMAL(10, 6) NULL COMMENT '成交额放大得分',
+    score_chg_strength DECIMAL(10, 6) NULL COMMENT '板块涨幅强度得分',
+    total_score DECIMAL(12, 6) NOT NULL COMMENT '加权总分',
+    latent_rank INT NULL COMMENT '潜伏榜名次',
+    risk_level VARCHAR(16) NULL COMMENT 'low/medium/high',
+    detail_json JSON NULL COMMENT '中间指标JSON',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_score (trade_date, industry_name),
+    KEY idx_score_trade_latent (trade_date, latent_rank),
+    KEY idx_score_total (trade_date, total_score)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业评分与潜伏';
+
+-- ============================================================================
+-- 【行业股票池】stock_pool_di — 行业详情龙头股列表（可选；无数据时接口用资金流领涨股占位）
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS stock_pool_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date DATE NOT NULL,
+    industry_name VARCHAR(128) NOT NULL,
+    stock_code VARCHAR(16) NOT NULL COMMENT '6位代码',
+    stock_name VARCHAR(64) NULL,
+    role_type VARCHAR(32) NOT NULL DEFAULT 'leader' COMMENT 'leader/weight/sample',
+    weight DECIMAL(10, 6) NULL COMMENT '权重或排序分',
+    change_pct DECIMAL(20, 6) NULL,
+    main_net_inflow DECIMAL(20, 6) NULL COMMENT '亿元',
+    raw_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_pool (trade_date, industry_name, stock_code, role_type),
+    KEY idx_pool_ind (trade_date, industry_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业股票池/龙头';
+
 CREATE TABLE IF NOT EXISTS stock_fund_flow_di (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
     trade_date DATE NOT NULL COMMENT '数据日期(入库业务日)',

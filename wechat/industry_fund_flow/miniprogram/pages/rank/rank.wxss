@@ -1,0 +1,6 @@
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  padding: 16rpx 24rpx;
+}

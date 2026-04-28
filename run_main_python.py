@@ -40,10 +40,13 @@ def run_industry_sw_universe(trade_date=None):
         user=cfg.MYSQL_USER,
         password=cfg.MYSQL_PASSWORD,
         database=cfg.MYSQL_DATABASE,
-        table_info=cfg.SW_INDUSTRY_INFO_TABLE,
-        table_constituent=cfg.SW_INDUSTRY_CONSTITUENT_TABLE,
-        levels=[1, 2, 3],
-        trade_date=trade_date
+        info_table=cfg.SW_INDUSTRY_INFO_TABLE,
+        cons_table=cfg.SW_INDUSTRY_CONSTITUENT_TABLE,
+        trade_date=trade_date,
+        levels={1, 2, 3},
+        sleep_seconds=0.15,
+        max_industries=None,
+        skip_constituents=False,
     )
     LOG.info("行业申万数据任务执行完成")
 
