@@ -7,8 +7,10 @@
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
+import os
+import time
+from datetime import date, datetime, timedelta
+from typing import Dict, List
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -20,11 +22,15 @@ try:
         _build_industry_code_map,
         _norm_name,
     )
+    from industry_indicator.ths_index_line_fetch import (
+        fetch_stock_board_industry_index_ths,
+    )
 except ImportError:  # 直接运行本文件时
     from industry_fund_flow_etl import (  # type: ignore[no-redef]
         _build_industry_code_map,
         _norm_name,
     )
+    from ths_index_line_fetch import fetch_stock_board_industry_index_ths  # type: ignore[no-redef]
 
 # 配置日志
 logging.basicConfig(
@@ -32,6 +38,28 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 LOG = logging.getLogger(__name__)
+
+# 与 history_data/ths_industry_history_backfill 一致：指数 K 成交额(元)、成交量(手)，保持原始单位。
+# 设为 0/false/no 时仅用板块一览表（较快，但与历史回填口径可能差两个数量级以上）。
+_USE_INDEX_K_FOR_OI = os.environ.get("THS_INDUSTRY_USE_INDEX_K", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
+
+
+def _volume_hand_to_wanshou(vol_hand: object) -> float | None:
+    if vol_hand is None or (isinstance(vol_hand, float) and pd.isna(vol_hand)):
+        return None
+    # 保持原始单位（手），不再转换为万手
+    return round(float(vol_hand), 2)
+
+
+def _amount_yuan_to_wan(yuan: object) -> float | None:
+    if yuan is None or (isinstance(yuan, float) and pd.isna(yuan)):
+        return None
+    # 保持原始单位（元），不再转换为万元
+    return round(float(yuan), 2)
 
 
 def _normalize_ths_industry_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -138,6 +166,93 @@ def _apply_ths_industry_code_by_name(df: pd.DataFrame) -> pd.DataFrame:
     return merged
 
 
+def _merge_index_k_volume_amount(df: pd.DataFrame, trade_date: str) -> pd.DataFrame:
+    """用行业指数日 K 覆盖「成交量」「成交额」，与历史回填脚本同一接口、保持原始单位。
+
+    说明：ak.stock_board_industry_index_ths 内部用 ``big_df[start_date:end_date]`` 做切片；
+    若 start_date 与 end_date 同为单日（如均为 20260429），在部分 pandas/数据源下会得到空表，
+    导致仍保留板块一览表数值（总成交量多为「万手」、量级约几千），与回填用的指数 K（手、量级约几十万）差两个数量级。
+    因此这里改为：从当年 1 月 1 日拉到 trade_date，再在本地取目标交易日一行。
+    """
+    if df is None or df.empty or "行业名称" not in df.columns:
+        return df
+    td = datetime.strptime(trade_date.strip(), "%Y-%m-%d").date()
+    year_start = date(td.year, 1, 1)
+    start_d = year_start
+    # 当年最初几个交易日：仅用年初单日切片仍可能为空，向前多取一段日历日
+    if (td - year_start).days < 7:
+        start_d = td - timedelta(days=14)
+    start_s = start_d.strftime("%Y%m%d")
+    end_s = td.strftime("%Y%m%d")
+    out = df.copy()
+    for col in ("成交量", "成交额"):
+        if col not in out.columns:
+            out[col] = pd.NA
+
+    ok = 0
+    miss = 0
+    for idx in out.index:
+        raw_name = out.at[idx, "行业名称"]
+        if raw_name is None or (isinstance(raw_name, float) and pd.isna(raw_name)):
+            miss += 1
+            continue
+        sym = str(raw_name).strip()
+        if not sym:
+            miss += 1
+            continue
+        try:
+            hist = fetch_stock_board_industry_index_ths(
+                symbol=sym,
+                start_date=start_s,
+                end_date=end_s,
+            )
+        except Exception as exc:  # noqa: BLE001
+            LOG.debug("指数 K 拉取失败 %s: %s", sym, exc)
+            miss += 1
+            time.sleep(0.05)
+            continue
+        if hist is None or hist.empty:
+            miss += 1
+            time.sleep(0.05)
+            continue
+        if isinstance(hist.index, pd.DatetimeIndex):
+            hist = hist.reset_index()
+        if "日期" not in hist.columns:
+            miss += 1
+            time.sleep(0.05)
+            continue
+        hist["_d"] = pd.to_datetime(hist["日期"], errors="coerce").dt.date
+        sub = hist[hist["_d"] == td]
+        if sub.empty:
+            miss += 1
+            time.sleep(0.05)
+            continue
+        row = sub.iloc[-1]
+        vh = pd.to_numeric(row.get("成交量"), errors="coerce")
+        ay = pd.to_numeric(row.get("成交额"), errors="coerce")
+        vol_db = _volume_hand_to_wanshou(vh)
+        amt_db = _amount_yuan_to_wan(ay)
+        patched = False
+        if vol_db is not None:
+            out.at[idx, "成交量"] = vol_db
+            patched = True
+        if amt_db is not None:
+            out.at[idx, "成交额"] = amt_db
+            patched = True
+        if patched:
+            ok += 1
+        else:
+            miss += 1
+        time.sleep(0.05)
+
+    LOG.info(
+        "指数 K 覆盖成交量/成交额（与历史回填一致，保持原始单位）: 成功 %s 条，未覆盖 %s 条",
+        ok,
+        miss,
+    )
+    return out
+
+
 class THSIndustryETL:
     """同花顺行业数据ETL类"""
 
@@ -164,8 +279,8 @@ class THSIndustryETL:
                     trade_date DATE NOT NULL COMMENT '数据日期',
                     industry_code VARCHAR(32) NOT NULL COMMENT '行业代码',
                     industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
-                    volume DECIMAL(20, 2) NULL COMMENT '成交量（手）',
-                    amount DECIMAL(20, 2) NULL COMMENT '成交额（万元）',
+                    volume DECIMAL(20, 2) NULL COMMENT '成交量（手），与指数 K 一致',
+                    amount DECIMAL(20, 2) NULL COMMENT '成交额（元）',
                     change_pct DECIMAL(10, 4) NULL COMMENT '涨跌幅（%）',
                     raw_json JSON NOT NULL COMMENT '原始数据JSON',
                     created_at DATETIME NOT NULL COMMENT '创建时间',
@@ -174,7 +289,25 @@ class THSIndustryETL:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺行业数据日报';
             """))
             conn.commit()
+            self._drop_level_columns_if_exist(conn)
         LOG.info("同花顺行业数据表创建成功")
+
+    def _drop_level_columns_if_exist(self, conn) -> None:
+        """曾有一级~三级行业列的旧表，升级时删除。"""
+        legacy = (
+            "industry_l1_code",
+            "industry_l1_name",
+            "industry_l2_code",
+            "industry_l2_name",
+            "industry_l3_code",
+            "industry_l3_name",
+        )
+        res = conn.execute(text("SHOW COLUMNS FROM ths_industry_di"))
+        existing = {row[0] for row in res.fetchall()}
+        for col in legacy:
+            if col in existing:
+                conn.execute(text(f"ALTER TABLE ths_industry_di DROP COLUMN `{col}`"))
+        conn.commit()
 
     def get_ths_industry_data(self, trade_date: str) -> pd.DataFrame:
         """获取同花顺行业数据
@@ -232,6 +365,10 @@ class THSIndustryETL:
                 for col in ["成交量", "成交额", "涨跌幅"]:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors="coerce")
+
+                # 板块一览表「总成交额」与行业指数 K「成交额」口径不同；与历史回填对齐须用指数 K（略慢）
+                if _USE_INDEX_K_FOR_OI:
+                    df = _merge_index_k_volume_amount(df, trade_date)
                 
                 return df
             else:
@@ -242,7 +379,7 @@ class THSIndustryETL:
             LOG.error(f"获取同花顺行业数据失败：{e}")
             return pd.DataFrame()
 
-    def process_data(self, df: pd.DataFrame, trade_date: str) -> List[Dict[str, Any]]:
+    def process_data(self, df: pd.DataFrame, trade_date: str) -> List[Dict[str, object]]:
         """处理数据
         
         Args:
@@ -256,10 +393,12 @@ class THSIndustryETL:
         
         if df is not None and not df.empty:
             for _, row in df.iterrows():
+                icode = _normalize_industry_code_cell(row.get("行业代码", ""))
+                iname = row.get("行业名称", "")
                 record = {
                     "trade_date": trade_date,
-                    "industry_code": _normalize_industry_code_cell(row.get("行业代码", "")),
-                    "industry_name": row.get("行业名称", ""),
+                    "industry_code": icode,
+                    "industry_name": iname,
                     "volume": row.get("成交量", None),
                     "amount": row.get("成交额", None),
                     "change_pct": row.get("涨跌幅", None),
@@ -271,7 +410,7 @@ class THSIndustryETL:
         
         return records
 
-    def save_data(self, records: List[Dict[str, Any]], trade_date: str):
+    def save_data(self, records: List[Dict[str, object]], trade_date: str):
         """保存数据到数据库
         
         Args:
@@ -312,12 +451,10 @@ class THSIndustryETL:
         """运行ETL流程
         
         Args:
-            trade_date: 交易日期，格式为"YYYY-MM-DD"，默认使用前一个交易日
+            trade_date: 入库业务日期，格式为 "YYYY-MM-DD"；不传则使用当天（本地日历日）
         """
-        # 如果没有指定日期，使用前一个交易日
         if not trade_date:
-            today = datetime.now()
-            trade_date = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+            trade_date = datetime.now().strftime("%Y-%m-%d")
         
         LOG.info(f"开始运行同花顺行业数据ETL，日期：{trade_date}")
         

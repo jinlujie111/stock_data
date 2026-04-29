@@ -508,10 +508,10 @@ CREATE TABLE IF NOT EXISTS trading_day_di (
 --    说明：同花顺API返回的行业名称
 --
 -- 3) 成交量（volume）
---    说明：同花顺API返回的行业成交量，单位为手
+--    说明：行业指数日 K 成交量（手）÷10000 存万手；与板块一览表「总成交量」非同一路径
 --
 -- 4) 成交额（amount）
---    说明：同花顺API返回的行业成交额，单位为万元
+--    说明：行业指数日 K 成交额（元）÷10000 存万元；与板块一览表「总成交额」非同一路径
 --
 -- 5) 涨跌幅（change_pct）
 --    说明：同花顺API返回的行业涨跌幅，单位为%
@@ -522,7 +522,7 @@ CREATE TABLE IF NOT EXISTS ths_industry_di (
     trade_date DATE NOT NULL COMMENT '数据日期',
     industry_code VARCHAR(32) NOT NULL COMMENT '行业代码',
     industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
-    volume DECIMAL(20, 2) NULL COMMENT '成交量（手）',
+    volume DECIMAL(20, 2) NULL COMMENT '成交量（万手），与行业指数 K 线一致',
     amount DECIMAL(20, 2) NULL COMMENT '成交额（万元）',
     change_pct DECIMAL(10, 4) NULL COMMENT '涨跌幅（%）',
     raw_json JSON NOT NULL COMMENT '原始数据JSON',

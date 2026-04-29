@@ -223,7 +223,16 @@ def run(
     run_date = trade_date or datetime.now().strftime("%Y-%m-%d")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    df = fetcher()
+    try:
+        df = fetcher()
+    except Exception as exc:  # noqa: BLE001 — 乐咕 504/改版等导致 akshare 解析失败
+        LOG.warning(
+            "申万行业估值抓取失败（站点不可用或页面与 akshare 不匹配）: level=%s %s, %s",
+            level,
+            rank_desc,
+            exc,
+        )
+        return 0
     if df is None or df.empty:
         LOG.warning("申万行业估值接口返回空: level=%s", level)
         return 0
