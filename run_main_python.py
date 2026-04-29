@@ -344,13 +344,13 @@ def main():
         ## 有问题 run_industry_fund_flow_derivative(trade_date)
         
         # 11. 个股财务数据
-        run_stock_financial_full()
+        # run_stock_financial_full()
         
         # 12. 交易日维度
-        ## 无问题 run_trading_day()
+        run_trading_day()
         
         # 13. 同花顺行业数据
-        ## 无问题 run_ths_industry()
+        run_ths_industry()
         
         LOG.info("所有数据处理任务执行完成")
         
