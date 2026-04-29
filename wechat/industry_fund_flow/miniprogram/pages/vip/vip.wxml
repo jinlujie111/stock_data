@@ -1,7 +1,0 @@
-<view class="card">
-  <view style="font-size:36rpx;font-weight:700;">主力资金监控 VIP</view>
-  <view class="muted" style="margin-top:12rpx;">解锁完整榜单、次日潜伏 TOP5、评分拆解</view>
-  <view style="margin-top:32rpx;">
-    <button class="btn btn-primary" bindtap="buy">开通会员（待接入支付）</button>
-  </view>
-</view>

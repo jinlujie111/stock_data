@@ -1,7 +1,5 @@
-<view class="card" wx:if="{{user}}">
+<view class="card" wx:if="{{user && user.logged_in}}">
   <view>昵称：{{user.nickname || '未设置'}}</view>
-  <view class="muted">VIP：{{user.is_vip ? '是' : '否'}}</view>
-  <view class="muted" wx:if="{{user.vip_expire_at}}">到期：{{user.vip_expire_at}}</view>
   <button class="btn btn-danger" style="margin-top:24rpx;" bindtap="logout">退出</button>
 </view>
 <view wx:else class="card">

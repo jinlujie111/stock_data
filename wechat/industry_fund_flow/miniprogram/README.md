@@ -1,6 +1,6 @@
 # 小程序说明
 
-当前界面已改为 **微信原生组件 + app.wxss**，**无需** `npm install` / **构建 npm**，导入项目即可预览。
+- **板块资金流**（`pages/flow/flow`）：左侧「概览 / 榜单」，右侧内容；**无需** npm 构建即可预览。
 
 若日后重新接入 Vant：安装 `@vant/weapp` 后在开发者工具 **工具 → 构建 npm**，并在 `app.json` 配置 `usingComponents`。
 

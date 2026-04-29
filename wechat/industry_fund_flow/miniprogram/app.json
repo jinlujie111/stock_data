@@ -1,9 +1,7 @@
 {
   "pages": [
-    "pages/index/index",
-    "pages/rank/rank",
+    "pages/flow/flow",
     "pages/detail/detail",
-    "pages/vip/vip",
     "pages/user/user"
   ],
   "window": {
@@ -19,8 +17,7 @@
     "selectedColor": "#4fd1c5",
     "backgroundColor": "#0b1220",
     "list": [
-      { "pagePath": "pages/index/index", "text": "概览" },
-      { "pagePath": "pages/rank/rank", "text": "榜单" },
+      { "pagePath": "pages/flow/flow", "text": "板块资金流" },
       { "pagePath": "pages/user/user", "text": "我的" }
     ]
   }

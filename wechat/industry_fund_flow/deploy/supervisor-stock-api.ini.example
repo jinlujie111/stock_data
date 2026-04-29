@@ -1,0 +1,13 @@
+; 复制到 /etc/supervisor/conf.d/stock-api.conf
+; 将 /opt/stock_data 换为你服务器上实际路径
+
+[program:stock-api]
+directory=/opt/stock_data/wechat/industry_fund_flow/backend
+command=/opt/stock_data/wechat/industry_fund_flow/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+user=www-data
+autostart=true
+autorestart=true
+startsecs=3
+stderr_logfile=/var/log/stock-api.err.log
+stdout_logfile=/var/log/stock-api.out.log
+environment=PATH="/opt/stock_data/wechat/industry_fund_flow/backend/.venv/bin"

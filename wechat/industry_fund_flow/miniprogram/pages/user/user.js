@@ -4,7 +4,7 @@ const app = getApp()
 Page({
   data: { user: null },
   onShow() {
-    if (app.globalData.token) this.profile()
+    this.profile()
   },
   mockLogin() {
     wx.login({

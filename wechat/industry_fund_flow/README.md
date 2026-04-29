@@ -15,6 +15,7 @@
 | `docs/DEPLOY.md` | 通用部署说明 |
 | `docs/DEPLOY_ALIYUN.md` | **阿里云 ECS** 一步步部署（推荐） |
 | `deploy/*.example` | Nginx / Supervisor 配置模板 |
+| **`tables_metrics/README.md`** | **MySQL 使用表清单 + 各指标计算口径（必读维护）** |
 
 ## 本地运行后端
 

@@ -1,4 +1,4 @@
-"""用途：排行榜 — 主力净流入、连续吸筹、出货、潜伏（VIP）。"""
+"""用途：排行榜 — 主力净流入、连续吸筹、出货、潜伏。"""
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
@@ -6,8 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.core.responses import ok
 from app.database import get_db
-from app.models.orm import User
-from app.deps import get_current_user
 from app.services import industry_query
 from app.services import insight_service
 
@@ -20,16 +18,12 @@ def rank_inflow(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
 ):
     td = trade_date or industry_query.latest_trade_date(db)
     if not td:
         return ok({"items": [], "total": 0})
     rows = industry_query.fund_flow_day(db, td)
     total = len(rows)
-    if user is None or not _is_vip(user):
-        rows = rows[:3]
-        total = min(total, 3)
     start = (page - 1) * page_size
     slice_rows = rows[start : start + page_size]
     return ok({"trade_date": str(td), "items": slice_rows, "total": total, "page": page})
@@ -64,28 +58,24 @@ def rank_exit(
 def rank_latent(
     trade_date: date | None = Query(None),
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
 ):
-    """次日潜伏 TOP5：VIP 看满额；免费仅前 3 条可见详情（客户端再遮罩）。"""
+    """次日潜伏 TOP5（全量）。数据来自 **industry_score_di**，由 **score_engine** 日终任务写入；非 industry_fund_flow_di 直出。"""
     td = trade_date or industry_query.latest_trade_date(db)
     if not td:
-        return ok([])
+        return ok(
+            {
+                "trade_date": None,
+                "items": [],
+                "hint": "库内尚无 industry_fund_flow_di 可用交易日，无法生成潜伏榜。",
+            }
+        )
     rows = industry_query.latent_scores(db, td, limit=10)
-    vip = user is not None and _is_vip(user)
-    top = rows[:5] if vip else rows[:3]
-    return ok(
-        {
-            "trade_date": str(td),
-            "vip": vip,
-            "items": top,
-            "hint": None if vip else "开通VIP解锁TOP5与完整评分拆解",
-        }
-    )
-
-
-def _is_vip(user: User) -> bool:
-    from datetime import datetime
-
-    return bool(
-        user.is_vip == 1 and user.vip_expire_at and user.vip_expire_at > datetime.utcnow()
-    )
+    top = rows[:5]
+    hint = None
+    if not top:
+        hint = (
+            "当日 industry_score_di 无数据。需先跑评分："
+            "日终任务 job_daily_pipeline（默认 15:10）或手动 score_engine.compute_and_persist(当日)。"
+            "表未创建时也会为空。"
+        )
+    return ok({"trade_date": str(td), "items": top, "hint": hint})

@@ -14,6 +14,20 @@ from app.services import industry_query
 router = APIRouter(prefix="/industry", tags=["industry"])
 
 
+@router.get("/list-names")
+def industry_list_names(
+    trade_date: date | None = Query(None, description="业务日；缺省为库内最新交易日"),
+    db: Session = Depends(get_db),
+):
+    """当日「即时」口径行业名称列表（供小程序筛选），顺序与资金流入排序一致。"""
+    td = trade_date or industry_query.latest_trade_date(db)
+    if not td:
+        return ok({"trade_date": None, "names": []})
+    rows = industry_query.fund_flow_day(db, td)
+    names = [str(r["industry_name"]) for r in rows if r.get("industry_name")]
+    return ok({"trade_date": str(td), "names": names})
+
+
 @router.get("/{name}/detail")
 def industry_detail(
     name: str,
