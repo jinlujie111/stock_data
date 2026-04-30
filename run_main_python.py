@@ -316,9 +316,6 @@ def main():
         # 1. 行业申万数据
         ## 有问题 run_industry_sw_universe(trade_date)
         
-        # 2. 行业资金流
-        ## 无问题 run_industry_fund_flow(trade_date)
-        
         # 3. 个股资金流
         ## 无问题 run_stock_fund_flow(trade_date)
         
@@ -351,6 +348,9 @@ def main():
         
         # 13. 同花顺行业数据
         run_ths_industry()
+
+        # 2. 行业资金流
+        #run_industry_fund_flow(trade_date)
         
         LOG.info("所有数据处理任务执行完成")
         

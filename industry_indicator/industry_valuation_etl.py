@@ -311,3 +311,6 @@ if __name__ == "__main__":
             trade_date=args.trade_date,
         )
     LOG.info("任务结束，合计写入/更新 %s 行", total)
+
+
+###python3.11 industry_fund_flow_etl.py --start-date 2026-04-01 --end-date 2026-04-02

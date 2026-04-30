@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Iterable
+from typing import Any, Iterable
 
 import akshare as ak
 import pandas as pd
@@ -532,14 +532,86 @@ def _date_cell_to_iso(val: object) -> str:
     return s[:10] if len(s) >= 10 else s
 
 
-def _em_sector_name_to_code() -> dict[str, str]:
-    try:
-        from akshare.stock.stock_fund_em import _get_stock_sector_fund_flow_summary_code
+def _em_primary_em_sector_map_with_retry(
+    max_attempts: int = 5,
+    base_delay: float = 1.5,
+) -> dict[str, str]:
+    """
+    东财 push2 行业资金流汇总列表（与 AkShare stock_sector_fund_flow_hist 内部一致），带重试。
+    """
+    import akshare.stock.stock_fund_em as em_mod
 
-        return dict(_get_stock_sector_fund_flow_summary_code())
-    except Exception as exc:  # noqa: BLE001
-        LOG.warning("获取东财行业名称-代码映射失败: %s", exc)
-        return {}
+    orig = em_mod._get_stock_sector_fund_flow_summary_code
+    last_err: Exception | None = None
+    for attempt in range(max_attempts):
+        try:
+            if hasattr(orig, "cache_clear"):
+                orig.cache_clear()
+        except (AttributeError, TypeError):
+            pass
+        try:
+            m = dict(orig())
+            if not m:
+                raise ValueError("东财行业映射为空")
+            return m
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            if attempt < max_attempts - 1:
+                delay = base_delay * (2**attempt)
+                LOG.warning(
+                    "获取东财行业名称-代码映射失败 (%s/%s): %s，%.1fs 后重试",
+                    attempt + 1,
+                    max_attempts,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+    LOG.warning("获取东财行业名称-代码映射失败: %s", last_err)
+    return {}
+
+
+def _em_fallback_em_sector_map_with_retry(
+    max_attempts: int = 5,
+    base_delay: float = 1.5,
+) -> dict[str, str]:
+    """
+    主列表接口不稳定时的回退：东财「行业板块名称」列表（17.push2，与主接口不同域名）。
+    """
+    last_err: Exception | None = None
+    for attempt in range(max_attempts):
+        try:
+            df = ak.stock_board_industry_name_em()
+            if df is None or df.empty:
+                raise ValueError("东财行业板块名称列表为空")
+            m = dict(
+                zip(
+                    df["板块名称"].astype(str).str.strip(),
+                    df["板块代码"].astype(str).str.strip(),
+                )
+            )
+            m = {k: v for k, v in m.items() if k}
+            if not m:
+                raise ValueError("东财行业板块映射为空")
+            return m
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            if attempt < max_attempts - 1:
+                delay = base_delay * (2**attempt)
+                LOG.warning(
+                    "东财板块名称列表回退失败 (%s/%s): %s，%.1fs 后重试",
+                    attempt + 1,
+                    max_attempts,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+    LOG.warning("东财板块名称列表回退失败: %s", last_err)
+    return {}
+
+
+def _em_sector_name_to_code() -> dict[str, str]:
+    """兼容旧名：仅主接口（含重试），无列表回退。"""
+    return _em_primary_em_sector_map_with_retry()
 
 
 def run_historical_em_range(
@@ -575,113 +647,134 @@ def run_historical_em_range(
     _create_table_if_not_exists(conn, table_name)
     _ensure_table_columns(conn, table_name)
 
-    code_map = _em_sector_name_to_code()
+    code_map = _em_primary_em_sector_map_with_retry()
+    restore_em_get_code: Any = None
     if not code_map:
-        conn.close()
-        LOG.error("无法获取东财行业列表，终止历史回填。")
-        return 0
+        import akshare.stock.stock_fund_em as em_mod
+
+        fb = _em_fallback_em_sector_map_with_retry()
+        if not fb:
+            conn.close()
+            LOG.error("无法获取东财行业列表（主接口与板块名称回退均失败），终止历史回填。")
+            return 0
+        restore_em_get_code = em_mod._get_stock_sector_fund_flow_summary_code
+        if hasattr(restore_em_get_code, "cache_clear"):
+            restore_em_get_code.cache_clear()
+        em_mod._get_stock_sector_fund_flow_summary_code = lambda m=fb: m  # noqa: E731
+        code_map = fb
+        LOG.info(
+            "已使用东财「行业板块名称」回退映射（共 %s 个行业），并已临时 patch AkShare 资金流映射函数",
+            len(code_map),
+        )
 
     # 行业名 -> 该行业在区间内的行（已过滤日期）
     pending: list[dict] = []
     names = list(code_map.keys())
-    for idx, name in enumerate(names):
-        if idx > 0 and sleep_seconds > 0:
-            time.sleep(sleep_seconds)
-        try:
-            df = ak.stock_sector_fund_flow_hist(symbol=name)
-        except Exception as exc:  # noqa: BLE001
-            LOG.warning("行业 %s 历史资金流抓取失败: %s", name, exc)
-            continue
-        if df is None or df.empty or "日期" not in df.columns:
-            continue
-        df = df.copy()
-        df["_d"] = pd.to_datetime(df["日期"], errors="coerce").dt.date
-        mask = (df["_d"] >= start_d) & (df["_d"] <= end_d)
-        sub = df.loc[mask]
-
-        turnover_by_date: dict[str, float] = {}
-        try:
-            kdf = ak.stock_board_industry_hist_em(
-                symbol=name,
-                start_date=start_compact,
-                end_date=end_compact,
-                period="日k",
-                adjust="",
-            )
-            if kdf is not None and not kdf.empty and "成交额" in kdf.columns:
-                kdf = kdf.copy()
-                kdf["_kd"] = pd.to_datetime(kdf["日期"], errors="coerce").dt.date
-                for _, kr in kdf.iterrows():
-                    kd = kr["_kd"]
-                    if not isinstance(kd, date) or kd < start_d or kd > end_d:
-                        continue
-                    kds = kd.strftime("%Y-%m-%d")
-                    v = _safe_float(kr.get("成交额"))
-                    if v is not None:
-                        turnover_by_date[kds] = v / 1e8
-        except Exception as exc:  # noqa: BLE001
-            LOG.debug("行业 %s 东财板块日K成交额(区间)失败: %s", name, exc)
-
-        for _, row in sub.iterrows():
-            d = row["_d"]
-            if not isinstance(d, date):
+    n = 0
+    try:
+        for idx, name in enumerate(names):
+            if idx > 0 and sleep_seconds > 0:
+                time.sleep(sleep_seconds)
+            try:
+                df = ak.stock_sector_fund_flow_hist(symbol=name)
+            except Exception as exc:  # noqa: BLE001
+                LOG.warning("行业 %s 历史资金流抓取失败: %s", name, exc)
                 continue
-            ds = d.strftime("%Y-%m-%d")
-            if allowed_trade_dates is not None and ds not in allowed_trade_dates:
+            if df is None or df.empty or "日期" not in df.columns:
                 continue
-            pending.append(
-                {
-                    "trade_date": ds,
-                    "industry_name": name,
-                    "industry_code": code_map.get(name),
-                    "row": row,
-                    "industry_turnover_yi": turnover_by_date.get(ds),
-                }
-            )
+            df = df.copy()
+            df["_d"] = pd.to_datetime(df["日期"], errors="coerce").dt.date
+            mask = (df["_d"] >= start_d) & (df["_d"] <= end_d)
+            sub = df.loc[mask]
 
-    by_day: dict[str, list[dict]] = defaultdict(list)
-    for item in pending:
-        by_day[item["trade_date"]].append(item)
-
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    all_tuples: list[tuple] = []
-
-    def _sort_key(it: dict) -> tuple:
-        row = it["row"]
-        m = _yuan_to_yi(row.get("主力净流入-净额"))
-        if m is None:
-            return (1, 0.0)
-        return (0, -m)
-
-    for ds in sorted(by_day.keys()):
-        items = sorted(by_day[ds], key=_sort_key)
-        for rank, it in enumerate(items, start=1):
-            row = it["row"]
-            raw = {k: (None if pd.isna(v) else v) for k, v in row.items()}
-            all_tuples.append(
-                (
-                    ds,
-                    EM_HIST_PERIOD_TYPE,
-                    rank,
-                    it["industry_code"],
-                    it["industry_name"],
-                    None,
-                    None,
-                    _yuan_to_yi(row.get("主力净流入-净额")),
-                    _yuan_to_yi(row.get("超大单净流入-净额")),
-                    _yuan_to_yi(row.get("大单净流入-净额")),
-                    None,
-                    None,
-                    None,
-                    None,
-                    it.get("industry_turnover_yi"),
-                    json.dumps(raw, ensure_ascii=False, default=str),
-                    now,
-                    now,
+            turnover_by_date: dict[str, float] = {}
+            try:
+                kdf = ak.stock_board_industry_hist_em(
+                    symbol=name,
+                    start_date=start_compact,
+                    end_date=end_compact,
+                    period="日k",
+                    adjust="",
                 )
-            )
+                if kdf is not None and not kdf.empty and "成交额" in kdf.columns:
+                    kdf = kdf.copy()
+                    kdf["_kd"] = pd.to_datetime(kdf["日期"], errors="coerce").dt.date
+                    for _, kr in kdf.iterrows():
+                        kd = kr["_kd"]
+                        if not isinstance(kd, date) or kd < start_d or kd > end_d:
+                            continue
+                        kds = kd.strftime("%Y-%m-%d")
+                        v = _safe_float(kr.get("成交额"))
+                        if v is not None:
+                            turnover_by_date[kds] = v / 1e8
+            except Exception as exc:  # noqa: BLE001
+                LOG.debug("行业 %s 东财板块日K成交额(区间)失败: %s", name, exc)
 
-    n = _upsert_rows(conn, table_name, all_tuples)
+            for _, row in sub.iterrows():
+                d = row["_d"]
+                if not isinstance(d, date):
+                    continue
+                ds = d.strftime("%Y-%m-%d")
+                if allowed_trade_dates is not None and ds not in allowed_trade_dates:
+                    continue
+                pending.append(
+                    {
+                        "trade_date": ds,
+                        "industry_name": name,
+                        "industry_code": code_map.get(name),
+                        "row": row,
+                        "industry_turnover_yi": turnover_by_date.get(ds),
+                    }
+                )
+
+        by_day: dict[str, list[dict]] = defaultdict(list)
+        for item in pending:
+            by_day[item["trade_date"]].append(item)
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        all_tuples: list[tuple] = []
+
+        def _sort_key(it: dict) -> tuple:
+            row = it["row"]
+            m = _yuan_to_yi(row.get("主力净流入-净额"))
+            if m is None:
+                return (1, 0.0)
+            return (0, -m)
+
+        for ds in sorted(by_day.keys()):
+            items = sorted(by_day[ds], key=_sort_key)
+            for rank, it in enumerate(items, start=1):
+                row = it["row"]
+                raw = {k: (None if pd.isna(v) else v) for k, v in row.items()}
+                all_tuples.append(
+                    (
+                        ds,
+                        EM_HIST_PERIOD_TYPE,
+                        rank,
+                        it["industry_code"],
+                        it["industry_name"],
+                        None,
+                        None,
+                        _yuan_to_yi(row.get("主力净流入-净额")),
+                        _yuan_to_yi(row.get("超大单净流入-净额")),
+                        _yuan_to_yi(row.get("大单净流入-净额")),
+                        None,
+                        None,
+                        None,
+                        None,
+                        it.get("industry_turnover_yi"),
+                        json.dumps(raw, ensure_ascii=False, default=str),
+                        now,
+                        now,
+                    )
+                )
+
+        n = _upsert_rows(conn, table_name, all_tuples)
+    finally:
+        if restore_em_get_code is not None:
+            import akshare.stock.stock_fund_em as em_mod
+
+            em_mod._get_stock_sector_fund_flow_summary_code = restore_em_get_code
     conn.close()
     LOG.info(
         "东财历史日 K 回填完成：区间 %s ~ %s，共 %s 行（period_type=%s）",
@@ -767,6 +860,14 @@ def sync_trade_cal_to_mysql(start_compact: str, end_compact: str) -> int:
     return len(df)
 
 
+def _compact_to_iso_date(compact: str) -> str:
+    """YYYYMMDD -> YYYY-MM-DD。"""
+    c = compact.strip()
+    if len(c) == 8 and c.isdigit():
+        return f"{c[:4]}-{c[4:6]}-{c[6:8]}"
+    return compact[:10] if len(compact) >= 10 else compact
+
+
 def _fetch_trade_dates_from_db(
     host: str,
     port: int,
@@ -776,7 +877,9 @@ def _fetch_trade_dates_from_db(
     start_compact: str,
     end_compact: str,
 ) -> list[str]:
-    """从 trade_cal 读取交易日(YYYY-MM-DD)；失败或空表返回空列表。"""
+    """从 trading_day_di 读取交易日(YYYY-MM-DD)；失败或空表返回空列表。"""
+    start_iso = _compact_to_iso_date(start_compact)
+    end_iso = _compact_to_iso_date(end_compact)
     try:
         conn = pymysql.connect(
             host=host,
@@ -789,11 +892,12 @@ def _fetch_trade_dates_from_db(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT cal_date FROM trade_cal
-                WHERE is_open = '1' AND cal_date >= %s AND cal_date <= %s
-                ORDER BY cal_date
+                SELECT trade_date FROM trading_day_di
+                WHERE is_trading_day = 1
+                  AND trade_date >= %s AND trade_date <= %s
+                ORDER BY trade_date
                 """,
-                (start_compact, end_compact),
+                (start_iso, end_iso),
             )
             rows = cur.fetchall()
         conn.close()
@@ -804,7 +908,7 @@ def _fetch_trade_dates_from_db(
                 out.append(iso)
         return out
     except Exception as exc:  # noqa: BLE001
-        LOG.warning("无法从 trade_cal 读取交易日: %s", exc)
+        LOG.warning("无法从 trading_day_di 读取交易日: %s", exc)
         return []
 
 
@@ -926,7 +1030,7 @@ if __name__ == "__main__":
             allowed = set(dates_from_db)
         else:
             LOG.warning(
-                "trade_cal 无可用交易日，按自然日集合过滤；东财日K仅含交易日，周末无数据。"
+                "trading_day_di 无可用交易日，按自然日集合过滤；东财日K仅含交易日，周末无数据。"
             )
             allowed = set(_calendar_days_iso(args.from_date, end_iso))
         total = run_historical_em_range(
