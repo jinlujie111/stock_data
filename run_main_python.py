@@ -350,7 +350,7 @@ def main():
         run_ths_industry()
 
         # 2. 行业资金流
-        #run_industry_fund_flow(trade_date)
+        run_industry_fund_flow(trade_date)
         
         LOG.info("所有数据处理任务执行完成")
         
