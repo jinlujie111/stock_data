@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     mysql_host: str = "127.0.0.1"
     mysql_port: int = 3306
     mysql_user: str = "root"
-    # 与主工程 industry_indicator/config 一致；勿在仓库提交真实生产密码。务必用 .env 或环境变量覆盖。
+    # 与主工程 utils/mysql_config 一致；勿在仓库提交真实生产密码。务必用 .env 或环境变量覆盖。
     mysql_password: str = "jinlujie"
     mysql_database: str = "stock_data"
 

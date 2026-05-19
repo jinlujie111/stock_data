@@ -3,7 +3,7 @@
 """
 同花顺个股资金流向快照 → MySQL（AkShare stock_fund_flow_individual）。
 
-与 industry_fund_flow_etl（行业）数据源相同站点、周期口径一致：即时 / 3·5·10·20 日排行。
+与 industry_fund_flow_etl（行业）同源；本任务默认仅抓取「即时」快照。
 """
 from __future__ import annotations
 
@@ -25,13 +25,7 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_TABLE_NAME = "stock_fund_flow_di"
 
-DEFAULT_PERIODS = [
-    "\u5373\u65f6",
-    "3\u65e5\u6392\u884c",
-    "5\u65e5\u6392\u884c",
-    "10\u65e5\u6392\u884c",
-    "20\u65e5\u6392\u884c",
-]
+DEFAULT_PERIODS = ["\u5373\u65f6"]
 
 PERIOD_ALIAS = {
     "now": "\u5373\u65f6",
@@ -44,12 +38,11 @@ PERIOD_ALIAS = {
 
 
 def _load_config():
-    """配置在仓库的 industry_indicator/config.py（本脚本位于 repo/stock_data/）。"""
-    _here = Path(__file__).resolve().parent
-    ind_dir = _here.parent / "industry_indicator"
-    if str(ind_dir) not in sys.path:
-        sys.path.insert(0, str(ind_dir))
-    import config as cfg  # noqa: E402
+    """配置在 utils/mysql_config.py（项目根由 sync_runner 注入 STOCK_DATA_ROOT）。"""
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from utils import mysql_config as cfg  # noqa: E402
 
     return cfg
 

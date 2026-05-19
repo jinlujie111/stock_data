@@ -18,7 +18,7 @@
 | **user_subscriptions** | — | 订阅消息预留 |
 | **system_logs** | 写 | 定时任务与异常日志（APScheduler  pipeline） |
 
-> **`industry_fund_flow_di` 本身由主仓库 `industry_indicator/industry_fund_flow_etl.py` 等写入**，小程序仅消费。
+> **`industry_fund_flow_di` 由主仓库 `sync/sync_runner.sh` 配置驱动写入**，小程序仅消费。
 
 ---
 
