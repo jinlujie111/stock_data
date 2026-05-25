@@ -22,7 +22,7 @@ fi
 # shellcheck source=/dev/null
 source "${path_git_utils}/func.sh"
 
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+# PYTHON_BIN 由 utils/func.sh 导出（默认 /usr/local/bin/python3.11）
 RUNNER_PY="${SCRIPT_PATH}/sync_runner.py"
 
 trade_date=""

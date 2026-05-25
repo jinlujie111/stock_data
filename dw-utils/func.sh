@@ -32,10 +32,22 @@ XXL_MYSQL_DATABASE="${XXL_MYSQL_DATABASE:-xxl_job}"
 # --- stock_data Python 项目根（默认即本仓库根目录）---
 STOCK_DATA_ROOT="${STOCK_DATA_ROOT:-${DW_ROOT}}"
 
+# --- Python 解释器（脚本中 alias 不生效，须用绝对路径）---
+if [[ -z "${PYTHON_BIN:-}" ]]; then
+    if [[ -x /usr/local/bin/python3.11 ]]; then
+        PYTHON_BIN="/usr/local/bin/python3.11"
+    elif command -v python3.11 &>/dev/null; then
+        PYTHON_BIN="$(command -v python3.11)"
+    else
+        PYTHON_BIN="python3"
+    fi
+fi
+
 export CONFIG_MYSQL_HOST CONFIG_MYSQL_PORT CONFIG_MYSQL_USER CONFIG_MYSQL_PASSWORD CONFIG_MYSQL_DATABASE
 export STOCK_MYSQL_HOST STOCK_MYSQL_PORT STOCK_MYSQL_USER STOCK_MYSQL_PASSWORD STOCK_MYSQL_DATABASE
 export XXL_MYSQL_HOST XXL_MYSQL_PORT XXL_MYSQL_USER XXL_MYSQL_PASSWORD XXL_MYSQL_DATABASE
 export STOCK_DATA_ROOT
+export PYTHON_BIN
 export MYSQL_HOST="${STOCK_MYSQL_HOST}"
 export MYSQL_PORT="${STOCK_MYSQL_PORT}"
 export MYSQL_USER="${STOCK_MYSQL_USER}"
@@ -69,6 +81,17 @@ init_xxl_job_stock_sync() {
     fi
     echo "初始化 xxl-job 调度: ${sql_file}"
     ${xxl_job} < "${sql_file}"
+}
+
+# --- 安装 sync 所需 Python 依赖（使用 PYTHON_BIN）---
+install_sync_deps() {
+    local req="${1:-${DW_ROOT}/requirements.txt}"
+    if [[ ! -f "${req}" ]]; then
+        echo "ERROR: 未找到 ${req}" >&2
+        return 1
+    fi
+    echo "安装依赖: ${PYTHON_BIN} -m pip install -r ${req}"
+    "${PYTHON_BIN}" -m pip install -r "${req}" -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 
 # --- 执行数据源同步（封装 dw/sync/sync_runner.sh）---
