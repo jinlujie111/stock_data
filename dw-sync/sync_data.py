@@ -41,7 +41,7 @@ def ensure_dw_loaded() -> None:
     if os.getenv("DW_FUNC_LOADED") != "1":
         logger.warning(
             "未检测到 DW_FUNC_LOADED=1，将使用环境变量默认值；"
-            "请先 source dw-utils/func.sh（或 DW_ENV=pre source ...）再执行"
+            "请先 source dw-utils/func.sh 再执行"
         )
 
 

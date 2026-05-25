@@ -2,11 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 项目统一配置：MySQL 连接。
-环境变量由 dw-utils/func.sh + env/{prod,pre}.sh 注入，禁止在代码中写死账号密码。
-
-切换环境（shell）:
-  source dw-utils/func.sh           # DW_ENV=prod 生产
-  DW_ENV=pre source dw-utils/func.sh  # 预发
+环境变量由 dw-utils/func.sh 注入，禁止在代码中写死账号密码。
 """
 from __future__ import annotations
 
@@ -16,9 +12,6 @@ from typing import Any
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-
-# prod | pre，与 func.sh 中 DW_ENV 一致
-DW_ENV = os.getenv("DW_ENV", "prod")
 
 # --- stock_data 业务库（func.sh 导出为 MYSQL_*）---
 MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
