@@ -1,3 +1,14 @@
+-- ============================================================================
+-- 交易日维度表 trading_day_di
+-- 设计说明：
+--   存储历史和未来的交易日信息，用于数据处理时判断日期是否为交易日。
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ods_trading_day (
+    trade_date DATE COMMENT '交易日日期'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
+
+
 CREATE TABLE IF NOT EXISTS industry_indicator_valuation (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     source VARCHAR(64) NOT NULL COMMENT '数据来源标识',
@@ -475,27 +486,7 @@ CREATE TABLE IF NOT EXISTS stock_financial_report_di (
     UNIQUE KEY uniq_sfr (source, ts_code, report_date, data_kind)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股财务多源明细';
 
--- ============================================================================
--- 交易日维度表 trading_day_di
--- 脚本：trading_day/trading_day_etl.py
---
--- 设计说明：
---   存储历史和未来的交易日信息，用于数据处理时判断日期是否为交易日。
---   包含日期、是否交易日、星期、月份、季度、年份等维度信息。
--- ============================================================================
 
-CREATE TABLE IF NOT EXISTS trading_day_di (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
-    trade_date DATE NOT NULL COMMENT '日期',
-    is_trading_day INT NOT NULL COMMENT '是否交易日: 1=是, 0=否',
-    week INT NULL COMMENT '星期: 1=周一, 7=周日',
-    month INT NULL COMMENT '月份',
-    quarter INT NULL COMMENT '季度',
-    year INT NULL COMMENT '年份',
-    created_at DATETIME NOT NULL COMMENT '创建时间',
-    updated_at DATETIME NOT NULL COMMENT '更新时间',
-    UNIQUE KEY uniq_trade_date (trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
 
 -- ============================================================================
 -- 【同花顺行业数据】计算方法（表 ths_industry_di）

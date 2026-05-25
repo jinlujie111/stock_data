@@ -2,7 +2,7 @@
 -- data_config 库：数据源凭证 + 同步任务配置
 -- 用法：source dw/utils/func.sh && init_data_config_schema
 -- 同步：source dw/utils/func.sh && run_data_sync [YYYYMMDD] [--task-code xxx]
--- 调度：由 xxl-job 管理，见 mysql_tables/xxl_job_stock_sync.sql
+-- 定时触发：系统 crontab 调用 dw-utils/func.sh run_data_sync，见 调度执行流程.md
 -- ============================================================================
 
 CREATE DATABASE IF NOT EXISTS data_config DEFAULT CHARSET utf8mb4;
@@ -31,7 +31,7 @@ ON DUPLICATE KEY UPDATE
 
 -- ---------------------------------------------------------------------------
 -- 同步任务配置主表（一条记录 = 一个「数据源 → MySQL 表」任务）
--- script_key 与 sync/task_registry.py 中注册项一一对应，禁止随意改名
+-- proxy_source + source_table 与 dw-sync/task_registry.py 注册项对应
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS db_sync_task (
     id                BIGINT       PRIMARY KEY AUTO_INCREMENT,
@@ -53,12 +53,6 @@ CREATE TABLE IF NOT EXISTS db_sync_task (
 INSERT INTO db_sync_task
     (proxy_source,source_table,target_database,target_table,target_table_describe,sync_mode,status,remark)
 VALUES
-    ('','trading_day', '交易日维度', 'internal', 'stock_data', 'trading_day_di',
-     'full', 'trading_day', '{"start_year":2020,"end_year":2026}',
-     NULL, 10, 1, '无外部 API，生成交易日历'),
-    ('stock_fund_flow', '个股资金流', 'akshare', 'stock_data', 'stock_fund_flow_di',
-     'snapshot', 'stock_fund_flow',
-     '{"periods":["即时"]}',
-     'trading_day', 20, 1, NULL)
+    ('akshare','tool_trade_date_hist_sina','stock_data','ods_trading_day','交易日','full',1,'全量更新交易日数据')
 
 

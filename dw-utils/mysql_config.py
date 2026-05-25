@@ -2,33 +2,116 @@
 # -*- coding: utf-8 -*-
 """
 项目统一配置：MySQL 连接。
-环境变量由 utils/func.sh 注入，禁止在代码中写死生产账号密码。
+环境变量由 dw-utils/func.sh + env/{prod,pre}.sh 注入，禁止在代码中写死账号密码。
+
+切换环境（shell）:
+  source dw-utils/func.sh           # DW_ENV=prod 生产
+  DW_ENV=pre source dw-utils/func.sh  # 预发
 """
 from __future__ import annotations
 
 import os
 import urllib.parse
+from typing import Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 
+# prod | pre，与 func.sh 中 DW_ENV 一致
+DW_ENV = os.getenv("DW_ENV", "prod")
+
+# --- stock_data 业务库（func.sh 导出为 MYSQL_*）---
 MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
-MYSQL_USER = os.getenv("MYSQL_USER", "root")
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "jinlujie")
+MYSQL_USER = os.getenv("MYSQL_USER", "app_user")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "stock_data")
 
+# --- data_config 配置库（db_sync_task、db_token）---
+CONFIG_MYSQL_HOST = os.getenv("CONFIG_MYSQL_HOST", "localhost")
+CONFIG_MYSQL_PORT = int(os.getenv("CONFIG_MYSQL_PORT", "3306"))
+CONFIG_MYSQL_USER = os.getenv("CONFIG_MYSQL_USER", "data_config")
+CONFIG_MYSQL_PASSWORD = os.getenv("CONFIG_MYSQL_PASSWORD", "")
+CONFIG_MYSQL_DATABASE = os.getenv("CONFIG_MYSQL_DATABASE", "data_config")
+
 STOCK_FUND_FLOW_TABLE = os.getenv("STOCK_FUND_FLOW_TABLE", "stock_fund_flow_di")
+MYSQL_DRIVER = os.getenv("MYSQL_DRIVER", "pymysql")
 
-MYSQL_DRIVER = os.getenv("MYSQL_DRIVER", "mysqlconnector")
 
-
-def get_sqlalchemy_url_pymysql() -> str:
-    pwd = urllib.parse.quote_plus(MYSQL_PASSWORD)
-    user_q = urllib.parse.quote_plus(MYSQL_USER)
+def _build_url(
+    host: str,
+    port: int,
+    user: str,
+    password: str,
+    database: str,
+    driver: str = "pymysql",
+) -> str:
+    pwd = urllib.parse.quote_plus(password)
+    user_q = urllib.parse.quote_plus(user)
     return (
-        f"mysql+pymysql://{user_q}:{pwd}@{MYSQL_HOST}:{MYSQL_PORT}/"
-        f"{MYSQL_DATABASE}?charset=utf8mb4"
+        f"mysql+{driver}://{user_q}:{pwd}@{host}:{port}/"
+        f"{database}?charset=utf8mb4"
     )
+
+
+def get_sqlalchemy_url_pymysql(database: str | None = None) -> str:
+    db = database or MYSQL_DATABASE
+    return _build_url(MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, db)
+
+
+def get_config_sqlalchemy_url() -> str:
+    return _build_url(
+        CONFIG_MYSQL_HOST,
+        CONFIG_MYSQL_PORT,
+        CONFIG_MYSQL_USER,
+        CONFIG_MYSQL_PASSWORD,
+        CONFIG_MYSQL_DATABASE,
+        MYSQL_DRIVER,
+    )
+
+
+def get_engine(database: str | None = None) -> Engine:
+    """业务库 engine；database 为空时用 MYSQL_DATABASE。"""
+    db = database or MYSQL_DATABASE
+    return create_engine(get_sqlalchemy_url_pymysql(db), pool_pre_ping=True)
+
+
+def get_config_engine() -> Engine:
+    return create_engine(get_config_sqlalchemy_url(), pool_pre_ping=True)
+
+
+def get_target_engine(target_database: str) -> Engine:
+    if target_database == CONFIG_MYSQL_DATABASE:
+        return get_config_engine()
+    return get_engine(target_database)
+
+
+def load_sync_tasks(
+    *,
+    task_id: int | None = None,
+    source_table: str | None = None,
+    status: int = 1,
+) -> list[dict[str, Any]]:
+    """从 data_config.db_sync_task 读取启用中的同步任务。"""
+    sql = """
+        SELECT id, proxy_source, source_table, target_database, target_table,
+               target_table_describe, sync_mode, status, remark
+        FROM db_sync_task
+        WHERE status = :status
+    """
+    params: dict[str, Any] = {"status": status}
+    if task_id is not None:
+        sql += " AND id = :task_id"
+        params["task_id"] = task_id
+    if source_table:
+        sql += " AND source_table = :source_table"
+        params["source_table"] = source_table
+    sql += " ORDER BY id"
+
+    engine = get_config_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(text(sql), params).mappings().all()
+    return [dict(r) for r in rows]
 
 
 def db_connect_mysql():
