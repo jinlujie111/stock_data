@@ -9,6 +9,31 @@ CREATE TABLE IF NOT EXISTS ods_trading_day (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
 
 
+
+CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
+    trade_date DATE NOT NULL COMMENT '数据日期',
+    period_type VARCHAR(32) NOT NULL COMMENT '周期类型: 即时/3日排行/5日排行/10日排行/20日排行',
+    ranking_no INT NULL COMMENT '行业排名',
+    industry_code VARCHAR(32) NULL COMMENT '行业代码',
+    industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
+    industry_index_value DECIMAL(20, 6) NULL COMMENT '行业指数值(即时口径可用)',
+    industry_change_pct DECIMAL(20, 6) NULL COMMENT '行业涨跌幅(%)',
+    main_net_inflow DECIMAL(20, 6) NULL COMMENT '主力净流入(亿元)',
+    super_large_net_inflow DECIMAL(20, 6) NULL COMMENT '超大单净流入(亿元)',
+    large_net_inflow DECIMAL(20, 6) NULL COMMENT '大单净流入(亿元)',
+    company_count INT NULL COMMENT '公司家数(即时口径可用)',
+    top_stock_name VARCHAR(128) NULL COMMENT '领涨股名称',
+    top_stock_change_pct DECIMAL(20, 6) NULL COMMENT '领涨股涨跌幅(%)',
+    current_price DECIMAL(20, 6) NULL COMMENT '当前价(即时口径可用)',
+    industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：从 ths_industry_di 表的 amount 字段获取，单位为亿元（源数据为万元）',
+    raw_json JSON NOT NULL COMMENT '原始数据JSON',
+    created_at DATETIME NOT NULL COMMENT '创建时间',
+    updated_at DATETIME NOT NULL COMMENT '更新时间',
+    UNIQUE KEY uniq_industry_fund_flow (trade_date, period_type, industry_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流日报';
+
+
 CREATE TABLE IF NOT EXISTS industry_indicator_valuation (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     source VARCHAR(64) NOT NULL COMMENT '数据来源标识',
