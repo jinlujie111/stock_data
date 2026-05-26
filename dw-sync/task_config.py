@@ -12,6 +12,8 @@ from typing import Any
 
 import pandas as pd
 
+_NOW_FMT = "%Y-%m-%d %H:%M:%S"
+
 TaskDict = dict[str, Any]
 
 
@@ -147,6 +149,12 @@ def apply_transform(df: pd.DataFrame, task: TaskDict) -> pd.DataFrame:
     cfg = get_transform_config(task)
     out = df.copy()
 
+    if cfg.get("add_raw_json"):
+        out["raw_json"] = df.apply(
+            lambda row: json.dumps(row.to_dict(), ensure_ascii=False, default=str),
+            axis=1,
+        )
+
     rename = cfg.get("rename") or {}
     if rename:
         out = out.rename(columns=rename)
@@ -160,6 +168,23 @@ def apply_transform(df: pd.DataFrame, task: TaskDict) -> pd.DataFrame:
         else:
             out[col] = pd.to_datetime(out[col], errors="coerce").dt.date
 
+    constants = cfg.get("constants") or {}
+    for col, val in constants.items():
+        out[col] = val
+
+    rank_cfg = cfg.get("rank_by")
+    if rank_cfg:
+        col = rank_cfg.get("column", "main_net_inflow")
+        part = rank_cfg.get("partition_by", ["trade_date"])
+        ascending = rank_cfg.get("ascending", False)
+        keys = [c for c in part if c in out.columns]
+        if col in out.columns and keys:
+            out["ranking_no"] = (
+                out.groupby(keys, dropna=False)[col]
+                .rank(ascending=ascending, method="min")
+                .astype("Int64")
+            )
+
     dropna = cfg.get("dropna")
     if dropna:
         out = out.dropna(subset=dropna)
@@ -169,6 +194,11 @@ def apply_transform(df: pd.DataFrame, task: TaskDict) -> pd.DataFrame:
         keys = [c for c in dedupe if c in out.columns]
         if keys:
             out = out.drop_duplicates(subset=keys, keep="last")
+
+    if cfg.get("add_timestamps"):
+        now = datetime.now().strftime(_NOW_FMT)
+        out["created_at"] = now
+        out["updated_at"] = now
 
     keep = cfg.get("keep_columns")
     if keep:

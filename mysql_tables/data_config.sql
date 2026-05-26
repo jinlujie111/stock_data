@@ -85,5 +85,29 @@ INSERT INTO db_sync_task (
     1, '全量更新交易日(Tushare)'
 );
 
--- 已有库升级：
--- ALTER TABLE db_sync_task ADD COLUMN fetch_config JSON NULL AFTER sync_mode, ADD COLUMN transform_config JSON NULL AFTER fetch_config;
+-- Tushare moneyflow → ods_stock_fund_flow_di（按日 snapshot，字段与接口一致）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'moneyflow', 'stock_data', 'ods_stock_fund_flow_di', '个股资金流向', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date',
+            'buy_sm_vol', 'buy_sm_amount', 'sell_sm_vol', 'sell_sm_amount',
+            'buy_md_vol', 'buy_md_amount', 'sell_md_vol', 'sell_md_amount',
+            'buy_lg_vol', 'buy_lg_amount', 'sell_lg_vol', 'sell_lg_amount',
+            'buy_elg_vol', 'buy_elg_amount', 'sell_elg_vol', 'sell_elg_amount',
+            'net_mf_vol', 'net_mf_amount'
+        )
+    ),
+    1, 'A股个股资金流向日快照(Tushare moneyflow)'
+);
