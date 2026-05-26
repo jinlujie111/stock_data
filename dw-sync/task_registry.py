@@ -145,6 +145,12 @@ def sync_tushare_trade_cal(task: TaskDict, trade_date: date | None, dry_run: boo
         start_date=td_str,
         end_date=td_str,
     )
+    logger.info("trade_cal 接口返回 %s 行 (date=%s)", len(df), td_str)
+    if df.empty:
+        logger.warning(
+            "trade_cal 为空，请检查: 是否交易日、token/代理是否有效；"
+            "勿将 api_url 改成纯 IP（Cloudflare 需要域名 Host）"
+        )
     out = _map_tushare_trade_cal(df)
 
     if dry_run:

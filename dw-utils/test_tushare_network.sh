@@ -43,5 +43,5 @@ curl -4 -sS -o /dev/null -w "baidu http_code=%{http_code}\n" \
 
 echo "=== 结束 ==="
 echo "结论: http_code=404 且 baidu=200 → 外网与中转域名均正常，可执行 run_data_sync"
-echo "若 Python 仍 Network unreachable: source func.sh 后确认 TUSHARE_FORCE_IPV4=1"
+echo "若 Python 仍 Network unreachable: TUSHARE_FORCE_IPV4=1（保留域名，勿改 URL 为 IP）"
 echo "可选: db_token.api_url 使用 https://${HOST}/ （与 http 二选一，以代理商为准）"

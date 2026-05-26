@@ -7,11 +7,11 @@ import logging
 import os
 import socket
 from typing import Any
-from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
 _pro_cache: dict[str, Any] = {}
+_ipv4_patched = False
 
 
 def _normalize_api_url(url: str | None) -> str | None:
@@ -23,27 +23,26 @@ def _normalize_api_url(url: str | None) -> str | None:
     return u
 
 
-def _maybe_force_ipv4_url(url: str) -> str:
+def _ensure_ipv4_requests() -> None:
     """
-    阿里云 ECS 常见：DNS 优先解析 IPv6，VPC 无 IPv6 路由 → Network is unreachable。
-    设置 TUSHARE_FORCE_IPV4=1 时将域名替换为 IPv4 地址。
+    阿里云 ECS：优先 IPv6 且无路由时会 Network unreachable。
+    仅让 requests/urllib3 解析 A 记录，**不把 URL 换成 IP**（Cloudflare 代理需保留 Host 头）。
     """
+    global _ipv4_patched
+    if _ipv4_patched:
+        return
     if os.getenv("TUSHARE_FORCE_IPV4", "").lower() not in ("1", "true", "yes"):
-        return url
-    parsed = urlparse(url)
-    host = parsed.hostname
-    if not host or host.replace(".", "").isdigit():
-        return url
+        return
     try:
-        infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
-        ipv4 = infos[0][4][0]
-    except OSError as exc:
-        logger.warning("TUSHARE_FORCE_IPV4: 无法解析 %s 的 IPv4: %s", host, exc)
-        return url
-    new_netloc = parsed.netloc.replace(host, ipv4, 1)
-    forced = urlunparse(parsed._replace(netloc=new_netloc))
-    logger.info("Tushare 代理强制 IPv4: %s -> %s", host, ipv4)
-    return forced
+        import urllib3.util.connection as urllib3_connection
+
+        urllib3_connection.allowed_gai_family = lambda: socket.AF_INET
+        _ipv4_patched = True
+        logger.info(
+            "Tushare 请求强制 IPv4（保留代理域名，避免 Cloudflare 因无 Host 返回空数据）"
+        )
+    except Exception as exc:
+        logger.warning("Tushare 强制 IPv4 补丁未生效: %s", exc)
 
 
 def get_tushare_pro(token_type: str = "tushare") -> Any:
@@ -62,6 +61,8 @@ def get_tushare_pro(token_type: str = "tushare") -> Any:
             f"db_token 中无有效记录: token_type={token_type!r}（status=1 且在有效期内）"
         )
 
+    _ensure_ipv4_requests()
+
     import tushare as ts
 
     token_id = row["token_id"]
@@ -71,7 +72,6 @@ def get_tushare_pro(token_type: str = "tushare") -> Any:
         os.getenv("TUSHARE_HTTP_URL")
     )
     if api_url:
-        api_url = _maybe_force_ipv4_url(api_url)
         pro._DataApi__http_url = api_url
         logger.info("Tushare 使用代理 API: %s (token_type=%s)", api_url, token_type)
     else:
