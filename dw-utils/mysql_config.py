@@ -109,7 +109,8 @@ def load_sync_tasks(
     """从 data_config.db_sync_task 读取启用中的同步任务。"""
     sql = """
         SELECT id, proxy_source, source_table, target_database, target_table,
-               target_table_describe, sync_mode, status, remark
+               target_table_describe, sync_mode, status, remark,
+               fetch_config, transform_config
         FROM db_sync_task
         WHERE status = :status
     """
