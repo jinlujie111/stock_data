@@ -47,6 +47,37 @@ def get_handler(task: TaskDict) -> TaskHandler | None:
     return _HANDLERS.get(task_key(task["proxy_source"], task["source_table"]))
 
 
+def fetch_tushare(source_table: str, token_type: str = "tushare", **kwargs: Any) -> pd.DataFrame:
+    """调用 Tushare Pro 接口；source_table 为 pro 上的方法名，如 trade_cal、index_basic。"""
+    from tushare_client import get_tushare_pro
+
+    pro = get_tushare_pro(token_type)
+    fn = getattr(pro, source_table, None)
+    if fn is None or not callable(fn):
+        raise ValueError(f"tushare 未找到接口: {source_table}")
+    df = fn(**kwargs)
+    if df is None:
+        return pd.DataFrame()
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(f"{source_table} 返回值不是 DataFrame")
+    return df
+
+
+def _map_tushare_trade_cal(df: pd.DataFrame) -> pd.DataFrame:
+    """trade_cal 字段映射为 ods_trading_day_di 列。"""
+    if df.empty:
+        return df
+    out = df.copy()
+    if "cal_date" in out.columns:
+        out["trade_date"] = pd.to_datetime(out["cal_date"], format="%Y%m%d", errors="coerce").dt.date
+    if "pretrade_date" in out.columns:
+        out["pretrade_date"] = pd.to_datetime(
+            out["pretrade_date"], format="%Y%m%d", errors="coerce"
+        ).dt.date
+    keep = [c for c in ("exchange", "trade_date", "is_open", "pretrade_date") if c in out.columns]
+    return out[keep].dropna(subset=["trade_date"])
+
+
 def fetch_akshare(source_table: str) -> pd.DataFrame:
     import akshare as ak
 
@@ -101,6 +132,78 @@ def sync_trading_day(task: TaskDict, trade_date: date | None, dry_run: bool) -> 
     )
 
 
+@register("tushare", "trade_cal")
+def sync_tushare_trade_cal(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """按业务日增量拉取 Tushare trade_cal → ods_trading_day_di。"""
+    from sync_writer import write_dataframe
+
+    td = trade_date or date.today()
+    td_str = td.strftime("%Y%m%d")
+    df = fetch_tushare(
+        "trade_cal",
+        exchange="",
+        start_date=td_str,
+        end_date=td_str,
+    )
+    out = _map_tushare_trade_cal(df)
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode=task["sync_mode"],
+        trade_date=td,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
+@register("tushare", "_default")
+def sync_tushare_default(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """未单独注册时的 Tushare 通用拉取（无参调用，列名需与目标表一致）。"""
+    from sync_writer import write_dataframe
+
+    df = fetch_tushare(task["source_table"])
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(df),
+            ok=True,
+            message="dry-run",
+        )
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=df,
+        sync_mode=task["sync_mode"],
+        trade_date=trade_date,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 @register("akshare", "_default")
 def sync_akshare_default(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
     """
@@ -142,6 +245,8 @@ def resolve_handler(task: TaskDict) -> TaskHandler:
         return handler
     if task["proxy_source"] == "akshare":
         return _HANDLERS[task_key("akshare", "_default")]
+    if task["proxy_source"] == "tushare":
+        return _HANDLERS[task_key("tushare", "_default")]
     raise KeyError(
         f"未注册同步处理器: {key}（请在 task_registry.py 中 @register 或扩展 proxy_source）"
     )

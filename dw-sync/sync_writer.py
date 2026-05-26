@@ -31,6 +31,7 @@ def write_dataframe(
             conn.execute(text(f"TRUNCATE TABLE `{table}`"))
         elif mode in ("snapshot", "incremental") and trade_date is not None:
             if "trade_date" in df.columns:
+                # incremental：按业务日覆盖（可能含多 exchange）
                 conn.execute(
                     text(f"DELETE FROM `{table}` WHERE trade_date = :td"),
                     {"td": trade_date},

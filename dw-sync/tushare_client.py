@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""从 db_token 加载 Tushare Pro 客户端（token + 代理 API URL）。"""
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+_pro_cache: dict[str, Any] = {}
+
+
+def _normalize_api_url(url: str | None) -> str | None:
+    if not url or not str(url).strip():
+        return None
+    u = str(url).strip()
+    if not u.endswith("/"):
+        u += "/"
+    return u
+
+
+def get_tushare_pro(token_type: str = "tushare") -> Any:
+    """
+    按 token_type 从 db_token 取有效 token，构造 ts.pro_api 并设置代理 URL。
+    URL 优先级：db_token.api_url > 环境变量 TUSHARE_HTTP_URL
+    """
+    if token_type in _pro_cache:
+        return _pro_cache[token_type]
+
+    from mysql_config import load_db_token
+
+    row = load_db_token(token_type)
+    if not row:
+        raise RuntimeError(
+            f"db_token 中无有效记录: token_type={token_type!r}（status=1 且在有效期内）"
+        )
+
+    import tushare as ts
+
+    token_id = row["token_id"]
+    pro = ts.pro_api(token_id)
+
+    api_url = _normalize_api_url(row.get("api_url")) or _normalize_api_url(
+        os.getenv("TUSHARE_HTTP_URL")
+    )
+    if api_url:
+        pro._DataApi__http_url = api_url
+        logger.info("Tushare 使用代理 API: %s (token_type=%s)", api_url, token_type)
+    else:
+        logger.info("Tushare 使用官方 API (token_type=%s)", token_type)
+
+    _pro_cache[token_type] = pro
+    return pro
+
+
+def clear_tushare_cache() -> None:
+    _pro_cache.clear()

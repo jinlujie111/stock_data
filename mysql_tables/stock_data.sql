@@ -8,6 +8,12 @@ CREATE TABLE IF NOT EXISTS ods_trading_day (
     trade_date DATE COMMENT '交易日日期'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度表';
 
+CREATE TABLE IF NOT EXISTS ods_trading_day_di (
+    exchange      VARCHAR(10) COMMENT '交易所 SSE上交所 SZSE深交所',
+    trade_date    VARCHAR(10)   COMMENT '日历日期',
+    is_open       VARCHAR(1) COMMENT '是否交易 0休市 1交易',
+    pretrade_date VARCHAR(10) COMMENT '上一个交易日'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度增量日期';
 
 
 CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (

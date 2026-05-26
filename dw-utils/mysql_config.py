@@ -79,6 +79,27 @@ def get_target_engine(target_database: str) -> Engine:
     return get_engine(target_database)
 
 
+def load_db_token(token_type: str = "tushare") -> dict[str, Any] | None:
+    """
+    从 db_token 读取当前有效的 token（status=1，且在 start_date~end_date 内）。
+    返回 token_id、api_url 等字段；无有效记录时返回 None。
+    """
+    sql = """
+        SELECT id, token_type, token_id, api_url, status, remark, start_date, end_date
+        FROM db_token
+        WHERE token_type = :token_type
+          AND status = 1
+          AND (start_date IS NULL OR start_date <= NOW())
+          AND (end_date IS NULL OR end_date >= NOW())
+        ORDER BY id DESC
+        LIMIT 1
+    """
+    engine = get_config_engine()
+    with engine.connect() as conn:
+        row = conn.execute(text(sql), {"token_type": token_type}).mappings().first()
+    return dict(row) if row else None
+
+
 def load_sync_tasks(
     *,
     task_id: int | None = None,
