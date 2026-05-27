@@ -111,3 +111,32 @@ INSERT INTO db_sync_task (
     ),
     1, 'A股个股资金流向日快照(Tushare moneyflow)'
 );
+
+-- Tushare moneyflow_ind_dc → ods_industry_fund_flow_di（按日 snapshot，接口字段映射入库）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'moneyflow_ind_dc', 'stock_data', 'ods_industry_fund_flow_di', '东财板块资金流向', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('ts_code', 'industry_code', 'name', 'industry_name'),
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'industry_code'),
+        'dropna', JSON_ARRAY('trade_date', 'industry_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'content_type', 'industry_code', 'industry_name', 'pct_change', 'close',
+            'net_amount', 'net_amount_rate',
+            'buy_elg_amount', 'buy_elg_amount_rate',
+            'buy_lg_amount', 'buy_lg_amount_rate',
+            'buy_md_amount', 'buy_md_amount_rate',
+            'buy_sm_amount', 'buy_sm_amount_rate',
+            'buy_sm_amount_stock', 'rank'
+        )
+    ),
+    1, '东财行业/概念/地域板块资金流向日快照(Tushare moneyflow_ind_dc)'
+);

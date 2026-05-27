@@ -40,30 +40,28 @@ CREATE TABLE IF NOT EXISTS ods_stock_fund_flow_di (
     UNIQUE KEY uk_stock_mf (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个股资金流向(Tushare moneyflow)';
 
-
 CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
-    trade_date DATE NOT NULL COMMENT '数据日期',
-    period_type VARCHAR(32) NOT NULL COMMENT '周期类型: 即时/3日排行/5日排行/10日排行/20日排行',
-    ranking_no INT NULL COMMENT '行业排名',
-    industry_code VARCHAR(32) NULL COMMENT '行业代码',
-    industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
-    industry_index_value DECIMAL(20, 6) NULL COMMENT '行业指数值(即时口径可用)',
-    industry_change_pct DECIMAL(20, 6) NULL COMMENT '行业涨跌幅(%)',
-    main_net_inflow DECIMAL(20, 6) NULL COMMENT '主力净流入(亿元)',
-    super_large_net_inflow DECIMAL(20, 6) NULL COMMENT '超大单净流入(亿元)',
-    large_net_inflow DECIMAL(20, 6) NULL COMMENT '大单净流入(亿元)',
-    company_count INT NULL COMMENT '公司家数(即时口径可用)',
-    top_stock_name VARCHAR(128) NULL COMMENT '领涨股名称',
-    top_stock_change_pct DECIMAL(20, 6) NULL COMMENT '领涨股涨跌幅(%)',
-    current_price DECIMAL(20, 6) NULL COMMENT '当前价(即时口径可用)',
-    industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：从 ths_industry_di 表的 amount 字段获取，单位为亿元（源数据为万元）',
-    raw_json JSON NOT NULL COMMENT '原始数据JSON',
-    created_at DATETIME NOT NULL COMMENT '创建时间',
-    updated_at DATETIME NOT NULL COMMENT '更新时间',
-    UNIQUE KEY uniq_industry_fund_flow (trade_date, period_type, industry_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流日报';
-
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    content_type          VARCHAR(32)    NULL COMMENT '资金类型(行业、概念、地域)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '行业板块代码',
+    industry_name         VARCHAR(128)   NULL COMMENT '行业板块名称',
+    pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
+    close                 DECIMAL(20, 6) NULL COMMENT '板块最新指数',
+    net_amount            DECIMAL(20, 4) NULL COMMENT '今日主力净流入净额(元)',
+    net_amount_rate       DECIMAL(20, 6) NULL COMMENT '今日主力净流入净占比(%)',
+    buy_elg_amount        DECIMAL(20, 4) NULL COMMENT '今日超大单净流入净额(元)',
+    buy_elg_amount_rate   DECIMAL(20, 6) NULL COMMENT '今日超大单净流入净占比(%)',
+    buy_lg_amount         DECIMAL(20, 4) NULL COMMENT '今日大单净流入净额(元)',
+    buy_lg_amount_rate    DECIMAL(20, 6) NULL COMMENT '今日大单净流入净占比(%)',
+    buy_md_amount         DECIMAL(20, 4) NULL COMMENT '今日中单净流入净额(元)',
+    buy_md_amount_rate    DECIMAL(20, 6) NULL COMMENT '今日中单净流入净占比(%)',
+    buy_sm_amount         DECIMAL(20, 4) NULL COMMENT '今日小单净流入净额(元)',
+    buy_sm_amount_rate    DECIMAL(20, 6) NULL COMMENT '今日小单净流入净占比(%)',
+    buy_sm_amount_stock   VARCHAR(128)   NULL COMMENT '今日主力净流入最大股',
+    `rank`                INT            NULL COMMENT '序号',
+    UNIQUE KEY uk_industry_mf_dc (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金流向(Tushare moneyflow_ind_dc)';
 
 CREATE TABLE IF NOT EXISTS industry_indicator_valuation (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -83,29 +81,6 @@ CREATE TABLE IF NOT EXISTS industry_indicator_valuation (
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uniq_industry_pe (source, category_symbol, trade_date, industry_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业估值快照(申万等)';
-
-CREATE TABLE IF NOT EXISTS industry_fund_flow_di (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键',
-    trade_date DATE NOT NULL COMMENT '数据日期',
-    period_type VARCHAR(32) NOT NULL COMMENT '周期类型: 即时',
-    ranking_no INT NULL COMMENT '行业排名',
-    industry_code VARCHAR(32) NULL COMMENT '行业代码',
-    industry_name VARCHAR(128) NOT NULL COMMENT '行业名称',
-    industry_index_value DECIMAL(20, 6) NULL COMMENT '行业指数值(即时口径可用)',
-    industry_change_pct DECIMAL(20, 6) NULL COMMENT '行业涨跌幅(%)',
-    main_net_inflow DECIMAL(20, 6) NULL COMMENT '主力净流入(亿元)',
-    super_large_net_inflow DECIMAL(20, 6) NULL COMMENT '超大单净流入(亿元)',
-    large_net_inflow DECIMAL(20, 6) NULL COMMENT '大单净流入(亿元)',
-    company_count INT NULL COMMENT '公司家数(即时口径可用)',
-    top_stock_name VARCHAR(128) NULL COMMENT '领涨股名称',
-    top_stock_change_pct DECIMAL(20, 6) NULL COMMENT '领涨股涨跌幅(%)',
-    current_price DECIMAL(20, 6) NULL COMMENT '当前价(即时口径可用)',
-    industry_turnover DECIMAL(20, 6) NULL COMMENT '行业成交额(亿元)：从 ths_industry_di 表的 amount 字段获取，单位为亿元（源数据为万元）',
-    raw_json JSON NOT NULL COMMENT '原始数据JSON',
-    created_at DATETIME NOT NULL COMMENT '创建时间',
-    updated_at DATETIME NOT NULL COMMENT '更新时间',
-    UNIQUE KEY uniq_industry_fund_flow (trade_date, period_type, industry_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流日报';
 
 -- ============================================================================
 -- 【市场日度快照】market_daily_di — 小程序/API 仪表盘：总成交额、涨跌家数、风险提示

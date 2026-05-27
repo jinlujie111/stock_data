@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-临时补数：按交易日循环执行 moneyflow → ods_stock_fund_flow_di（snapshot）。
+临时补数：按交易日循环执行 moneyflow_ind_dc → ods_industry_fund_flow_di（snapshot）。
 
 用法（须先 source dw-utils/func.sh）：
   python dw-tmp/tmp.py
   python dw-tmp/tmp.py --start 20230101 --end 20260525
   python dw-tmp/tmp.py --dry-run
   python dw-tmp/tmp.py --sleep 0.3
+  python dw-tmp/tmp.py --source-table moneyflow   # 个股资金流补数
 
 等价于逐日执行：
-  run_data_sync YYYYMMDD --source-table moneyflow
+  run_data_sync YYYYMMDD --source-table moneyflow_ind_dc
 """
 from __future__ import annotations
 
@@ -36,9 +37,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SOURCE_TABLE = "moneyflow"
+SOURCE_TABLE = "moneyflow_ind_dc"
 DEFAULT_START = date(2023, 1, 1)
-DEFAULT_END = date(2026, 5, 25)
+DEFAULT_END = date.today()
 
 
 def _parse_ymd(s: str) -> date:
@@ -107,7 +108,7 @@ def load_trading_dates(start: date, end: date) -> list[date]:
     except Exception as exc:
         logger.warning("trade_cal 获取失败: %s", exc)
 
-  # 兜底：仅工作日（不含法定假日）
+    # 兜底：仅工作日（不含法定假日）
     out: list[date] = []
     d = start
     while d <= end:
@@ -119,10 +120,16 @@ def load_trading_dates(start: date, end: date) -> list[date]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="moneyflow 历史补数")
-    parser.add_argument("--start", default="20230101", help="起始 YYYYMMDD")
-    parser.add_argument("--end", default="20260525", help="结束 YYYYMMDD")
-    parser.add_argument("--source-table", default=SOURCE_TABLE)
+    parser = argparse.ArgumentParser(
+        description="Tushare 资金流历史补数（默认 moneyflow_ind_dc → ods_industry_fund_flow_di）"
+    )
+    parser.add_argument("--start", default=DEFAULT_START.strftime("%Y%m%d"), help="起始 YYYYMMDD")
+    parser.add_argument("--end", default=DEFAULT_END.strftime("%Y%m%d"), help="结束 YYYYMMDD")
+    parser.add_argument(
+        "--source-table",
+        default=SOURCE_TABLE,
+        help="db_sync_task.source_table，默认 moneyflow_ind_dc",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--sleep", type=float, default=0.2, help="每日同步间隔秒数")
     parser.add_argument("--fail-fast", action="store_true", help="遇错即停")
