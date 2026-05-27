@@ -140,3 +140,56 @@ INSERT INTO db_sync_task (
     ),
     1, '东财行业/概念/地域板块资金流向日快照(Tushare moneyflow_ind_dc)'
 );
+
+-- Tushare index_classify → ods_industry_classify（full，字段与接口一致）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'index_classify', 'stock_data', 'ods_industry_classify', '申万行业分类', 'full',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'calls', JSON_ARRAY(
+            JSON_OBJECT(
+                'src', 'SW2014',
+                'fields', 'index_code,industry_name,parent_code,level,industry_code,is_pub,src'
+            ),
+            JSON_OBJECT(
+                'src', 'SW2021',
+                'fields', 'index_code,industry_name,parent_code,level,industry_code,is_pub,src'
+            )
+        ),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'dedupe', JSON_ARRAY('src', 'industry_code'),
+        'dropna', JSON_ARRAY('src', 'industry_code'),
+        'keep_columns', JSON_ARRAY(
+            'index_code', 'industry_name', 'parent_code', 'level', 'industry_code', 'is_pub', 'src'
+        )
+    ),
+    1, '全量更新申万行业分类(Tushare index_classify, SW2014+SW2021)'
+);
+
+-- Tushare sw_daily → ods_industry_daily_di（按日 snapshot，字段与接口一致）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'sw_daily', 'stock_data', 'ods_industry_daily_di', '申万行业日线行情', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date', 'name', 'open', 'low', 'high', 'close',
+            'change', 'pct_change', 'vol', 'amount', 'pe', 'pb', 'float_mv', 'total_mv'
+        )
+    ),
+    1, '申万行业日线行情日快照(Tushare sw_daily)'
+);

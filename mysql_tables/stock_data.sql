@@ -63,85 +63,33 @@ CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
     UNIQUE KEY uk_industry_mf_dc (trade_date, industry_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金流向(Tushare moneyflow_ind_dc)';
 
-CREATE TABLE IF NOT EXISTS industry_indicator_valuation (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    source VARCHAR(64) NOT NULL COMMENT '数据来源标识',
-    category_symbol VARCHAR(64) NOT NULL COMMENT '分类维度，如 SW_L1/SW_L2/SW_L3',
-    trade_date DATE NOT NULL COMMENT '入库业务日期(快照按抓取日)',
-    industry_name VARCHAR(128) NULL COMMENT '行业名称',
-    industry_code VARCHAR(64) NULL COMMENT '行业代码(与资金流等表统一，如 801010，不含 .SI)',
-    pe_value DECIMAL(20, 6) NULL COMMENT 'TTM滚动市盈率(主展示)',
-    pe_static DECIMAL(20, 6) NULL COMMENT '静态市盈率',
-    pb_value DECIMAL(20, 6) NULL COMMENT '市净率',
-    ps_value DECIMAL(20, 6) NULL COMMENT '市销率(预留，当前源无则空)',
-    dividend_yield DECIMAL(20, 6) NULL COMMENT '静态股息率',
-    rank_desc VARCHAR(64) NULL COMMENT '层级说明，如 申万三级',
-    raw_json JSON NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    UNIQUE KEY uniq_industry_pe (source, category_symbol, trade_date, industry_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业估值快照(申万等)';
+CREATE TABLE IF NOT EXISTS ods_industry_classify (
+    index_code     VARCHAR(32)  NULL COMMENT '指数代码',  ??????
+    industry_name  VARCHAR(128) NULL COMMENT '行业名称',
+    parent_code    VARCHAR(32)  NULL COMMENT '父级代码',
+    level          VARCHAR(8)   NULL COMMENT '行业层级(L1/L2/L3)',
+    industry_code  VARCHAR(32)  NOT NULL COMMENT '行业代码',
+    is_pub         VARCHAR(8)   NULL COMMENT '是否发布了指数',
+    src            VARCHAR(16)  NOT NULL COMMENT '行业分类(SW2014/SW2021)',
+    UNIQUE KEY uk_industry_classify (src, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业分类(Tushare index_classify)';
 
--- ============================================================================
--- 【市场日度快照】market_daily_di — 小程序/API 仪表盘：总成交额、涨跌家数、风险提示
--- 写入：wechat 后端定时任务 market_snapshot_job；或手工 INSERT
--- ============================================================================
-CREATE TABLE IF NOT EXISTS market_daily_di (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    trade_date DATE NOT NULL,
-    total_turnover_yi DECIMAL(20, 4) NULL COMMENT 'A股总成交额(亿元，口径可配置)',
-    sh_up INT NULL,
-    sh_down INT NULL,
-    sz_up INT NULL,
-    sz_down INT NULL,
-    up_count INT NULL COMMENT '上涨家数合计',
-    down_count INT NULL COMMENT '下跌家数合计',
-    risk_note VARCHAR(512) NULL COMMENT '风险提示文案',
-    raw_json JSON NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_mkt_date (trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='市场日度快照';
-
--- ============================================================================
--- 【行业评分与次日潜伏】industry_score_di — 评分引擎写入，供 /rank/latent 等接口
--- ============================================================================
-CREATE TABLE IF NOT EXISTS industry_score_di (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    trade_date DATE NOT NULL,
-    industry_name VARCHAR(128) NOT NULL,
-    industry_code VARCHAR(32) NULL,
-    score_rank_today DECIMAL(10, 6) NULL COMMENT '今日净流入排名得分0-100',
-    score_sum5 DECIMAL(10, 6) NULL COMMENT '5日累计净流入得分',
-    score_turnover_amp DECIMAL(10, 6) NULL COMMENT '成交额放大得分',
-    score_chg_strength DECIMAL(10, 6) NULL COMMENT '板块涨幅强度得分',
-    total_score DECIMAL(12, 6) NOT NULL COMMENT '加权总分',
-    latent_rank INT NULL COMMENT '潜伏榜名次',
-    risk_level VARCHAR(16) NULL COMMENT 'low/medium/high',
-    detail_json JSON NULL COMMENT '中间指标JSON',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_score (trade_date, industry_name),
-    KEY idx_score_trade_latent (trade_date, latent_rank),
-    KEY idx_score_total (trade_date, total_score)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业评分与潜伏';
-
--- ============================================================================
--- 【行业股票池】stock_pool_di — 行业详情龙头股列表（可选；无数据时接口用资金流领涨股占位）
--- ============================================================================
-CREATE TABLE IF NOT EXISTS stock_pool_di (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    trade_date DATE NOT NULL,
-    industry_name VARCHAR(128) NOT NULL,
-    stock_code VARCHAR(16) NOT NULL COMMENT '6位代码',
-    stock_name VARCHAR(64) NULL,
-    role_type VARCHAR(32) NOT NULL DEFAULT 'leader' COMMENT 'leader/weight/sample',
-    weight DECIMAL(10, 6) NULL COMMENT '权重或排序分',
-    change_pct DECIMAL(20, 6) NULL,
-    main_net_inflow DECIMAL(20, 6) NULL COMMENT '亿元',
-    raw_json JSON NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_pool (trade_date, industry_name, stock_code, role_type),
-    KEY idx_pool_ind (trade_date, industry_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业股票池/龙头';
+CREATE TABLE IF NOT EXISTS ods_industry_daily_di (
+    ts_code      VARCHAR(32)    NOT NULL COMMENT '指数代码',
+    trade_date   DATE           NOT NULL COMMENT '交易日期',
+    name         VARCHAR(128)   NULL COMMENT '指数名称',
+    open         DECIMAL(20, 6) NULL COMMENT '开盘点位',
+    low          DECIMAL(20, 6) NULL COMMENT '最低点位',
+    high         DECIMAL(20, 6) NULL COMMENT '最高点位',
+    close        DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    `change`     DECIMAL(20, 6) NULL COMMENT '涨跌点位',
+    pct_change   DECIMAL(20, 6) NULL COMMENT '涨跌幅',
+    vol          DECIMAL(20, 6) NULL COMMENT '成交量(万股)',
+    amount       DECIMAL(20, 6) NULL COMMENT '成交额(万元)',
+    pe           DECIMAL(20, 6) NULL COMMENT '市盈率',
+    pb           DECIMAL(20, 6) NULL COMMENT '市净率',
+    float_mv     DECIMAL(20, 6) NULL COMMENT '流通市值(万元)',
+    total_mv     DECIMAL(20, 6) NULL COMMENT '总市值(万元)',
+    UNIQUE KEY uk_industry_daily (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业日线行情(Tushare sw_daily)';
 
