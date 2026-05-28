@@ -16,10 +16,8 @@ import pandas as pd
 from sqlalchemy import text
 
 from task_config import (
-    _resolve_params,
     apply_transform,
     build_api_call_params_list,
-    build_template_context,
     get_fetch_config,
     write_trade_date_for_sync_mode,
 )
@@ -123,14 +121,23 @@ def fetch_task_dataframe(task: TaskDict, trade_date: date | None) -> pd.DataFram
     return pd.concat(frames, ignore_index=True)
 
 
-def _load_ts_codes(fetch_cfg: dict[str, Any], token_type: str) -> list[str]:
-    api = fetch_cfg.get("stock_list_api") or "stock_basic"
-    params = dict(fetch_cfg.get("stock_list_params") or {"list_status": "L"})
-    field = fetch_cfg.get("stock_list_field") or "ts_code"
-    df = fetch_tushare(api, token_type=token_type, **params)
-    if df.empty or field not in df.columns:
-        return []
-    return sorted(df[field].dropna().astype(str).unique().tolist())
+def _quarter_period_ends(from_yyyymmdd: str, through: date) -> list[str]:
+    """生成不晚于 through 的季报报告期末日列表（YYYYMMDD）。"""
+    from datetime import datetime
+
+    start = datetime.strptime(from_yyyymmdd, "%Y%m%d").date()
+    year = start.year
+    periods: list[str] = []
+    while year <= through.year:
+        for month_day in ((3, 31), (6, 30), (9, 30), (12, 31)):
+            d = date(year, month_day[0], month_day[1])
+            if d < start:
+                continue
+            if d > through:
+                return periods
+            periods.append(d.strftime("%Y%m%d"))
+        year += 1
+    return periods
 
 
 def _delete_by_date_column(
@@ -146,57 +153,50 @@ def _delete_by_date_column(
         )
 
 
-@register("tushare", "fina_indicator")
-def sync_fina_indicator(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
-    """fina_indicator 必须按 ts_code 循环；snapshot 按 ann_date 覆盖，full 按报告期区间拉历史。"""
+@register("tushare", "fina_indicator_vip")
+def sync_fina_indicator_vip(
+    task: TaskDict, trade_date: date | None, dry_run: bool
+) -> SyncResult:
+    """fina_indicator_vip 单次拉全市场；snapshot 按 ann_date，full 按 period 季末循环。"""
     from sync_writer import write_dataframe
 
     fetch_cfg = get_fetch_config(task)
     token_type = fetch_cfg.get("token_type") or "tushare"
     sync_mode = (task.get("sync_mode") or "snapshot").lower()
-    codes = _load_ts_codes(fetch_cfg, token_type)
-    if not codes:
-        return SyncResult(
-            task_id=task["id"],
-            source_table=task["source_table"],
-            target_table=task["target_table"],
-            rows_affected=0,
-            ok=False,
-            message="stock_basic 未返回 ts_code 列表",
-        )
-
-    ctx = build_template_context(task, trade_date)
-    if sync_mode == "full":
-        base = _resolve_params(dict(fetch_cfg.get("full_params") or {}), ctx)
-    else:
-        ctx_list = build_api_call_params_list(task, trade_date)
-        base = ctx_list[0] if ctx_list else {}
-
-    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.25)
+    td = trade_date or date.today()
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.5)
     frames: list[pd.DataFrame] = []
-    for i, code in enumerate(codes):
-        params = dict(base)
-        params["ts_code"] = code
-        if (i + 1) % 200 == 0:
-            logger.info("fina_indicator 进度 %s/%s", i + 1, len(codes))
-        try:
-            part = fetch_tushare("fina_indicator", token_type=token_type, **params)
-        except Exception as exc:
-            logger.warning("fina_indicator %s 失败: %s", code, exc)
-            continue
-        if not part.empty:
-            frames.append(part)
-        if sleep_s > 0:
-            time.sleep(sleep_s)
+
+    if sync_mode == "full":
+        from_yyyymmdd = str(fetch_cfg.get("full_start") or "20180101")
+        periods = _quarter_period_ends(from_yyyymmdd, td)
+        for i, period in enumerate(periods):
+            logger.info("fina_indicator_vip 进度 %s/%s period=%s", i + 1, len(periods), period)
+            try:
+                part = fetch_tushare(
+                    "fina_indicator_vip", token_type=token_type, period=period
+                )
+            except Exception as exc:
+                logger.warning("fina_indicator_vip period=%s 失败: %s", period, exc)
+                continue
+            if not part.empty:
+                frames.append(part)
+            if sleep_s > 0:
+                time.sleep(sleep_s)
+    else:
+        param_list = build_api_call_params_list(task, trade_date)
+        for params in param_list:
+            part = fetch_tushare("fina_indicator_vip", token_type=token_type, **params)
+            if not part.empty:
+                frames.append(part)
 
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     out = apply_transform(df, task)
     write_td = write_trade_date_for_sync_mode(task, trade_date)
 
     logger.info(
-        "fina_indicator id=%s 股票数=%s 原始=%s 映射后=%s mode=%s",
+        "fina_indicator_vip id=%s 原始=%s 映射后=%s mode=%s",
         task["id"],
-        len(codes),
         len(df),
         len(out),
         sync_mode,
@@ -230,7 +230,7 @@ def sync_fina_indicator(task: TaskDict, trade_date: date | None, dry_run: bool) 
         database=task["target_database"],
         table=task["target_table"],
         df=out,
-        sync_mode="append" if sync_mode in ("snapshot", "full") else sync_mode,
+        sync_mode="append",
         trade_date=None,
     )
     return SyncResult(

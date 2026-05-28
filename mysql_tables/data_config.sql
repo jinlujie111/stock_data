@@ -265,24 +265,17 @@ INSERT INTO db_sync_task (
     1, '全量更新申万行业成分(Tushare index_member_all, is_new=Y)'
 );
 
--- Tushare fina_indicator → ods_fina_indicator（按股票循环；snapshot 按 ann_date 增量）
+-- Tushare fina_indicator_vip → ods_fina_indicator（全市场一季/一日；需约5000积分）
 INSERT INTO db_sync_task (
     proxy_source, source_table, target_database, target_table, target_table_describe,
     sync_mode, fetch_config, transform_config, status, remark
 ) VALUES (
-    'tushare', 'fina_indicator', 'stock_data', 'ods_fina_indicator', '上市公司财务指标', 'snapshot',
+    'tushare', 'fina_indicator_vip', 'stock_data', 'ods_fina_indicator', '上市公司财务指标', 'snapshot',
     JSON_OBJECT(
         'token_type', 'tushare',
-        'stock_list_api', 'stock_basic',
-        'stock_list_params', JSON_OBJECT('list_status', 'L', 'fields', 'ts_code'),
-        'stock_list_field', 'ts_code',
         'params', JSON_OBJECT('ann_date', '$trade_date'),
-        'full_params', JSON_OBJECT(
-            'start_date', '$full_start',
-            'end_date', '$full_end'
-        ),
         'full_start', '20180101',
-        'sleep_seconds', 0.25,
+        'sleep_seconds', 0.5,
         'inject_date_range', FALSE
     ),
     JSON_OBJECT(
@@ -297,5 +290,5 @@ INSERT INTO db_sync_task (
             'op_yoy', 'ebt_yoy', 'equity_yoy', 'q_profit_yoy', 'q_sales_yoy', 'ocf_yoy'
         )
     ),
-    1, '财务指标按股拉取(Tushare fina_indicator)；snapshot=当日公告日，full=按报告期区间历史'
+    1, '财务指标VIP(Tushare fina_indicator_vip)；snapshot=ann_date全市场，full=按季period回溯'
 );

@@ -175,5 +175,5 @@ CREATE TABLE IF NOT EXISTS ods_fina_indicator (
     q_sales_yoy        DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(单季度)(%)',
     ocf_yoy            DECIMAL(20, 6) NULL COMMENT '经营现金流同比增长率(%)',
     UNIQUE KEY uk_fina_indicator (ts_code, end_date, ann_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator_vip)';
 
