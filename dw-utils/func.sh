@@ -26,6 +26,9 @@ STOCK_MYSQL_USER="${STOCK_MYSQL_USER:-app_user}"
 STOCK_MYSQL_PASSWORD="${STOCK_MYSQL_PASSWORD:-jinlujie}"
 STOCK_MYSQL_DATABASE="${STOCK_MYSQL_DATABASE:-stock_data}"
 
+# --- 清除系统 HTTP 代理（避免 requests 误读占位符 http_proxy，影响 Tushare/AkShare）---
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY 2>/dev/null || true
+
 # --- Tushare 代理 API（db_token.api_url 优先；此处为兜底）---
 TUSHARE_HTTP_URL="${TUSHARE_HTTP_URL:-http://a.sszhixia.cn/}"
 # 代理 IP 兜底（阿里云 DNS 不稳时必配；curl -4 http://a.sszhixia.cn/ 不通则改 IP）

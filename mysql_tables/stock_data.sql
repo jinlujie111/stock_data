@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金流向(Tushare moneyflow_ind_dc)';
 
 CREATE TABLE IF NOT EXISTS ods_industry_classify (
-    index_code     VARCHAR(32)  NULL COMMENT '指数代码',  ??????
+    index_code     VARCHAR(32)  NULL COMMENT '指数代码',
     industry_name  VARCHAR(128) NULL COMMENT '行业名称',
     parent_code    VARCHAR(32)  NULL COMMENT '父级代码',
     level          VARCHAR(8)   NULL COMMENT '行业层级(L1/L2/L3)',
@@ -108,4 +108,72 @@ CREATE TABLE IF NOT EXISTS ods_industry_daily_di (
     total_mv     DECIMAL(20, 6) NULL COMMENT '总市值(万元)',
     UNIQUE KEY uk_industry_daily (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业日线行情(Tushare sw_daily)';
+
+CREATE TABLE IF NOT EXISTS ods_limit_list_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    ts_code         VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    industry        VARCHAR(128)   NULL COMMENT '所属行业',
+    name            VARCHAR(64)    NULL COMMENT '股票名称',
+    close           DECIMAL(20, 6) NULL COMMENT '收盘价',
+    pct_chg         DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    amount          DECIMAL(20, 4) NULL COMMENT '成交额',
+    limit_amount    DECIMAL(20, 4) NULL COMMENT '板上成交金额',
+    float_mv        DECIMAL(20, 4) NULL COMMENT '流通市值',
+    total_mv        DECIMAL(20, 4) NULL COMMENT '总市值',
+    turnover_ratio  DECIMAL(20, 6) NULL COMMENT '换手率',
+    fd_amount       DECIMAL(20, 4) NULL COMMENT '封单金额',
+    first_time      VARCHAR(16)    NULL COMMENT '首次封板时间',
+    last_time       VARCHAR(16)    NULL COMMENT '最后封板时间',
+    open_times      INT            NULL COMMENT '炸板次数(跌停为开板次数)',
+    up_stat         VARCHAR(32)    NULL COMMENT '涨停统计(N/T)',
+    limit_times     INT            NULL COMMENT '连板数',
+    `limit`         VARCHAR(4)     NOT NULL COMMENT 'U涨停 D跌停 Z炸板',
+    UNIQUE KEY uk_limit_list (trade_date, ts_code, `limit`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='涨跌停炸板列表(Tushare limit_list_d)';
+
+CREATE TABLE IF NOT EXISTS ods_index_member_all (
+    id         BIGINT PRIMARY KEY AUTO_INCREMENT,
+    l1_code    VARCHAR(32)  NULL COMMENT '一级行业代码',
+    l1_name    VARCHAR(64)  NULL COMMENT '一级行业名称',
+    l2_code    VARCHAR(32)  NULL COMMENT '二级行业代码',
+    l2_name    VARCHAR(64)  NULL COMMENT '二级行业名称',
+    l3_code    VARCHAR(32)  NULL COMMENT '三级行业代码',
+    l3_name    VARCHAR(64)  NULL COMMENT '三级行业名称',
+    ts_code    VARCHAR(16)  NOT NULL COMMENT '成分股票代码',
+    name       VARCHAR(64)  NULL COMMENT '成分股票名称',
+    in_date    DATE         NULL COMMENT '纳入日期',
+    out_date   DATE         NULL COMMENT '剔除日期',
+    is_new     VARCHAR(4)   NULL COMMENT '是否最新(Y/N)',
+    UNIQUE KEY uk_index_member_all (ts_code, l3_code, in_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业成分分级(Tushare index_member_all)';
+
+CREATE TABLE IF NOT EXISTS ods_fina_indicator (
+    id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code            VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date           DATE           NOT NULL COMMENT '公告日期',
+    end_date           DATE           NOT NULL COMMENT '报告期',
+    eps                DECIMAL(20, 6) NULL COMMENT '基本每股收益',
+    dt_eps             DECIMAL(20, 6) NULL COMMENT '稀释每股收益',
+    bps                DECIMAL(20, 6) NULL COMMENT '每股净资产',
+    roe                DECIMAL(20, 6) NULL COMMENT '净资产收益率',
+    roe_waa            DECIMAL(20, 6) NULL COMMENT '加权平均净资产收益率',
+    roe_dt             DECIMAL(20, 6) NULL COMMENT '净资产收益率(扣非)',
+    roa                DECIMAL(20, 6) NULL COMMENT '总资产报酬率',
+    grossprofit_margin DECIMAL(20, 6) NULL COMMENT '销售毛利率',
+    netprofit_margin   DECIMAL(20, 6) NULL COMMENT '销售净利率',
+    debt_to_assets     DECIMAL(20, 6) NULL COMMENT '资产负债率',
+    profit_dedt        DECIMAL(20, 4) NULL COMMENT '扣非净利润',
+    tr_yoy             DECIMAL(20, 6) NULL COMMENT '营业总收入同比增长率(%)',
+    or_yoy             DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(%)',
+    netprofit_yoy      DECIMAL(20, 6) NULL COMMENT '归母净利润同比增长率(%)',
+    dt_netprofit_yoy   DECIMAL(20, 6) NULL COMMENT '归母扣非净利润同比增长率(%)',
+    op_yoy             DECIMAL(20, 6) NULL COMMENT '营业利润同比增长率(%)',
+    ebt_yoy            DECIMAL(20, 6) NULL COMMENT '利润总额同比增长率(%)',
+    equity_yoy         DECIMAL(20, 6) NULL COMMENT '净资产同比增长率',
+    q_profit_yoy       DECIMAL(20, 6) NULL COMMENT '净利润同比增长率(单季度)(%)',
+    q_sales_yoy        DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(单季度)(%)',
+    ocf_yoy            DECIMAL(20, 6) NULL COMMENT '经营现金流同比增长率(%)',
+    UNIQUE KEY uk_fina_indicator (ts_code, end_date, ann_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator)';
 

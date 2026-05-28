@@ -7,15 +7,19 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Callable
 
 import pandas as pd
+from sqlalchemy import text
 
 from task_config import (
+    _resolve_params,
     apply_transform,
     build_api_call_params_list,
+    build_template_context,
     get_fetch_config,
     write_trade_date_for_sync_mode,
 )
@@ -117,6 +121,125 @@ def fetch_task_dataframe(task: TaskDict, trade_date: date | None) -> pd.DataFram
     if len(frames) == 1:
         return frames[0]
     return pd.concat(frames, ignore_index=True)
+
+
+def _load_ts_codes(fetch_cfg: dict[str, Any], token_type: str) -> list[str]:
+    api = fetch_cfg.get("stock_list_api") or "stock_basic"
+    params = dict(fetch_cfg.get("stock_list_params") or {"list_status": "L"})
+    field = fetch_cfg.get("stock_list_field") or "ts_code"
+    df = fetch_tushare(api, token_type=token_type, **params)
+    if df.empty or field not in df.columns:
+        return []
+    return sorted(df[field].dropna().astype(str).unique().tolist())
+
+
+def _delete_by_date_column(
+    database: str, table: str, column: str, value: date
+) -> None:
+    from mysql_config import get_target_engine
+
+    engine = get_target_engine(database)
+    with engine.begin() as conn:
+        conn.execute(
+            text(f"DELETE FROM `{table}` WHERE `{column}` = :v"),
+            {"v": value},
+        )
+
+
+@register("tushare", "fina_indicator")
+def sync_fina_indicator(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """fina_indicator 必须按 ts_code 循环；snapshot 按 ann_date 覆盖，full 按报告期区间拉历史。"""
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sync_mode = (task.get("sync_mode") or "snapshot").lower()
+    codes = _load_ts_codes(fetch_cfg, token_type)
+    if not codes:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message="stock_basic 未返回 ts_code 列表",
+        )
+
+    ctx = build_template_context(task, trade_date)
+    if sync_mode == "full":
+        base = _resolve_params(dict(fetch_cfg.get("full_params") or {}), ctx)
+    else:
+        ctx_list = build_api_call_params_list(task, trade_date)
+        base = ctx_list[0] if ctx_list else {}
+
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.25)
+    frames: list[pd.DataFrame] = []
+    for i, code in enumerate(codes):
+        params = dict(base)
+        params["ts_code"] = code
+        if (i + 1) % 200 == 0:
+            logger.info("fina_indicator 进度 %s/%s", i + 1, len(codes))
+        try:
+            part = fetch_tushare("fina_indicator", token_type=token_type, **params)
+        except Exception as exc:
+            logger.warning("fina_indicator %s 失败: %s", code, exc)
+            continue
+        if not part.empty:
+            frames.append(part)
+        if sleep_s > 0:
+            time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+    write_td = write_trade_date_for_sync_mode(task, trade_date)
+
+    logger.info(
+        "fina_indicator id=%s 股票数=%s 原始=%s 映射后=%s mode=%s",
+        task["id"],
+        len(codes),
+        len(df),
+        len(out),
+        sync_mode,
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if not out.empty and sync_mode == "snapshot" and write_td is not None:
+        _delete_by_date_column(
+            task["target_database"],
+            task["target_table"],
+            "ann_date",
+            write_td,
+        )
+    elif sync_mode == "full" and not out.empty:
+        from mysql_config import get_target_engine
+
+        engine = get_target_engine(task["target_database"])
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE `{task['target_table']}`"))
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="append" if sync_mode in ("snapshot", "full") else sync_mode,
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
 
 
 def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:

@@ -217,3 +217,85 @@ INSERT INTO db_sync_task (
     ),
     1, 'A股日线行情日快照(Tushare daily)'
 );
+
+-- Tushare limit_list_d → ods_limit_list_di（按日 snapshot，含涨停U/跌停D/炸板Z）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'limit_list_d', 'stock_data', 'ods_limit_list_di', '涨跌停炸板列表', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'limit'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code', 'limit'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'industry', 'name', 'close', 'pct_chg', 'amount',
+            'limit_amount', 'float_mv', 'total_mv', 'turnover_ratio', 'fd_amount',
+            'first_time', 'last_time', 'open_times', 'up_stat', 'limit_times', 'limit'
+        )
+    ),
+    1, '涨跌停炸板日快照(Tushare limit_list_d，U/D/Z)'
+);
+
+-- Tushare index_member_all → ods_index_member_all（full，申万行业成分分级）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'index_member_all', 'stock_data', 'ods_index_member_all', '申万行业成分分级', 'full',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('is_new', 'Y'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('in_date', '%Y%m%d', 'out_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'l3_code', 'in_date'),
+        'dropna', JSON_ARRAY('ts_code', 'l3_code'),
+        'keep_columns', JSON_ARRAY(
+            'l1_code', 'l1_name', 'l2_code', 'l2_name', 'l3_code', 'l3_name',
+            'ts_code', 'name', 'in_date', 'out_date', 'is_new'
+        )
+    ),
+    1, '全量更新申万行业成分(Tushare index_member_all, is_new=Y)'
+);
+
+-- Tushare fina_indicator → ods_fina_indicator（按股票循环；snapshot 按 ann_date 增量）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'fina_indicator', 'stock_data', 'ods_fina_indicator', '上市公司财务指标', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'stock_list_api', 'stock_basic',
+        'stock_list_params', JSON_OBJECT('list_status', 'L', 'fields', 'ts_code'),
+        'stock_list_field', 'ts_code',
+        'params', JSON_OBJECT('ann_date', '$trade_date'),
+        'full_params', JSON_OBJECT(
+            'start_date', '$full_start',
+            'end_date', '$full_end'
+        ),
+        'full_start', '20180101',
+        'sleep_seconds', 0.25,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'ann_date'),
+        'dropna', JSON_ARRAY('ts_code', 'end_date', 'ann_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'end_date',
+            'eps', 'dt_eps', 'bps', 'roe', 'roe_waa', 'roe_dt', 'roa',
+            'grossprofit_margin', 'netprofit_margin', 'debt_to_assets', 'profit_dedt',
+            'tr_yoy', 'or_yoy', 'netprofit_yoy', 'dt_netprofit_yoy',
+            'op_yoy', 'ebt_yoy', 'equity_yoy', 'q_profit_yoy', 'q_sales_yoy', 'ocf_yoy'
+        )
+    ),
+    1, '财务指标按股拉取(Tushare fina_indicator)；snapshot=当日公告日，full=按报告期区间历史'
+);
