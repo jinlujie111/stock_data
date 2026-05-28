@@ -40,6 +40,22 @@ CREATE TABLE IF NOT EXISTS ods_stock_fund_flow_di (
     UNIQUE KEY uk_stock_mf (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个股资金流向(Tushare moneyflow)';
 
+CREATE TABLE IF NOT EXISTS ods_stock_detail_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    open        DECIMAL(20, 6) NULL COMMENT '开盘价',
+    high        DECIMAL(20, 6) NULL COMMENT '最高价',
+    low         DECIMAL(20, 6) NULL COMMENT '最低价',
+    close       DECIMAL(20, 6) NULL COMMENT '收盘价',
+    pre_close   DECIMAL(20, 6) NULL COMMENT '昨收价(除权)',
+    `change`    DECIMAL(20, 6) NULL COMMENT '涨跌额',
+    pct_chg     DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    vol         DECIMAL(20, 6) NULL COMMENT '成交量(手)',
+    amount      DECIMAL(20, 6) NULL COMMENT '成交额(千元)',
+    UNIQUE KEY uk_stock_detail (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股日线行情(Tushare daily)';
+
 CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
     id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date            DATE           NOT NULL COMMENT '交易日期',

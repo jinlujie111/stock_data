@@ -193,3 +193,27 @@ INSERT INTO db_sync_task (
     ),
     1, '申万行业日线行情日快照(Tushare sw_daily)'
 );
+
+-- Tushare daily → ods_stock_detail_di（按日 snapshot，A股日线行情）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'daily', 'stock_data', 'ods_stock_detail_di', 'A股日线行情', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date',
+            'open', 'high', 'low', 'close', 'pre_close',
+            'change', 'pct_chg', 'vol', 'amount'
+        )
+    ),
+    1, 'A股日线行情日快照(Tushare daily)'
+);
