@@ -151,12 +151,16 @@ INSERT INTO db_sync_task (
         'token_type', 'tushare',
         'calls', JSON_ARRAY(
             JSON_OBJECT(
-                'src', 'SW2014',
-                'fields', 'index_code,industry_name,parent_code,level,industry_code,is_pub,src'
+                'params', JSON_OBJECT(
+                    'src', 'SW2014',
+                    'fields', 'index_code,industry_name,parent_code,level,industry_code,is_pub,src'
+                )
             ),
             JSON_OBJECT(
-                'src', 'SW2021',
-                'fields', 'index_code,industry_name,parent_code,level,industry_code,is_pub,src'
+                'params', JSON_OBJECT(
+                    'src', 'SW2021',
+                    'fields', 'index_code,industry_name,parent_code,level,industry_code,is_pub,src'
+                )
             )
         ),
         'inject_date_range', FALSE
@@ -329,9 +333,9 @@ INSERT INTO db_sync_task (
         'token_type', 'tushare',
         'params', JSON_OBJECT('trade_date', '$trade_date'),
         'calls', JSON_ARRAY(
-            JSON_OBJECT('ts_code', '000300.SH'),
-            JSON_OBJECT('ts_code', '000001.SH'),
-            JSON_OBJECT('ts_code', '399001.SZ')
+            JSON_OBJECT('params', JSON_OBJECT('ts_code', '000300.SH')),
+            JSON_OBJECT('params', JSON_OBJECT('ts_code', '000001.SH')),
+            JSON_OBJECT('params', JSON_OBJECT('ts_code', '399001.SZ'))
         ),
         'inject_date_range', FALSE
     ),
@@ -356,10 +360,7 @@ INSERT INTO db_sync_task (
     JSON_OBJECT(
         'token_type', 'tushare',
         'params', JSON_OBJECT('trade_date', '$trade_date'),
-        'calls', JSON_ARRAY(
-            JSON_OBJECT('exchange', 'SSE'),
-            JSON_OBJECT('exchange', 'SZSE')
-        ),
+        'exchange_list', JSON_ARRAY('SSE', 'SZSE'),
         'inject_date_range', FALSE
     ),
     JSON_OBJECT(
