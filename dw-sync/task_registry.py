@@ -19,6 +19,7 @@ from task_config import (
     apply_transform,
     build_api_call_params_list,
     get_fetch_config,
+    get_transform_config,
     write_trade_date_for_sync_mode,
 )
 
@@ -269,12 +270,14 @@ def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> Sync
             message="dry-run",
         )
 
+    transform_cfg = get_transform_config(task)
     rows = write_dataframe(
         database=task["target_database"],
         table=task["target_table"],
         df=out,
         sync_mode=sync_mode,
         trade_date=write_td,
+        snapshot_delete_column=transform_cfg.get("snapshot_delete_column"),
     )
     return SyncResult(
         task_id=task["id"],

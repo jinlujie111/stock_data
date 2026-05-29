@@ -18,6 +18,7 @@ def write_dataframe(
     df: pd.DataFrame,
     sync_mode: str,
     trade_date: date | None = None,
+    snapshot_delete_column: str | None = None,
 ) -> int:
     """按 sync_mode 写入目标表，返回写入行数。"""
     if df.empty:
@@ -30,10 +31,10 @@ def write_dataframe(
         if mode == "full":
             conn.execute(text(f"TRUNCATE TABLE `{table}`"))
         elif mode in ("snapshot", "incremental") and trade_date is not None:
-            if "trade_date" in df.columns:
-                # incremental：按业务日覆盖（可能含多 exchange）
+            delete_col = snapshot_delete_column or "trade_date"
+            if delete_col in df.columns:
                 conn.execute(
-                    text(f"DELETE FROM `{table}` WHERE trade_date = :td"),
+                    text(f"DELETE FROM `{table}` WHERE `{delete_col}` = :td"),
                     {"td": trade_date},
                 )
 

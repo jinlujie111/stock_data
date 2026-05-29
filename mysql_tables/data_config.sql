@@ -292,3 +292,108 @@ INSERT INTO db_sync_task (
     ),
     1, '财务指标VIP(Tushare fina_indicator_vip)；snapshot=ann_date全市场，full=按季period回溯'
 );
+
+-- Tushare report_rc → ods_report_rc_di（按日 snapshot，卖方盈利预测）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'report_rc', 'stock_data', 'ods_report_rc_di', '卖方盈利预测', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('report_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('report_date', '%Y%m%d'),
+        'snapshot_delete_column', 'report_date',
+        'dedupe', JSON_ARRAY('ts_code', 'report_date', 'org_name', 'quarter'),
+        'dropna', JSON_ARRAY('ts_code', 'report_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'name', 'report_date', 'report_title', 'report_type', 'classify',
+            'org_name', 'author_name', 'quarter',
+            'op_rt', 'op_pr', 'tp', 'np', 'eps', 'pe', 'rd', 'roe', 'ev_ebitda',
+            'rating', 'max_price', 'min_price', 'imp_dg'
+        )
+    ),
+    1, '卖方研报盈利预测日快照(Tushare report_rc，report_date=$trade_date，约8000积分)'
+);
+
+-- Tushare index_daily → ods_index_daily_di（按日 snapshot，多指数 RS 基准）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'index_daily', 'stock_data', 'ods_index_daily_di', '指数日线行情', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'calls', JSON_ARRAY(
+            JSON_OBJECT('ts_code', '000300.SH'),
+            JSON_OBJECT('ts_code', '000001.SH'),
+            JSON_OBJECT('ts_code', '399001.SZ')
+        ),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'pre_close',
+            'change', 'pct_chg', 'vol', 'amount'
+        )
+    ),
+    1, '指数日线日快照(Tushare index_daily；沪深300/上证/深证成指，trade_date=$trade_date)'
+);
+
+-- Tushare etf_share_size → ods_etf_share_size_di（按日 snapshot，沪深 ETF 份额/规模）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'etf_share_size', 'stock_data', 'ods_etf_share_size_di', 'ETF份额规模', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'calls', JSON_ARRAY(
+            JSON_OBJECT('exchange', 'SSE'),
+            JSON_OBJECT('exchange', 'SZSE')
+        ),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'etf_name', 'total_share', 'total_size',
+            'nav', 'close', 'exchange'
+        )
+    ),
+    1, 'ETF份额规模日快照(Tushare etf_share_size，按交易所SSE+SZSE，约8000积分，建议19点后)'
+);
+
+-- Tushare etf_basic → ods_etf_basic_di（full，上市 ETF 基础信息与跟踪指数）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'etf_basic', 'stock_data', 'ods_etf_basic_di', 'ETF基础信息', 'full',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('list_status', 'L'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('setup_date', '%Y%m%d', 'list_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code'),
+        'dropna', JSON_ARRAY('ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'csname', 'extname', 'cname', 'index_code', 'index_name',
+            'setup_date', 'list_date', 'list_status', 'exchange', 'mgr_name',
+            'custod_name', 'mgt_fee', 'etf_type'
+        )
+    ),
+    1, '全量更新上市ETF基础信息(Tushare etf_basic，list_status=L)'
+);

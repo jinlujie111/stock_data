@@ -117,6 +117,10 @@ def build_api_call_params_list(task: TaskDict, trade_date: date | None) -> list[
         for call in fetch_cfg["calls"]:
             base = dict(fetch_cfg.get("params") or {})
             base.update(call.get("params") or {})
+            # calls 项顶层字段亦作为 API 参数（如 index_classify 的 src、index_daily 的 ts_code）
+            for key, val in call.items():
+                if key != "params":
+                    base[key] = val
             result.append(_resolve_params(base, ctx))
         return result
 

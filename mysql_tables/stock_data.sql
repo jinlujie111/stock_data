@@ -177,3 +177,78 @@ CREATE TABLE IF NOT EXISTS ods_fina_indicator (
     UNIQUE KEY uk_fina_indicator (ts_code, end_date, ann_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator_vip)';
 
+CREATE TABLE IF NOT EXISTS ods_report_rc_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    name          VARCHAR(64)    NULL COMMENT '股票名称',
+    report_date   DATE           NOT NULL COMMENT '研报日期',
+    report_title  VARCHAR(512)   NULL COMMENT '报告标题',
+    report_type   VARCHAR(64)    NULL COMMENT '报告类型',
+    classify      VARCHAR(64)    NULL COMMENT '报告分类',
+    org_name      VARCHAR(128)   NULL COMMENT '机构名称',
+    author_name   VARCHAR(128)   NULL COMMENT '作者',
+    quarter       VARCHAR(16)    NULL COMMENT '预测报告期',
+    op_rt         DECIMAL(20, 4) NULL COMMENT '预测营业收入(万元)',
+    op_pr         DECIMAL(20, 4) NULL COMMENT '预测营业利润(万元)',
+    tp            DECIMAL(20, 4) NULL COMMENT '预测利润总额(万元)',
+    np            DECIMAL(20, 4) NULL COMMENT '预测净利润(万元)',
+    eps           DECIMAL(20, 6) NULL COMMENT '预测每股收益(元)',
+    pe            DECIMAL(20, 6) NULL COMMENT '预测市盈率',
+    rd            DECIMAL(20, 6) NULL COMMENT '预测股息率',
+    roe           DECIMAL(20, 6) NULL COMMENT '预测净资产收益率',
+    ev_ebitda     DECIMAL(20, 6) NULL COMMENT '预测EV/EBITDA',
+    rating        VARCHAR(32)    NULL COMMENT '卖方评级',
+    max_price     DECIMAL(20, 6) NULL COMMENT '预测最高目标价',
+    min_price     DECIMAL(20, 6) NULL COMMENT '预测最低目标价',
+    imp_dg        VARCHAR(32)    NULL COMMENT '机构关注度',
+    UNIQUE KEY uk_report_rc (ts_code, report_date, org_name, quarter)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='卖方盈利预测(Tushare report_rc)';
+
+CREATE TABLE IF NOT EXISTS ods_index_daily_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)    NOT NULL COMMENT '指数代码',
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    open        DECIMAL(20, 6) NULL COMMENT '开盘点位',
+    high        DECIMAL(20, 6) NULL COMMENT '最高点位',
+    low         DECIMAL(20, 6) NULL COMMENT '最低点位',
+    close       DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    pre_close   DECIMAL(20, 6) NULL COMMENT '昨收点位',
+    `change`    DECIMAL(20, 6) NULL COMMENT '涨跌点位',
+    pct_chg     DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    vol         DECIMAL(20, 6) NULL COMMENT '成交量(手)',
+    amount      DECIMAL(20, 6) NULL COMMENT '成交额(千元)',
+    UNIQUE KEY uk_index_daily (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数日线行情(Tushare index_daily)';
+
+CREATE TABLE IF NOT EXISTS ods_etf_share_size_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'ETF代码',
+    etf_name    VARCHAR(128)   NULL COMMENT '基金名称',
+    total_share DECIMAL(20, 4) NULL COMMENT '总份额(万份)',
+    total_size  DECIMAL(20, 4) NULL COMMENT '总规模(万元)',
+    nav         DECIMAL(20, 6) NULL COMMENT '基金份额净值(元)',
+    close       DECIMAL(20, 6) NULL COMMENT '收盘价(元)',
+    exchange    VARCHAR(8)     NULL COMMENT '交易所(SSE/SZSE/BSE)',
+    UNIQUE KEY uk_etf_share_size (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ETF份额规模(Tushare etf_share_size)';
+
+CREATE TABLE IF NOT EXISTS ods_etf_basic_di (
+    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code      VARCHAR(16)  NOT NULL COMMENT 'ETF交易代码',
+    csname       VARCHAR(128) NULL COMMENT 'ETF中文简称',
+    extname      VARCHAR(128) NULL COMMENT 'ETF扩位简称',
+    cname        VARCHAR(256) NULL COMMENT '基金中文全称',
+    index_code   VARCHAR(32)  NULL COMMENT '跟踪指数代码',
+    index_name   VARCHAR(128) NULL COMMENT '跟踪指数名称',
+    setup_date   DATE         NULL COMMENT '设立日期',
+    list_date    DATE         NULL COMMENT '上市日期',
+    list_status  VARCHAR(4)   NULL COMMENT '存续状态(L/D/P)',
+    exchange     VARCHAR(8)   NULL COMMENT '交易所(SH/SZ)',
+    mgr_name     VARCHAR(128) NULL COMMENT '基金管理人简称',
+    custod_name  VARCHAR(128) NULL COMMENT '基金托管人名称',
+    mgt_fee      DECIMAL(10, 6) NULL COMMENT '管理费率',
+    etf_type     VARCHAR(32)  NULL COMMENT '投资通道类型',
+    UNIQUE KEY uk_etf_basic (ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ETF基础信息(Tushare etf_basic)';
+
