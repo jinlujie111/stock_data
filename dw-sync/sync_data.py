@@ -28,6 +28,7 @@ for _p in (_DW_UTILS, _DW_SYNC):
 
 from mysql_config import load_sync_tasks  # noqa: E402
 from task_registry import SyncResult, run_task  # noqa: E402
+from trade_data_flag import get_trade_day_flag  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,6 +69,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="只拉取并统计行数，不写库",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="跳过交易日校验（非交易日也执行同步）",
     )
     return parser.parse_args(argv)
 
@@ -136,10 +142,27 @@ def run_sync(
     return results
 
 
+def should_skip_sync(trade_date: date, *, force: bool) -> bool:
+    """调度默认检查当天是否在 ods_trading_day；非交易日跳过同步。"""
+    if force:
+        return False
+    flag = get_trade_day_flag(trade_date)
+    if flag == 0:
+        logger.info(
+            "%s 不在 ods_trading_day，trade_day_flag=0，跳过同步",
+            trade_date,
+        )
+        return True
+    logger.info("%s 为交易日，trade_day_flag=1", trade_date)
+    return False
+
+
 def main(argv: list[str] | None = None) -> None:
     ensure_dw_loaded()
     args = parse_args(argv)
     td = parse_trade_date(args.trade_date)
+    if should_skip_sync(td, force=args.force):
+        return
     logger.info("业务日期: %s dry_run=%s", td, args.dry_run)
     run_sync(
         td,

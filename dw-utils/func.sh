@@ -98,6 +98,11 @@ install_sync_deps() {
     "${PYTHON_BIN}" -m pip install -r "${req}" -i https://pypi.tuna.tsinghua.edu.cn/simple
 }
 
+trade_day_flag() {
+    export PYTHONPATH="${DW_ROOT}/dw-utils:${DW_ROOT}/dw-sync:${PYTHONPATH:-}"
+    "${PYTHON_BIN}" "${DW_ROOT}/dw-sync/trade_data_flag.py" "$@"
+}
+
 run_data_sync() {
     local runner="${DW_ROOT}/dw-sync/sync_runner.sh"
     if [[ ! -f "${runner}" ]]; then
