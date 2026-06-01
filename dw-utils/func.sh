@@ -134,6 +134,15 @@ run_dim_industry_etf_map() {
     bash "${runner}" "$@"
 }
 
+run_ods_data_check() {
+    local runner="${DW_ROOT}/dw-monitor/pro_ods_data_check.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 #得到统计日期：YYYYMMDD（无参或全空时默认昨日；多参时取第一个非空）
 get_date()
 {
