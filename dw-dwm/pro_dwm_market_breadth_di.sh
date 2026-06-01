@@ -1,35 +1,39 @@
 #!/bin/bash
 # =============================================================================
-# target_table: dwd_market_breadth_di
+# target_table: dwm_market_breadth_di
 # source_table: ods_stock_detail_di, ods_limit_list_di
 # 全市场广度：涨/跌/平家数、涨跌停家数、上涨占比
 #
-# 用法:
-#   source dw-utils/func.sh
-#   bash dw-dwd/pro_dwd_market_breadth_di.sh              # 默认昨日
-#   bash dw-dwd/pro_dwd_market_breadth_di.sh 20260527
-#   bash dw-dwd/pro_dwd_market_breadth_di.sh 20260501 20260527
+# 用法（必须用 bash，不要用 sh）:
+#   bash dw-dwm/pro_dwm_market_breadth_di.sh              # 默认昨日
+#   bash dw-dwm/pro_dwm_market_breadth_di.sh 20260527
+#   bash dw-dwm/pro_dwm_market_breadth_di.sh 20260501 20260527
+#   或: run_dwm_market_breadth 20260527  （先 source dw-utils/func.sh）
 # =============================================================================
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DW_ROOT="$(cd "${SCRIPT_PATH}/.." && pwd)"
 # shellcheck source=/dev/null
-source "${DW_ROOT}/stock_data/dw-utils/func.sh"
+source "${DW_ROOT}/dw-utils/func.sh"
 
 n_date_s="$(get_date "${1:-}")"
-n_date_e="$(get_date "${2:-}" "${1:-}")"
+n_date_e="$(get_date "${2:-${1:-}}")"
 n_date="${n_date_e}"
 
 LOG_PATH="/root/log/stock_log/${n_date}"
 mkdir -p "${LOG_PATH}"
-exec 1>>"${LOG_PATH}/pro_dwd_market_breadth_di_${n_date}.log"
-exec 2>>"${LOG_PATH}/pro_dwd_market_breadth_di_${n_date}.log"
+exec 1>>"${LOG_PATH}/pro_dwm_market_breadth_di_${n_date}.log"
+exec 2>>"${LOG_PATH}/pro_dwm_market_breadth_di_${n_date}.log"
 
-echo "======== $(date '+%F %T') pro_dwd_market_breadth_di ${n_date_s} ~ ${n_date_e} ========"
+echo "======== $(date '+%F %T') pro_dwm_market_breadth_di ${n_date_s} ~ ${n_date_e} ========"
 
-sql_table="
-CREATE TABLE IF NOT EXISTS dwd_market_breadth_di (
+${data_mysql} -e "
+CREATE TABLE IF NOT EXISTS dwm_market_breadth_di (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date      DATE           NOT NULL COMMENT '交易日期',
     advance_cnt     INT            NOT NULL DEFAULT 0 COMMENT '上涨家数(pct_chg>0)',
@@ -41,8 +45,8 @@ CREATE TABLE IF NOT EXISTS dwd_market_breadth_di (
     total_cnt       INT            NOT NULL DEFAULT 0 COMMENT '参与统计家数(沪深A股)',
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_dwd_market_breadth (trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWD,来源ods_stock_detail_di+ods_limit_list_di)';
+    UNIQUE KEY uk_dwm_market_breadth (trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWM,来源ods_stock_detail_di+ods_limit_list_di)';
 "
 
 load_market_breadth() {
@@ -63,9 +67,9 @@ load_market_breadth() {
   fi
 
   ${data_mysql} -e "
-    DELETE FROM dwd_market_breadth_di WHERE trade_date = '${v_date}';
+    DELETE FROM dwm_market_breadth_di WHERE trade_date = '${v_date}';
 
-    INSERT INTO dwd_market_breadth_di (
+    INSERT INTO dwm_market_breadth_di (
         trade_date,
         advance_cnt,
         decline_cnt,
@@ -110,7 +114,7 @@ load_market_breadth() {
   ${data_mysql} -e "
     SELECT trade_date, advance_cnt, decline_cnt, flat_cnt,
            limit_up_cnt, limit_down_cnt, advance_ratio, total_cnt
-    FROM dwd_market_breadth_di
+    FROM dwm_market_breadth_di
     WHERE trade_date = '${v_date}';
   "
 }

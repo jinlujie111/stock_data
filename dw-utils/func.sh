@@ -112,8 +112,8 @@ run_data_sync() {
     bash "${runner}" "$@"
 }
 
-run_dwd_market_breadth() {
-    local runner="${DW_ROOT}/dw-dwd/pro_dwd_market_breadth_di.sh"
+run_dwm_market_breadth() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_market_breadth_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1
@@ -121,18 +121,35 @@ run_dwd_market_breadth() {
     bash "${runner}" "$@"
 }
 
-#得到统计日期：YYYYMMDD
+run_dwd_market_breadth() {
+    run_dwm_market_breadth "$@"
+}
+
+run_dim_industry_etf_map() {
+    local runner="${DW_ROOT}/dw_dim/pro_dim_industry_etf_map.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+#得到统计日期：YYYYMMDD（无参或全空时默认昨日；多参时取第一个非空）
 get_date()
 {
-  if [ $# -ge 1 ];then
-      n_date=`date -d $1 +"%Y%m%d"`
-      if [ $? -ne 0 ];then
-        n_date=`date -d yesterday +"%Y%m%d"`
-      fi
+  local d="" arg
+  for arg in "$@"; do
+    if [ -n "$arg" ]; then
+      d="$arg"
+      break
+    fi
+  done
+  if [ -n "$d" ]; then
+      n_date=$(date -d "$d" +"%Y%m%d" 2>/dev/null) || n_date=$(date -d yesterday +"%Y%m%d")
   else
-      n_date=`date -d yesterday +"%Y%m%d"`
+      n_date=$(date -d yesterday +"%Y%m%d")
   fi
-  echo ${n_date}
+  echo "${n_date}"
 }
 
 #格式化日期：YYYY-MM-DD

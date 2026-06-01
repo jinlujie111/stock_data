@@ -253,9 +253,9 @@ CREATE TABLE IF NOT EXISTS ods_etf_basic_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ETF基础信息(Tushare etf_basic)';
 
 -- -----------------------------------------------------------------------------
--- DWD：全市场广度（由 ODS 聚合，ETL: dw-dwd/pro_dwd_market_breadth_di.sh）
+-- DWM：全市场广度（由 ODS 聚合，ETL: dw-dwm/pro_dwm_market_breadth_di.sh）
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS dwd_market_breadth_di (
+CREATE TABLE IF NOT EXISTS dwm_market_breadth_di (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date      DATE           NOT NULL COMMENT '交易日期',
     advance_cnt     INT            NOT NULL DEFAULT 0 COMMENT '上涨家数(pct_chg>0)',
@@ -267,6 +267,31 @@ CREATE TABLE IF NOT EXISTS dwd_market_breadth_di (
     total_cnt       INT            NOT NULL DEFAULT 0 COMMENT '参与统计家数(沪深A股)',
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_dwd_market_breadth (trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWD,来源ods_stock_detail_di+ods_limit_list_di)';
+    UNIQUE KEY uk_dwm_market_breadth (trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWM,来源ods_stock_detail_di+ods_limit_list_di)';
 
+-- -----------------------------------------------------------------------------
+-- DIM：行业-ETF 映射（ETL: dw_dim/pro_dim_industry_etf_map.sh）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dim_industry_etf_map (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    industry_code   VARCHAR(32)    NOT NULL COMMENT '申万行业代码',
+    industry_name   VARCHAR(128)   NULL COMMENT '申万行业名称',
+    industry_level  VARCHAR(8)     NULL COMMENT '行业层级 L1/L2/L3',
+    index_code      VARCHAR(32)    NULL COMMENT 'ETF跟踪指数代码',
+    index_name      VARCHAR(128)   NULL COMMENT 'ETF跟踪指数名称',
+    etf_code        VARCHAR(16)    NOT NULL COMMENT 'ETF代码 ts_code',
+    etf_name        VARCHAR(128)   NULL COMMENT 'ETF简称',
+    exchange        VARCHAR(8)     NULL COMMENT '交易所 SH/SZ',
+    weight          DECIMAL(5, 4)  NOT NULL DEFAULT 1.0000 COMMENT '映射权重',
+    map_type        VARCHAR(16)    NOT NULL DEFAULT 'index_match' COMMENT 'index_match=自动 manual=人工',
+    sw_src          VARCHAR(16)    NULL COMMENT '申万分类版本',
+    effective_date  DATE           NOT NULL COMMENT '映射生效日',
+    remark          VARCHAR(256)   NULL COMMENT '备注',
+    is_active       TINYINT        NOT NULL DEFAULT 1 COMMENT '1有效 0停用',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dim_industry_etf (etf_code, industry_code, map_type),
+    KEY idx_dim_industry_etf_industry (industry_code, is_active),
+    KEY idx_dim_industry_etf_index (index_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业-ETF映射维表';
