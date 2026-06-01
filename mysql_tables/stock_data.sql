@@ -252,3 +252,21 @@ CREATE TABLE IF NOT EXISTS ods_etf_basic_di (
     UNIQUE KEY uk_etf_basic (ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ETF基础信息(Tushare etf_basic)';
 
+-- -----------------------------------------------------------------------------
+-- DWD：全市场广度（由 ODS 聚合，ETL: dw-dwd/pro_dwd_market_breadth_di.sh）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwd_market_breadth_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    advance_cnt     INT            NOT NULL DEFAULT 0 COMMENT '上涨家数(pct_chg>0)',
+    decline_cnt     INT            NOT NULL DEFAULT 0 COMMENT '下跌家数(pct_chg<0)',
+    flat_cnt        INT            NOT NULL DEFAULT 0 COMMENT '平盘家数(pct_chg=0或NULL)',
+    limit_up_cnt    INT            NOT NULL DEFAULT 0 COMMENT '涨停家数(limit=U)',
+    limit_down_cnt  INT            NOT NULL DEFAULT 0 COMMENT '跌停家数(limit=D)',
+    advance_ratio   DECIMAL(10, 6) NULL COMMENT '上涨占比=advance_cnt/total_cnt',
+    total_cnt       INT            NOT NULL DEFAULT 0 COMMENT '参与统计家数(沪深A股)',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwd_market_breadth (trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWD,来源ods_stock_detail_di+ods_limit_list_di)';
+

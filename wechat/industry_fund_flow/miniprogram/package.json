@@ -1,8 +1,0 @@
-{
-  "name": "industry-fund-miniprogram",
-  "version": "1.0.0",
-  "description": "A股主力资金监控小程序，依赖 Vant Weapp",
-  "dependencies": {
-    "@vant/weapp": "^1.11.6"
-  }
-}
