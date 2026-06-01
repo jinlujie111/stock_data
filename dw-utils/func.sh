@@ -126,7 +126,7 @@ run_dwd_market_breadth() {
 }
 
 run_dim_industry_etf_map() {
-    local runner="${DW_ROOT}/dw_dim/pro_dim_industry_etf_map.sh"
+    local runner="${DW_ROOT}/dw-dim/pro_dim_industry_etf_map.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1

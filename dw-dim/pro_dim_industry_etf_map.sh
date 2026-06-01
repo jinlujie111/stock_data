@@ -5,8 +5,8 @@
 # 行业 ↔ ETF 映射维表：自动段=ETF 跟踪指数对齐申万行业指数；manual 段保留不删
 #
 # 用法（必须用 bash，不要用 sh）:
-#   bash dw_dim/pro_dim_industry_etf_map.sh              # 默认昨日为生效日
-#   bash dw_dim/pro_dim_industry_etf_map.sh 20260527
+#   bash dw-dim/pro_dim_industry_etf_map.sh              # 默认昨日为生效日
+#   bash dw-dim/pro_dim_industry_etf_map.sh 20260527
 #   或: run_dim_industry_etf_map  （先 source dw-utils/func.sh）
 #
 # 环境变量:

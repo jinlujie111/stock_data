@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS dwm_market_breadth_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWM,来源ods_stock_detail_di+ods_limit_list_di)';
 
 -- -----------------------------------------------------------------------------
--- DIM：行业-ETF 映射（ETL: dw_dim/pro_dim_industry_etf_map.sh）
+-- DIM：行业-ETF 映射（ETL: dw-dim/pro_dim_industry_etf_map.sh）
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS dim_industry_etf_map (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
