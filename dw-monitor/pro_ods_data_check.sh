@@ -49,6 +49,7 @@ echo "======== $(date '+%F %T') pro_ods_data_check trade_date=${v_date} ========
 
 # snapshot 表：table|date_column|min_rows|说明
 # min_rows 为当日最少行数，低于则报警
+# 注：ods_fina_indicator 按 ann_date 稀疏，不做日检（避免误报）
 ODS_SNAPSHOT_CHECKS=(
   "ods_stock_detail_di|trade_date|4000|A股日线daily"
   "ods_industry_daily_di|trade_date|30|申万行业日线sw_daily"
@@ -56,7 +57,6 @@ ODS_SNAPSHOT_CHECKS=(
   "ods_industry_fund_flow_di|trade_date|50|东财行业资金流moneyflow_ind_dc"
   "ods_limit_list_di|trade_date|5|涨跌停limit_list_d"
   "ods_index_daily_di|trade_date|3|指数日线index_daily"
-  "ods_fina_indicator|ann_date|50|财务指标fina_indicator_vip"
   "ods_report_rc_di|report_date|1|卖方预测report_rc"
   "ods_etf_share_size_di|trade_date|100|ETF份额etf_share_size"
 )
