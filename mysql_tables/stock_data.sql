@@ -390,6 +390,32 @@ CREATE TABLE IF NOT EXISTS dwm_market_breadth_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWM,来源ods_stock_detail_di+ods_limit_list_di)';
 
 -- -----------------------------------------------------------------------------
+-- DWM：东财板块资金强度（由 ODS 聚合，ETL: dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    net_amount            DECIMAL(20, 4) NULL COMMENT '主力净流入净额(元)',
+    net_amount_wan        DECIMAL(20, 4) NULL COMMENT '主力净流入净额(万元)',
+    net_amount_rate       DECIMAL(20, 6) NULL COMMENT '主力净流入占比(%)',
+    buy_elg_amount        DECIMAL(20, 4) NULL COMMENT '超大单净流入(元)',
+    pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
+    board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,来源ods_dc_daily)',
+    fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
+    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
+    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
+    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg',
+    elg_net_ratio         DECIMAL(20, 6) NULL COMMENT '超大单占主力净流入比',
+    dc_rank               INT            NULL COMMENT '东财资金流排名',
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_dc_industry_fund_flow (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金强度(DWM,来源ods_industry_fund_flow_di+ods_dc_daily)';
+
+-- -----------------------------------------------------------------------------
 -- DIM：行业-ETF 映射（ETL: dw-dim/pro_dim_industry_etf_map.sh）
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS dim_industry_etf_map (
