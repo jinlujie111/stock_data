@@ -55,10 +55,14 @@ ODS_SNAPSHOT_CHECKS=(
   "ods_industry_daily_di|trade_date|30|申万行业日线sw_daily"
   "ods_stock_fund_flow_di|trade_date|4000|个股资金流moneyflow"
   "ods_industry_fund_flow_di|trade_date|50|东财行业资金流moneyflow_ind_dc"
+  "ods_dc_index_di|trade_date|50|东财板块指数dc_index"
+  "ods_dc_daily_di|trade_date|50|东财板块日线dc_daily"
+  "ods_dc_member_di|trade_date|1000|东财板块成分dc_member"
   "ods_limit_list_di|trade_date|5|涨跌停limit_list_d"
   "ods_index_daily_di|trade_date|3|指数日线index_daily"
   "ods_report_rc_di|report_date|1|卖方预测report_rc"
   "ods_etf_share_size_di|trade_date|100|ETF份额etf_share_size"
+  "ods_ths_daily_di|trade_date|100|同花顺板块日线ths_daily"
 )
 
 # full 表：不按日，检查全表行数下限
@@ -67,6 +71,8 @@ ODS_FULL_CHECKS=(
   "ods_industry_classify|200|申万行业分类index_classify"
   "ods_index_member_all|3000|申万成分index_member_all"
   "ods_etf_basic_di|50|ETF基础etf_basic"
+  "ods_ths_index_di|200|同花顺板块指数ths_index"
+  "ods_ths_member_di|5000|同花顺板块成分ths_member"
 )
 
 alert_cnt=0

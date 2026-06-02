@@ -141,6 +141,84 @@ INSERT INTO db_sync_task (
     1, '东财行业/概念/地域板块资金流向日快照(Tushare moneyflow_ind_dc)'
 );
 
+-- Tushare dc_index → ods_dc_index_di（按日 snapshot，东财板块指数）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'dc_index', 'stock_data', 'ods_dc_index_di', '东财板块指数', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'calls', JSON_ARRAY(
+            JSON_OBJECT('params', JSON_OBJECT('idx_type', '行业板块')),
+            JSON_OBJECT('params', JSON_OBJECT('idx_type', '概念板块')),
+            JSON_OBJECT('params', JSON_OBJECT('idx_type', '地域板块'))
+        ),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('name', 'dc_name', 'leading', 'dc_leading'),
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'dc_name', 'dc_leading', 'leading_code',
+            'pct_change', 'leading_pct', 'total_mv', 'turnover_rate',
+            'up_num', 'down_num', 'idx_type', 'level'
+        )
+    ),
+    1, '东财板块指数日快照(Tushare dc_index, 行业+概念+地域；单次最多5000行/类型，需约6000积分)'
+);
+
+-- Tushare dc_daily → ods_dc_daily_di（按日 snapshot，东财板块日线行情）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'dc_daily', 'stock_data', 'ods_dc_daily_di', '东财板块日线行情', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'calls', JSON_ARRAY(
+            JSON_OBJECT('params', JSON_OBJECT('idx_type', '行业板块')),
+            JSON_OBJECT('params', JSON_OBJECT('idx_type', '概念板块')),
+            JSON_OBJECT('params', JSON_OBJECT('idx_type', '地域板块'))
+        ),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date', 'open', 'high', 'low', 'close',
+            'change', 'pct_change', 'vol', 'amount', 'swing', 'turnover_rate'
+        )
+    ),
+    1, '东财板块日线日快照(Tushare dc_daily, 行业+概念+地域；单次最多2000行/类型，需约6000积分)'
+);
+
+-- Tushare dc_member → ods_dc_member_di（按日 snapshot，东财板块成分）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'dc_member', 'stock_data', 'ods_dc_member_di', '东财板块成分', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'con_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code', 'con_code'),
+        'keep_columns', JSON_ARRAY('trade_date', 'ts_code', 'con_code', 'name')
+    ),
+    1, '东财板块成分日快照(Tushare dc_member, trade_date全市场；单次最多5000行，需约6000积分)'
+);
+
 -- Tushare index_classify → ods_industry_classify（full，字段与接口一致）
 INSERT INTO db_sync_task (
     proxy_source, source_table, target_database, target_table, target_table_describe,
@@ -397,4 +475,76 @@ INSERT INTO db_sync_task (
         )
     ),
     1, '全量更新上市ETF基础信息(Tushare etf_basic，list_status=L)'
+);
+
+-- Tushare ths_index → ods_ths_index_di（full，同花顺板块指数列表）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'ths_index', 'stock_data', 'ods_ths_index_di', '同花顺板块指数', 'full',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('exchange', 'A'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('type', 'index_type'),
+        'date_columns', JSON_OBJECT('list_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code'),
+        'dropna', JSON_ARRAY('ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'name', 'count', 'exchange', 'list_date', 'index_type'
+        )
+    ),
+    1, '全量更新同花顺板块指数(Tushare ths_index, exchange=A；需约6000积分)'
+);
+
+-- Tushare ths_daily → ods_ths_daily_di（按日 snapshot，同花顺板块指数日线）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'ths_daily', 'stock_data', 'ods_ths_daily_di', '同花顺板块指数日线', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date', 'open', 'high', 'low', 'close', 'pre_close',
+            'avg_price', 'change', 'pct_change', 'vol', 'turnover_rate', 'total_mv', 'float_mv'
+        )
+    ),
+    1, '同花顺板块指数日线日快照(Tushare ths_daily, trade_date全市场；单次最多3000行，需约6000积分)'
+);
+
+-- Tushare ths_member → ods_ths_member_di（full，按 ods_ths_index_di 循环拉成分）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'ths_member', 'stock_data', 'ods_ths_member_di', '同花顺板块成分', 'full',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'index_table', 'ods_ths_index_di',
+        'index_database', 'stock_data',
+        'index_exchange', 'A',
+        'sleep_seconds', 0.35,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('con_name', 'name'),
+        'date_columns', JSON_OBJECT('in_date', '%Y%m%d', 'out_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'con_code'),
+        'dropna', JSON_ARRAY('ts_code', 'con_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'con_code', 'name', 'weight', 'in_date', 'out_date', 'is_new'
+        )
+    ),
+    1, '全量更新同花顺板块成分(Tushare ths_member；依赖 ods_ths_index_di，按 ts_code 循环；需约6000积分)'
 );

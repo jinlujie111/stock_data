@@ -243,6 +243,97 @@ def sync_fina_indicator_vip(
     )
 
 
+@register("tushare", "ths_member")
+def sync_ths_member(
+    task: TaskDict, trade_date: date | None, dry_run: bool
+) -> SyncResult:
+    """ths_member 需按板块 ts_code 循环；指数列表来自 ods_ths_index_di。"""
+    from mysql_config import get_target_engine
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.35)
+    index_table = str(fetch_cfg.get("index_table") or "ods_ths_index_di")
+    index_database = str(fetch_cfg.get("index_database") or task["target_database"])
+    index_exchange = fetch_cfg.get("index_exchange")
+
+    engine = get_target_engine(index_database)
+    sql = f"SELECT ts_code FROM `{index_table}`"
+    params: dict[str, Any] = {}
+    if index_exchange:
+        sql += " WHERE exchange = :ex"
+        params["ex"] = index_exchange
+    sql += " ORDER BY ts_code"
+
+    with engine.connect() as conn:
+        codes = [row[0] for row in conn.execute(text(sql), params).fetchall()]
+
+    if not codes:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message=f"{index_database}.{index_table} 无 ts_code，请先同步 ths_index",
+        )
+
+    frames: list[pd.DataFrame] = []
+    for i, ts_code in enumerate(codes):
+        logger.info("ths_member 进度 %s/%s ts_code=%s", i + 1, len(codes), ts_code)
+        try:
+            part = fetch_tushare("ths_member", token_type=token_type, ts_code=ts_code)
+        except Exception as exc:
+            logger.warning("ths_member ts_code=%s 失败: %s", ts_code, exc)
+            continue
+        if not part.empty:
+            frames.append(part)
+        if sleep_s > 0 and i + 1 < len(codes):
+            time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+
+    logger.info(
+        "ths_member id=%s 板块=%s 原始=%s 映射后=%s",
+        task["id"],
+        len(codes),
+        len(df),
+        len(out),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if not out.empty:
+        target_engine = get_target_engine(task["target_database"])
+        with target_engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE `{task['target_table']}`"))
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="append",
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
     """通用同步：fetch_config → 拉数 → transform_config → 写库。"""
     from sync_writer import write_dataframe

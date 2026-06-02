@@ -1,7 +1,5 @@
 -- ============================================================================
--- 交易日维度表 trading_day_di
--- 设计说明：
---   存储历史和未来的交易日信息，用于数据处理时判断日期是否为交易日。
+-- 交易日数据
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ods_trading_day (
@@ -14,6 +12,10 @@ CREATE TABLE IF NOT EXISTS ods_trading_day_di (
     is_open       VARCHAR(1) COMMENT '是否交易 0休市 1交易',
     pretrade_date VARCHAR(10) COMMENT '上一个交易日'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交易日维度增量日期';
+
+-- ============================================================================
+-- 股票数据
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ods_stock_fund_flow_di (
     id                BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -56,6 +58,98 @@ CREATE TABLE IF NOT EXISTS ods_stock_detail_di (
     UNIQUE KEY uk_stock_detail (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股日线行情(Tushare daily)';
 
+
+CREATE TABLE IF NOT EXISTS ods_limit_list_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    ts_code         VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    industry        VARCHAR(128)   NULL COMMENT '所属行业',
+    name            VARCHAR(64)    NULL COMMENT '股票名称',
+    close           DECIMAL(20, 6) NULL COMMENT '收盘价',
+    pct_chg         DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    amount          DECIMAL(20, 4) NULL COMMENT '成交额',
+    limit_amount    DECIMAL(20, 4) NULL COMMENT '板上成交金额',
+    float_mv        DECIMAL(20, 4) NULL COMMENT '流通市值',
+    total_mv        DECIMAL(20, 4) NULL COMMENT '总市值',
+    turnover_ratio  DECIMAL(20, 6) NULL COMMENT '换手率',
+    fd_amount       DECIMAL(20, 4) NULL COMMENT '封单金额',
+    first_time      VARCHAR(16)    NULL COMMENT '首次封板时间',
+    last_time       VARCHAR(16)    NULL COMMENT '最后封板时间',
+    open_times      INT            NULL COMMENT '炸板次数(跌停为开板次数)',
+    up_stat         VARCHAR(32)    NULL COMMENT '涨停统计(N/T)',
+    limit_times     INT            NULL COMMENT '连板数',
+    `limit`         VARCHAR(4)     NOT NULL COMMENT 'U涨停 D跌停 Z炸板',
+    UNIQUE KEY uk_limit_list (trade_date, ts_code, `limit`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='涨跌停炸板列表(Tushare limit_list_d)';
+
+-- ============================================================================
+-- 股票财务数据
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ods_fina_indicator (
+    id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code            VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date           DATE           NOT NULL COMMENT '公告日期',
+    end_date           DATE           NOT NULL COMMENT '报告期',
+    eps                DECIMAL(20, 6) NULL COMMENT '基本每股收益',
+    dt_eps             DECIMAL(20, 6) NULL COMMENT '稀释每股收益',
+    bps                DECIMAL(20, 6) NULL COMMENT '每股净资产',
+    roe                DECIMAL(20, 6) NULL COMMENT '净资产收益率',
+    roe_waa            DECIMAL(20, 6) NULL COMMENT '加权平均净资产收益率',
+    roe_dt             DECIMAL(20, 6) NULL COMMENT '净资产收益率(扣非)',
+    roa                DECIMAL(20, 6) NULL COMMENT '总资产报酬率',
+    grossprofit_margin DECIMAL(20, 6) NULL COMMENT '销售毛利率',
+    netprofit_margin   DECIMAL(20, 6) NULL COMMENT '销售净利率',
+    debt_to_assets     DECIMAL(20, 6) NULL COMMENT '资产负债率',
+    profit_dedt        DECIMAL(20, 4) NULL COMMENT '扣非净利润',
+    tr_yoy             DECIMAL(20, 6) NULL COMMENT '营业总收入同比增长率(%)',
+    or_yoy             DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(%)',
+    netprofit_yoy      DECIMAL(20, 6) NULL COMMENT '归母净利润同比增长率(%)',
+    dt_netprofit_yoy   DECIMAL(20, 6) NULL COMMENT '归母扣非净利润同比增长率(%)',
+    op_yoy             DECIMAL(20, 6) NULL COMMENT '营业利润同比增长率(%)',
+    ebt_yoy            DECIMAL(20, 6) NULL COMMENT '利润总额同比增长率(%)',
+    equity_yoy         DECIMAL(20, 6) NULL COMMENT '净资产同比增长率',
+    q_profit_yoy       DECIMAL(20, 6) NULL COMMENT '净利润同比增长率(单季度)(%)',
+    q_sales_yoy        DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(单季度)(%)',
+    ocf_yoy            DECIMAL(20, 6) NULL COMMENT '经营现金流同比增长率(%)',
+    UNIQUE KEY uk_fina_indicator (ts_code, end_date, ann_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator_vip)';
+
+-- ============================================================================
+-- 股票的预测信息
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ods_report_rc_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    name          VARCHAR(64)    NULL COMMENT '股票名称',
+    report_date   DATE           NOT NULL COMMENT '研报日期',
+    report_title  VARCHAR(512)   NULL COMMENT '报告标题',
+    report_type   VARCHAR(64)    NULL COMMENT '报告类型',
+    classify      VARCHAR(64)    NULL COMMENT '报告分类',
+    org_name      VARCHAR(128)   NULL COMMENT '机构名称',
+    author_name   VARCHAR(128)   NULL COMMENT '作者',
+    quarter       VARCHAR(16)    NULL COMMENT '预测报告期',
+    op_rt         DECIMAL(20, 4) NULL COMMENT '预测营业收入(万元)',
+    op_pr         DECIMAL(20, 4) NULL COMMENT '预测营业利润(万元)',
+    tp            DECIMAL(20, 4) NULL COMMENT '预测利润总额(万元)',
+    np            DECIMAL(20, 4) NULL COMMENT '预测净利润(万元)',
+    eps           DECIMAL(20, 6) NULL COMMENT '预测每股收益(元)',
+    pe            DECIMAL(20, 6) NULL COMMENT '预测市盈率',
+    rd            DECIMAL(20, 6) NULL COMMENT '预测股息率',
+    roe           DECIMAL(20, 6) NULL COMMENT '预测净资产收益率',
+    ev_ebitda     DECIMAL(20, 6) NULL COMMENT '预测EV/EBITDA',
+    rating        VARCHAR(32)    NULL COMMENT '卖方评级',
+    max_price     DECIMAL(20, 6) NULL COMMENT '预测最高目标价',
+    min_price     DECIMAL(20, 6) NULL COMMENT '预测最低目标价',
+    imp_dg        VARCHAR(32)    NULL COMMENT '机构关注度',
+    UNIQUE KEY uk_report_rc (ts_code, report_date, org_name, quarter)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='卖方盈利预测(Tushare report_rc)';
+
+-- ============================================================================
+-- 东财板块数据
+-- ============================================================================
+
 CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
     id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date            DATE           NOT NULL COMMENT '交易日期',
@@ -78,6 +172,100 @@ CREATE TABLE IF NOT EXISTS ods_industry_fund_flow_di (
     `rank`                INT            NULL COMMENT '序号',
     UNIQUE KEY uk_industry_mf_dc (trade_date, industry_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金流向(Tushare moneyflow_ind_dc)';
+
+CREATE TABLE IF NOT EXISTS ods_dc_index_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    ts_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    dc_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    dc_leading      VARCHAR(64)    NULL COMMENT '领涨股票名称',
+    leading_code    VARCHAR(16)    NULL COMMENT '领涨股票代码',
+    pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    leading_pct     DECIMAL(20, 6) NULL COMMENT '领涨股票涨跌幅(%)',
+    total_mv        DECIMAL(20, 4) NULL COMMENT '总市值(万元)',
+    turnover_rate   DECIMAL(20, 6) NULL COMMENT '换手率(%)',
+    up_num          INT            NULL COMMENT '上涨家数',
+    down_num        INT            NULL COMMENT '下跌家数',
+    idx_type        VARCHAR(32)    NULL COMMENT '板块类型(行业板块/概念板块/地域板块)',
+    level           VARCHAR(16)    NULL COMMENT '行业层级',
+    UNIQUE KEY uk_dc_index (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块指数日快照(Tushare dc_index)';
+
+CREATE TABLE IF NOT EXISTS ods_dc_daily_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    open            DECIMAL(20, 6) NULL COMMENT '开盘点位',
+    high            DECIMAL(20, 6) NULL COMMENT '最高点位',
+    low             DECIMAL(20, 6) NULL COMMENT '最低点位',
+    close           DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    `change`        DECIMAL(20, 6) NULL COMMENT '涨跌点位',
+    pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    vol             DECIMAL(20, 4) NULL COMMENT '成交量(股)',
+    amount          DECIMAL(20, 4) NULL COMMENT '成交额(元)',
+    swing           DECIMAL(20, 6) NULL COMMENT '振幅(%)',
+    turnover_rate   DECIMAL(20, 6) NULL COMMENT '换手率(%)',
+    UNIQUE KEY uk_dc_daily (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块日线行情(Tushare dc_daily)';
+
+CREATE TABLE IF NOT EXISTS ods_dc_member_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE         NOT NULL COMMENT '交易日期',
+    ts_code     VARCHAR(32)  NOT NULL COMMENT '板块/概念代码(东财)',
+    con_code    VARCHAR(16)  NOT NULL COMMENT '成分股票代码',
+    name        VARCHAR(64)  NULL COMMENT '成分股票名称',
+    UNIQUE KEY uk_dc_member (trade_date, ts_code, con_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块成分(Tushare dc_member)';
+
+-- ============================================================================
+-- 同花顺板块数据
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ods_ths_index_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)  NOT NULL COMMENT '指数代码',
+    name        VARCHAR(128) NULL COMMENT '指数名称',
+    count       INT          NULL COMMENT '成分个数',
+    exchange    VARCHAR(8)   NULL COMMENT '市场类型(A/HK/US)',
+    list_date   DATE         NULL COMMENT '上市日期',
+    index_type  VARCHAR(8)   NULL COMMENT '指数类型(N概念/I行业/R地域/S特色/ST风格/TH主题/BB宽基)',
+    UNIQUE KEY uk_ths_index (ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块指数(Tushare ths_index)';
+
+CREATE TABLE IF NOT EXISTS ods_ths_daily_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code         VARCHAR(16)    NOT NULL COMMENT '板块指数代码',
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    open            DECIMAL(20, 6) NULL COMMENT '开盘点位',
+    high            DECIMAL(20, 6) NULL COMMENT '最高点位',
+    low             DECIMAL(20, 6) NULL COMMENT '最低点位',
+    close           DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    pre_close       DECIMAL(20, 6) NULL COMMENT '昨收点位',
+    avg_price       DECIMAL(20, 6) NULL COMMENT '平均价',
+    `change`        DECIMAL(20, 6) NULL COMMENT '涨跌点位',
+    pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    vol             DECIMAL(20, 6) NULL COMMENT '成交量(手)',
+    turnover_rate   DECIMAL(20, 6) NULL COMMENT '换手率(%)',
+    total_mv        DECIMAL(20, 4) NULL COMMENT '总市值(元)',
+    float_mv        DECIMAL(20, 4) NULL COMMENT '流通市值(元)',
+    UNIQUE KEY uk_ths_daily (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块指数日线(Tushare ths_daily)';
+
+CREATE TABLE IF NOT EXISTS ods_ths_member_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)  NOT NULL COMMENT '板块指数代码',
+    con_code    VARCHAR(16)  NOT NULL COMMENT '成分股票代码',
+    name        VARCHAR(64)  NULL COMMENT '成分股票名称',
+    weight      DECIMAL(20, 6) NULL COMMENT '权重(暂无)',
+    in_date     DATE         NULL COMMENT '纳入日期(暂无)',
+    out_date    DATE         NULL COMMENT '剔除日期(暂无)',
+    is_new      VARCHAR(4)   NULL COMMENT '是否最新(Y/N)',
+    UNIQUE KEY uk_ths_member (ts_code, con_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块成分(Tushare ths_member)';
+
+-- ============================================================================
+-- 申万行业指数信息
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ods_industry_classify (
     index_code     VARCHAR(32)  NULL COMMENT '指数代码',
@@ -109,29 +297,6 @@ CREATE TABLE IF NOT EXISTS ods_industry_daily_di (
     UNIQUE KEY uk_industry_daily (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业日线行情(Tushare sw_daily)';
 
-CREATE TABLE IF NOT EXISTS ods_limit_list_di (
-    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
-    trade_date      DATE           NOT NULL COMMENT '交易日期',
-    ts_code         VARCHAR(16)    NOT NULL COMMENT 'TS代码',
-    industry        VARCHAR(128)   NULL COMMENT '所属行业',
-    name            VARCHAR(64)    NULL COMMENT '股票名称',
-    close           DECIMAL(20, 6) NULL COMMENT '收盘价',
-    pct_chg         DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
-    amount          DECIMAL(20, 4) NULL COMMENT '成交额',
-    limit_amount    DECIMAL(20, 4) NULL COMMENT '板上成交金额',
-    float_mv        DECIMAL(20, 4) NULL COMMENT '流通市值',
-    total_mv        DECIMAL(20, 4) NULL COMMENT '总市值',
-    turnover_ratio  DECIMAL(20, 6) NULL COMMENT '换手率',
-    fd_amount       DECIMAL(20, 4) NULL COMMENT '封单金额',
-    first_time      VARCHAR(16)    NULL COMMENT '首次封板时间',
-    last_time       VARCHAR(16)    NULL COMMENT '最后封板时间',
-    open_times      INT            NULL COMMENT '炸板次数(跌停为开板次数)',
-    up_stat         VARCHAR(32)    NULL COMMENT '涨停统计(N/T)',
-    limit_times     INT            NULL COMMENT '连板数',
-    `limit`         VARCHAR(4)     NOT NULL COMMENT 'U涨停 D跌停 Z炸板',
-    UNIQUE KEY uk_limit_list (trade_date, ts_code, `limit`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='涨跌停炸板列表(Tushare limit_list_d)';
-
 CREATE TABLE IF NOT EXISTS ods_index_member_all (
     id         BIGINT PRIMARY KEY AUTO_INCREMENT,
     l1_code    VARCHAR(32)  NULL COMMENT '一级行业代码',
@@ -148,65 +313,15 @@ CREATE TABLE IF NOT EXISTS ods_index_member_all (
     UNIQUE KEY uk_index_member_all (ts_code, l3_code, in_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申万行业成分分级(Tushare index_member_all)';
 
-CREATE TABLE IF NOT EXISTS ods_fina_indicator (
-    id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ts_code            VARCHAR(16)    NOT NULL COMMENT 'TS代码',
-    ann_date           DATE           NOT NULL COMMENT '公告日期',
-    end_date           DATE           NOT NULL COMMENT '报告期',
-    eps                DECIMAL(20, 6) NULL COMMENT '基本每股收益',
-    dt_eps             DECIMAL(20, 6) NULL COMMENT '稀释每股收益',
-    bps                DECIMAL(20, 6) NULL COMMENT '每股净资产',
-    roe                DECIMAL(20, 6) NULL COMMENT '净资产收益率',
-    roe_waa            DECIMAL(20, 6) NULL COMMENT '加权平均净资产收益率',
-    roe_dt             DECIMAL(20, 6) NULL COMMENT '净资产收益率(扣非)',
-    roa                DECIMAL(20, 6) NULL COMMENT '总资产报酬率',
-    grossprofit_margin DECIMAL(20, 6) NULL COMMENT '销售毛利率',
-    netprofit_margin   DECIMAL(20, 6) NULL COMMENT '销售净利率',
-    debt_to_assets     DECIMAL(20, 6) NULL COMMENT '资产负债率',
-    profit_dedt        DECIMAL(20, 4) NULL COMMENT '扣非净利润',
-    tr_yoy             DECIMAL(20, 6) NULL COMMENT '营业总收入同比增长率(%)',
-    or_yoy             DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(%)',
-    netprofit_yoy      DECIMAL(20, 6) NULL COMMENT '归母净利润同比增长率(%)',
-    dt_netprofit_yoy   DECIMAL(20, 6) NULL COMMENT '归母扣非净利润同比增长率(%)',
-    op_yoy             DECIMAL(20, 6) NULL COMMENT '营业利润同比增长率(%)',
-    ebt_yoy            DECIMAL(20, 6) NULL COMMENT '利润总额同比增长率(%)',
-    equity_yoy         DECIMAL(20, 6) NULL COMMENT '净资产同比增长率',
-    q_profit_yoy       DECIMAL(20, 6) NULL COMMENT '净利润同比增长率(单季度)(%)',
-    q_sales_yoy        DECIMAL(20, 6) NULL COMMENT '营业收入同比增长率(单季度)(%)',
-    ocf_yoy            DECIMAL(20, 6) NULL COMMENT '经营现金流同比增长率(%)',
-    UNIQUE KEY uk_fina_indicator (ts_code, end_date, ann_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator_vip)';
 
-CREATE TABLE IF NOT EXISTS ods_report_rc_di (
-    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS代码',
-    name          VARCHAR(64)    NULL COMMENT '股票名称',
-    report_date   DATE           NOT NULL COMMENT '研报日期',
-    report_title  VARCHAR(512)   NULL COMMENT '报告标题',
-    report_type   VARCHAR(64)    NULL COMMENT '报告类型',
-    classify      VARCHAR(64)    NULL COMMENT '报告分类',
-    org_name      VARCHAR(128)   NULL COMMENT '机构名称',
-    author_name   VARCHAR(128)   NULL COMMENT '作者',
-    quarter       VARCHAR(16)    NULL COMMENT '预测报告期',
-    op_rt         DECIMAL(20, 4) NULL COMMENT '预测营业收入(万元)',
-    op_pr         DECIMAL(20, 4) NULL COMMENT '预测营业利润(万元)',
-    tp            DECIMAL(20, 4) NULL COMMENT '预测利润总额(万元)',
-    np            DECIMAL(20, 4) NULL COMMENT '预测净利润(万元)',
-    eps           DECIMAL(20, 6) NULL COMMENT '预测每股收益(元)',
-    pe            DECIMAL(20, 6) NULL COMMENT '预测市盈率',
-    rd            DECIMAL(20, 6) NULL COMMENT '预测股息率',
-    roe           DECIMAL(20, 6) NULL COMMENT '预测净资产收益率',
-    ev_ebitda     DECIMAL(20, 6) NULL COMMENT '预测EV/EBITDA',
-    rating        VARCHAR(32)    NULL COMMENT '卖方评级',
-    max_price     DECIMAL(20, 6) NULL COMMENT '预测最高目标价',
-    min_price     DECIMAL(20, 6) NULL COMMENT '预测最低目标价',
-    imp_dg        VARCHAR(32)    NULL COMMENT '机构关注度',
-    UNIQUE KEY uk_report_rc (ts_code, report_date, org_name, quarter)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='卖方盈利预测(Tushare report_rc)';
+-- ============================================================================
+-- 大盘指数
+-- ============================================================================
+
 
 CREATE TABLE IF NOT EXISTS ods_index_daily_di (
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ts_code     VARCHAR(16)    NOT NULL COMMENT '指数代码',
+    ts_code     VARCHAR(16)    NOT NULL COMMENT '指数代码,现在只有三个，大盘指数，沪深300、深圳指数',
     trade_date  DATE           NOT NULL COMMENT '交易日期',
     open        DECIMAL(20, 6) NULL COMMENT '开盘点位',
     high        DECIMAL(20, 6) NULL COMMENT '最高点位',
@@ -219,6 +334,10 @@ CREATE TABLE IF NOT EXISTS ods_index_daily_di (
     amount      DECIMAL(20, 6) NULL COMMENT '成交额(千元)',
     UNIQUE KEY uk_index_daily (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数日线行情(Tushare index_daily)';
+
+-- ============================================================================
+-- ETF数据
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ods_etf_share_size_di (
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
