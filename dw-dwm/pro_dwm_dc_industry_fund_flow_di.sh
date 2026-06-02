@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # target_table: dwm_dc_industry_fund_flow_di
-# source_table: ods_industry_fund_flow_di, ods_dc_daily
+# source_table: ods_industry_fund_flow_di, ods_dc_daily_di
 # 东财板块资金强度基本因子：流入强度、连续净流入天数、资金加速度
 #
 # 用法（必须用 bash，不要用 sh）:
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
     net_amount_rate       DECIMAL(20, 6) NULL COMMENT '主力净流入占比(%)',
     buy_elg_amount        DECIMAL(20, 4) NULL COMMENT '超大单净流入(元)',
     pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
-    board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,来源ods_dc_daily)',
+    board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,来源ods_dc_daily_di)',
     fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
     net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
     net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_dwm_dc_industry_fund_flow (trade_date, industry_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金强度(DWM,来源ods_industry_fund_flow_di+ods_dc_daily)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金强度(DWM,来源ods_industry_fund_flow_di+ods_dc_daily_di)';
 "
 
 load_dc_industry_fund_flow() {
@@ -174,7 +174,7 @@ load_dc_industry_fund_flow() {
         END AS elg_net_ratio,
         m.dc_rank
     FROM metrics m
-    LEFT JOIN ods_dc_daily d
+    LEFT JOIN ods_dc_daily_di d
       ON d.trade_date = m.trade_date
      AND d.ts_code = m.industry_code
     WHERE m.trade_date = '${v_date}';
