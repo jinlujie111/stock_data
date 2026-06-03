@@ -58,11 +58,13 @@ ODS_SNAPSHOT_CHECKS=(
   "ods_dc_index_di|trade_date|50|东财板块指数dc_index"
   "ods_dc_daily_di|trade_date|50|东财板块日线dc_daily"
   "ods_dc_member_di|trade_date|1000|东财板块成分dc_member"
+  "ods_dc_hot_di|trade_date|50|东财热榜dc_hot"
   "ods_limit_list_di|trade_date|5|涨跌停limit_list_d"
   "ods_index_daily_di|trade_date|3|指数日线index_daily"
   "ods_report_rc_di|report_date|1|卖方预测report_rc"
   "ods_etf_share_size_di|trade_date|100|ETF份额etf_share_size"
   "ods_ths_daily_di|trade_date|100|同花顺板块日线ths_daily"
+  "ods_ths_hot_di|trade_date|50|同花顺热榜ths_hot"
 )
 
 # full 表：不按日，检查全表行数下限

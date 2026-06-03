@@ -334,6 +334,182 @@ def sync_ths_member(
     )
 
 
+@register("tushare", "ths_hot")
+def sync_ths_hot(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """ths_hot 需按 market 热榜类型循环；接口不返回 market 字段，拉取后注入。"""
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.2)
+    td = trade_date or date.today()
+    td_str = td.strftime("%Y%m%d")
+
+    base_params = dict(fetch_cfg.get("params") or {})
+    base_params.setdefault("trade_date", td_str)
+    base_params.setdefault("is_new", "Y")
+
+    markets = fetch_cfg.get("market_list") or [
+        "热股",
+        "ETF",
+        "可转债",
+        "行业板块",
+        "概念板块",
+        "期货",
+        "港股",
+        "热基",
+        "美股",
+    ]
+
+    frames: list[pd.DataFrame] = []
+    for i, market in enumerate(markets):
+        params = dict(base_params)
+        params["market"] = market
+        logger.info("ths_hot 进度 %s/%s market=%s params=%s", i + 1, len(markets), market, params)
+        try:
+            part = fetch_tushare("ths_hot", token_type=token_type, **params)
+        except Exception as exc:
+            logger.warning("ths_hot market=%s 失败: %s", market, exc)
+            continue
+        if not part.empty:
+            part = part.copy()
+            part["market"] = market
+            frames.append(part)
+        if sleep_s > 0 and i + 1 < len(markets):
+            time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+
+    logger.info(
+        "ths_hot id=%s markets=%s 原始=%s 映射后=%s",
+        task["id"],
+        len(markets),
+        len(df),
+        len(out),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    transform_cfg = get_transform_config(task)
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="snapshot",
+        trade_date=td,
+        snapshot_delete_column=transform_cfg.get("snapshot_delete_column") or "trade_date",
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
+@register("tushare", "dc_hot")
+def sync_dc_hot(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """dc_hot 需按 market × hot_type 循环；接口不返回 market/hot_type 字段，拉取后注入。"""
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.2)
+    td = trade_date or date.today()
+    td_str = td.strftime("%Y%m%d")
+
+    base_params = dict(fetch_cfg.get("params") or {})
+    base_params.setdefault("trade_date", td_str)
+    base_params.setdefault("is_new", "Y")
+
+    markets = fetch_cfg.get("market_list") or [
+        "A股市场",
+        "ETF基金",
+        "港股市场",
+        "美股市场",
+    ]
+    hot_types = fetch_cfg.get("hot_type_list") or ["人气榜", "飙升榜"]
+
+    frames: list[pd.DataFrame] = []
+    total_calls = len(markets) * len(hot_types)
+    call_idx = 0
+    for market in markets:
+        for hot_type in hot_types:
+            call_idx += 1
+            params = dict(base_params)
+            params["market"] = market
+            params["hot_type"] = hot_type
+            logger.info(
+                "dc_hot 进度 %s/%s market=%s hot_type=%s",
+                call_idx,
+                total_calls,
+                market,
+                hot_type,
+            )
+            try:
+                part = fetch_tushare("dc_hot", token_type=token_type, **params)
+            except Exception as exc:
+                logger.warning(
+                    "dc_hot market=%s hot_type=%s 失败: %s", market, hot_type, exc
+                )
+                continue
+            if not part.empty:
+                part = part.copy()
+                part["market"] = market
+                part["hot_type"] = hot_type
+                frames.append(part)
+            if sleep_s > 0 and call_idx < total_calls:
+                time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+
+    logger.info(
+        "dc_hot id=%s calls=%s 原始=%s 映射后=%s",
+        task["id"],
+        total_calls,
+        len(df),
+        len(out),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    transform_cfg = get_transform_config(task)
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="snapshot",
+        trade_date=td,
+        snapshot_delete_column=transform_cfg.get("snapshot_delete_column") or "trade_date",
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
     """通用同步：fetch_config → 拉数 → transform_config → 写库。"""
     from sync_writer import write_dataframe

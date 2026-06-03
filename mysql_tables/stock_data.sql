@@ -217,6 +217,21 @@ CREATE TABLE IF NOT EXISTS ods_dc_member_di (
     UNIQUE KEY uk_dc_member (trade_date, ts_code, con_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块成分(Tushare dc_member)';
 
+CREATE TABLE IF NOT EXISTS ods_dc_hot_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    market          VARCHAR(32)    NOT NULL COMMENT '市场类型(A股市场/ETF基金/港股市场/美股市场)',
+    hot_type        VARCHAR(16)    NOT NULL COMMENT '热点类型(人气榜/飙升榜)',
+    data_type       VARCHAR(32)    NULL COMMENT '数据类型',
+    ts_code         VARCHAR(16)    NOT NULL COMMENT '代码',
+    ts_name         VARCHAR(128)   NULL COMMENT '名称',
+    dc_rank         INT            NULL COMMENT '排行',
+    pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    current_price   DECIMAL(20, 6) NULL COMMENT '当前价',
+    rank_time       VARCHAR(32)    NULL COMMENT '排行榜获取时间',
+    UNIQUE KEY uk_dc_hot (trade_date, market, hot_type, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财App热榜(Tushare dc_hot)';
+
 -- ============================================================================
 -- 同花顺板块数据
 -- ============================================================================
@@ -262,6 +277,23 @@ CREATE TABLE IF NOT EXISTS ods_ths_member_di (
     is_new      VARCHAR(4)   NULL COMMENT '是否最新(Y/N)',
     UNIQUE KEY uk_ths_member (ts_code, con_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块成分(Tushare ths_member)';
+
+CREATE TABLE IF NOT EXISTS ods_ths_hot_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    market          VARCHAR(32)    NOT NULL COMMENT '热榜类型(热股/行业板块/概念板块等)',
+    data_type       VARCHAR(32)    NULL COMMENT '数据类型',
+    ts_code         VARCHAR(16)    NOT NULL COMMENT '代码',
+    ts_name         VARCHAR(128)   NULL COMMENT '名称',
+    ths_rank        INT            NULL COMMENT '排行',
+    pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    current_price   DECIMAL(20, 6) NULL COMMENT '当前价格',
+    concept         VARCHAR(512)   NULL COMMENT '标签',
+    rank_reason     VARCHAR(512)   NULL COMMENT '上榜解读',
+    hot             DECIMAL(20, 4) NULL COMMENT '热度值',
+    rank_time       VARCHAR(32)    NULL COMMENT '排行榜获取时间',
+    UNIQUE KEY uk_ths_hot (trade_date, market, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺App热榜(Tushare ths_hot)';
 
 -- ============================================================================
 -- 申万行业指数信息
@@ -414,6 +446,32 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
     updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_dwm_dc_industry_fund_flow (trade_date, industry_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金强度(DWM,来源ods_industry_fund_flow_di+ods_dc_daily_di)';
+
+-- -----------------------------------------------------------------------------
+-- DWM：同花顺板块资金强度（由 ODS 成分股汇总估算，ETL: dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域等)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(同花顺)',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    net_amount            DECIMAL(20, 4) NULL COMMENT '主力净流入净额(元,成分股汇总估算)',
+    net_amount_wan        DECIMAL(20, 4) NULL COMMENT '主力净流入净额(万元)',
+    net_amount_rate       DECIMAL(20, 6) NULL COMMENT '主力净流入占比(%)=net_amount/board_amount*100',
+    buy_elg_amount        DECIMAL(20, 4) NULL COMMENT '超大单净流入(元,成分股汇总估算)',
+    pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
+    board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,成分股成交额汇总估算)',
+    fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
+    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
+    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
+    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg',
+    elg_net_ratio         DECIMAL(20, 6) NULL COMMENT '超大单占主力净流入比',
+    dc_rank               INT            NULL COMMENT '当日主力净流入排名(估算)',
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_ths_industry_fund_flow (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块资金强度(DWM,成分股资金流汇总估算)';
 
 -- -----------------------------------------------------------------------------
 -- DIM：行业-ETF 映射（ETL: dw-dim/pro_dim_industry_etf_map.sh）

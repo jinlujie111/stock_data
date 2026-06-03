@@ -548,3 +548,62 @@ INSERT INTO db_sync_task (
     ),
     1, '全量更新同花顺板块成分(Tushare ths_member；依赖 ods_ths_index_di，按 ts_code 循环；需约6000积分)'
 );
+
+-- Tushare ths_hot → ods_ths_hot_di（按日 snapshot，同花顺App热榜）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'ths_hot', 'stock_data', 'ods_ths_hot_di', '同花顺App热榜', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date', 'is_new', 'Y'),
+        'market_list', JSON_ARRAY(
+            '热股', 'ETF', '可转债', '行业板块', '概念板块',
+            '期货', '港股', '热基', '美股'
+        ),
+        'sleep_seconds', 0.2,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('rank', 'ths_rank'),
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'market', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'market', 'ts_code'),
+        'snapshot_delete_column', 'trade_date',
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'market', 'data_type', 'ts_code', 'ts_name',
+            'ths_rank', 'pct_change', 'current_price', 'concept',
+            'rank_reason', 'hot', 'rank_time'
+        )
+    ),
+    1, '同花顺App热榜日快照(Tushare ths_hot, is_new=Y收盘榜；按market循环；单次最多2000行/类型，需约6000积分，建议22:30后)'
+);
+
+-- Tushare dc_hot → ods_dc_hot_di（按日 snapshot，东财App热榜）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'dc_hot', 'stock_data', 'ods_dc_hot_di', '东财App热榜', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date', 'is_new', 'Y'),
+        'market_list', JSON_ARRAY('A股市场', 'ETF基金', '港股市场', '美股市场'),
+        'hot_type_list', JSON_ARRAY('人气榜', '飙升榜'),
+        'sleep_seconds', 0.2,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('rank', 'dc_rank'),
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'market', 'hot_type', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'market', 'hot_type', 'ts_code'),
+        'snapshot_delete_column', 'trade_date',
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'market', 'hot_type', 'data_type', 'ts_code', 'ts_name',
+            'dc_rank', 'pct_change', 'current_price', 'rank_time'
+        )
+    ),
+    1, '东财App热榜日快照(Tushare dc_hot, is_new=Y收盘榜；market×hot_type循环；单次最多2000行/组合，需约8000积分，建议22:30后)'
+);
