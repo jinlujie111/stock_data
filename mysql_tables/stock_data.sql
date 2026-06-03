@@ -288,8 +288,8 @@ CREATE TABLE IF NOT EXISTS ods_ths_hot_di (
     ths_rank        INT            NULL COMMENT '排行',
     pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
     current_price   DECIMAL(20, 6) NULL COMMENT '当前价格',
-    concept         VARCHAR(512)   NULL COMMENT '标签',
-    rank_reason     VARCHAR(512)   NULL COMMENT '上榜解读',
+    concept         TEXT           NULL COMMENT '标签(JSON数组字符串)',
+    rank_reason     TEXT           NULL COMMENT '上榜解读',
     hot             DECIMAL(20, 4) NULL COMMENT '热度值',
     rank_time       VARCHAR(32)    NULL COMMENT '排行榜获取时间',
     UNIQUE KEY uk_ths_hot (trade_date, market, ts_code)
