@@ -12,6 +12,11 @@
 #   pct_change         = ods_ths_daily_di.pct_change
 #   dc_rank            = 当日 net_amount 降序排名（结构对齐东财表）
 #
+# 要点：
+#   - ths_member.con_code 可能不含交易所后缀(.SZ/.SH)，程序自动补全
+#   - 回看窗口 730 天（≈500 交易日），过大窗口会导致查询超时
+#   - 含诊断：执行前检查代码格式匹配，不匹配时报错并给出样例
+#
 # 用法（必须用 bash，不要用 sh）:
 #   bash dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh              # 默认昨日
 #   bash dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh 20260527
@@ -70,11 +75,16 @@ load_ths_industry_fund_flow() {
   local v_date
   v_date="$(format_date "${n_date}")"
 
-  local member_cnt mf_cnt
+  local member_cnt mf_cnt detail_cnt
   member_cnt="$(${data_mysql} -N -e "SELECT COUNT(*) FROM ods_ths_member_di;")"
   mf_cnt="$(${data_mysql} -N -e "
     SELECT COUNT(*)
     FROM ods_stock_fund_flow_di
+    WHERE trade_date = '${v_date}';
+  ")"
+  detail_cnt="$(${data_mysql} -N -e "
+    SELECT COUNT(*)
+    FROM ods_stock_detail_di
     WHERE trade_date = '${v_date}';
   ")"
   if [[ -z "${member_cnt}" || "${member_cnt}" -eq 0 ]]; then
@@ -85,6 +95,57 @@ load_ths_industry_fund_flow() {
     echo "WARN: skip ${v_date}, ods_stock_fund_flow_di has no rows"
     return 1
   fi
+  if [[ -z "${detail_cnt}" || "${detail_cnt}" -eq 0 ]]; then
+    echo "WARN: skip ${v_date}, ods_stock_detail_di has no rows, board_amount may be 0"
+  fi
+
+  # ---- 诊断：检查 ths_member 与 moneyflow 股票代码格式是否匹配 ----
+  echo "DIAG 表统计: ods_ths_member_di=${member_cnt} ods_stock_fund_flow_di[${v_date}]=${mf_cnt} ods_stock_detail_di[${v_date}]=${detail_cnt}"
+  local code_match con_code_sample mf_code_sample
+  code_match="$(${data_mysql} -N -e "
+    SELECT COUNT(*)
+    FROM (
+      SELECT DISTINCT
+        CASE
+          WHEN m.con_code LIKE '%.%' THEN m.con_code
+          WHEN LEFT(m.con_code, 1) IN ('0','1','2','3') THEN CONCAT(m.con_code, '.SZ')
+          WHEN LEFT(m.con_code, 1) = '6' THEN CONCAT(m.con_code, '.SH')
+          WHEN LEFT(m.con_code, 1) IN ('4','8','9') THEN CONCAT(m.con_code, '.BJ')
+          ELSE m.con_code
+        END AS con_code_norm
+      FROM ods_ths_member_di m
+      WHERE (m.is_new IS NULL OR m.is_new = 'Y')
+    ) mem
+    INNER JOIN (
+      SELECT DISTINCT f.ts_code
+      FROM ods_stock_fund_flow_di f
+      WHERE f.trade_date = '${v_date}'
+    ) mf ON mf.ts_code = mem.con_code_norm
+  ")"
+  con_code_sample="$(${data_mysql} -N -e "
+    SELECT DISTINCT con_code FROM ods_ths_member_di
+    WHERE (is_new IS NULL OR is_new = 'Y') LIMIT 3;
+  " | tr '\n' ' ')"
+  mf_code_sample="$(${data_mysql} -N -e "
+    SELECT DISTINCT ts_code FROM ods_stock_fund_flow_di
+    WHERE trade_date = '${v_date}' LIMIT 3;
+  " | tr '\n' ' ')"
+  echo "DIAG 成分股代码样例: [${con_code_sample}]"
+  echo "DIAG 资金流代码样例: [${mf_code_sample}]"
+  echo "DIAG 匹配数(成分股∩资金流) = ${code_match}"
+  if [[ -z "${code_match}" || "${code_match}" -eq 0 ]]; then
+    echo "ERROR: ods_ths_member_di.con_code 与 ods_stock_fund_flow_di.ts_code 无匹配！"
+    echo "  成分股代码格式: '${con_code_sample}'"
+    echo "  资金流代码格式: '${mf_code_sample}'"
+    echo "  请检查: (1) ods_ths_member_di 股票代码是否含交易所后缀(.SZ/.SH)"
+    echo "         (2) run_data_sync --source-table ths_member 是否同步成功"
+    echo "  程序已内置代码格式自动转换（无后缀→补全.SZ/.SH/.BJ），若仍无匹配请联系开发"
+    return 1
+  fi
+
+  # 计算回看窗口：保留约 500 个交易日用于计算连续净流入天数
+  local v_date_lookback
+  v_date_lookback="$(date -d "${v_date} - 730 days" +%Y-%m-%d 2>/dev/null || echo "2020-01-01")"
 
   ${data_mysql} -e "
     DELETE FROM dwm_ths_industry_fund_flow_di WHERE trade_date = '${v_date}';
@@ -110,7 +171,13 @@ load_ths_industry_fund_flow() {
     WITH ths_member AS (
         SELECT
             m.ts_code AS industry_code,
-            m.con_code,
+            CASE
+                WHEN m.con_code LIKE '%.%' THEN m.con_code
+                WHEN LEFT(m.con_code, 1) IN ('0','1','2','3') THEN CONCAT(m.con_code, '.SZ')
+                WHEN LEFT(m.con_code, 1) = '6' THEN CONCAT(m.con_code, '.SH')
+                WHEN LEFT(m.con_code, 1) IN ('4','8','9') THEN CONCAT(m.con_code, '.BJ')
+                ELSE m.con_code
+            END AS con_code,
             i.name AS industry_name,
             CASE i.index_type
                 WHEN 'I'  THEN '行业'
@@ -139,6 +206,7 @@ load_ths_industry_fund_flow() {
             (IFNULL(f.buy_elg_amount, 0) - IFNULL(f.sell_elg_amount, 0)) * 10000 AS elg_net_yuan
         FROM ods_stock_fund_flow_di f
         WHERE f.trade_date <= '${v_date}'
+          AND f.trade_date > '${v_date_lookback}'
     ),
     stock_amt AS (
         SELECT
@@ -147,6 +215,7 @@ load_ths_industry_fund_flow() {
             IFNULL(d.amount, 0) * 1000 AS amount_yuan
         FROM ods_stock_detail_di d
         WHERE d.trade_date <= '${v_date}'
+          AND d.trade_date > '${v_date_lookback}'
     ),
     daily_base AS (
         SELECT
