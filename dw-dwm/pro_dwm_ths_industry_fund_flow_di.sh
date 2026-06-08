@@ -38,6 +38,7 @@ n_date_s="$(get_date "${1:-}")"
 n_date_e="$(get_date "${2:-${1:-}}")"
 n_date="${n_date_e}"
 
+
 LOG_PATH="/root/log/stock_log/${n_date}"
 mkdir -p "${LOG_PATH}"
 exec 1>>"${LOG_PATH}/pro_dwm_ths_industry_fund_flow_di_${n_date}.log"
@@ -47,7 +48,6 @@ echo "======== $(date '+%F %T') pro_dwm_ths_industry_fund_flow_di ${n_date_s} ~ 
 
 ${data_mysql} -e "
 CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
-    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date            DATE           NOT NULL COMMENT '交易日期',
     content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域等)',
     industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(同花顺)',
@@ -72,80 +72,21 @@ CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
 
 load_ths_industry_fund_flow() {
   local n_date="$1"
-  local v_date
+  local v_date v_date_120
   v_date="$(format_date "${n_date}")"
+  v_date_120="$(date -d "${n_date} 120 day ago" +%Y-%m-%d)"
+  echo "DEBUG load_ths_industry_fund_flow: n_date=${n_date} v_date=${v_date} v_date_120=${v_date_120}"
 
-  local member_cnt mf_cnt detail_cnt
-  member_cnt="$(${data_mysql} -N -e "SELECT COUNT(*) FROM ods_ths_member_di;")"
-  mf_cnt="$(${data_mysql} -N -e "
+  local ods_cnt
+  ods_cnt="$(${data_mysql} -N -e "
     SELECT COUNT(*)
-    FROM ods_stock_fund_flow_di
+    FROM ods_ths_daily_di
     WHERE trade_date = '${v_date}';
   ")"
-  detail_cnt="$(${data_mysql} -N -e "
-    SELECT COUNT(*)
-    FROM ods_stock_detail_di
-    WHERE trade_date = '${v_date}';
-  ")"
-  if [[ -z "${member_cnt}" || "${member_cnt}" -eq 0 ]]; then
-    echo "WARN: skip ${v_date}, ods_ths_member_di is empty, run: run_data_sync --source-table ths_member"
+  if [[ -z "${ods_cnt}" || "${ods_cnt}" -eq 0 ]]; then
+    echo "WARN: skip ${v_date}, ods_ths_daily_di has no rows"
     return 1
   fi
-  if [[ -z "${mf_cnt}" || "${mf_cnt}" -eq 0 ]]; then
-    echo "WARN: skip ${v_date}, ods_stock_fund_flow_di has no rows"
-    return 1
-  fi
-  if [[ -z "${detail_cnt}" || "${detail_cnt}" -eq 0 ]]; then
-    echo "WARN: skip ${v_date}, ods_stock_detail_di has no rows, board_amount may be 0"
-  fi
-
-  # ---- 诊断：检查 ths_member 与 moneyflow 股票代码格式是否匹配 ----
-  echo "DIAG 表统计: ods_ths_member_di=${member_cnt} ods_stock_fund_flow_di[${v_date}]=${mf_cnt} ods_stock_detail_di[${v_date}]=${detail_cnt}"
-  local code_match con_code_sample mf_code_sample
-  code_match="$(${data_mysql} -N -e "
-    SELECT COUNT(*)
-    FROM (
-      SELECT DISTINCT
-        CASE
-          WHEN m.con_code LIKE '%.%' THEN m.con_code
-          WHEN LEFT(m.con_code, 1) IN ('0','1','2','3') THEN CONCAT(m.con_code, '.SZ')
-          WHEN LEFT(m.con_code, 1) = '6' THEN CONCAT(m.con_code, '.SH')
-          WHEN LEFT(m.con_code, 1) IN ('4','8','9') THEN CONCAT(m.con_code, '.BJ')
-          ELSE m.con_code
-        END AS con_code_norm
-      FROM ods_ths_member_di m
-      WHERE (m.is_new IS NULL OR m.is_new = 'Y')
-    ) mem
-    INNER JOIN (
-      SELECT DISTINCT f.ts_code
-      FROM ods_stock_fund_flow_di f
-      WHERE f.trade_date = '${v_date}'
-    ) mf ON mf.ts_code = mem.con_code_norm
-  ")"
-  con_code_sample="$(${data_mysql} -N -e "
-    SELECT DISTINCT con_code FROM ods_ths_member_di
-    WHERE (is_new IS NULL OR is_new = 'Y') LIMIT 3;
-  " | tr '\n' ' ')"
-  mf_code_sample="$(${data_mysql} -N -e "
-    SELECT DISTINCT ts_code FROM ods_stock_fund_flow_di
-    WHERE trade_date = '${v_date}' LIMIT 3;
-  " | tr '\n' ' ')"
-  echo "DIAG 成分股代码样例: [${con_code_sample}]"
-  echo "DIAG 资金流代码样例: [${mf_code_sample}]"
-  echo "DIAG 匹配数(成分股∩资金流) = ${code_match}"
-  if [[ -z "${code_match}" || "${code_match}" -eq 0 ]]; then
-    echo "ERROR: ods_ths_member_di.con_code 与 ods_stock_fund_flow_di.ts_code 无匹配！"
-    echo "  成分股代码格式: '${con_code_sample}'"
-    echo "  资金流代码格式: '${mf_code_sample}'"
-    echo "  请检查: (1) ods_ths_member_di 股票代码是否含交易所后缀(.SZ/.SH)"
-    echo "         (2) run_data_sync --source-table ths_member 是否同步成功"
-    echo "  程序已内置代码格式自动转换（无后缀→补全.SZ/.SH/.BJ），若仍无匹配请联系开发"
-    return 1
-  fi
-
-  # 计算回看窗口：保留约 500 个交易日用于计算连续净流入天数
-  local v_date_lookback
-  v_date_lookback="$(date -d "${v_date} - 730 days" +%Y-%m-%d 2>/dev/null || echo "2020-01-01")"
 
   ${data_mysql} -e "
     DELETE FROM dwm_ths_industry_fund_flow_di WHERE trade_date = '${v_date}';
@@ -168,75 +109,64 @@ load_ths_industry_fund_flow() {
         elg_net_ratio,
         dc_rank
     )
-    WITH ths_member AS (
+    WITH member_norm AS (
         SELECT
-            m.ts_code AS industry_code,
+            m.ts_code,
+            m.con_code,
             CASE
-                WHEN m.con_code LIKE '%.%' THEN m.con_code
-                WHEN LEFT(m.con_code, 1) IN ('0','1','2','3') THEN CONCAT(m.con_code, '.SZ')
-                WHEN LEFT(m.con_code, 1) = '6' THEN CONCAT(m.con_code, '.SH')
-                WHEN LEFT(m.con_code, 1) IN ('4','8','9') THEN CONCAT(m.con_code, '.BJ')
-                ELSE m.con_code
-            END AS con_code,
-            i.name AS industry_name,
-            CASE i.index_type
-                WHEN 'I'  THEN '行业'
-                WHEN 'N'  THEN '概念'
-                WHEN 'R'  THEN '地域'
-                WHEN 'S'  THEN '特色'
-                WHEN 'ST' THEN '风格'
-                WHEN 'TH' THEN '主题'
-                WHEN 'BB' THEN '宽基'
-                ELSE i.index_type
-            END AS content_type
+                WHEN INSTR(m.con_code, '.') > 0 THEN m.con_code
+                WHEN LEFT(m.con_code, 1) IN ('6', '5', '9') THEN CONCAT(m.con_code, '.SH')
+                ELSE CONCAT(m.con_code, '.SZ')
+            END AS stock_code
         FROM ods_ths_member_di m
-        INNER JOIN ods_ths_index_di i
-          ON i.ts_code = m.ts_code
-        WHERE (i.exchange = 'A' OR i.exchange IS NULL)
-          AND (m.is_new IS NULL OR m.is_new = 'Y')
     ),
-    stock_mf AS (
+    base AS (
+        -- 同花顺板块基础指标：成分股资金流汇总
         SELECT
-            f.trade_date,
-            f.ts_code,
-            (
-                IFNULL(f.buy_elg_amount, 0) - IFNULL(f.sell_elg_amount, 0)
-                + IFNULL(f.buy_lg_amount, 0) - IFNULL(f.sell_lg_amount, 0)
-            ) * 10000 AS main_net_yuan,
-            (IFNULL(f.buy_elg_amount, 0) - IFNULL(f.sell_elg_amount, 0)) * 10000 AS elg_net_yuan
-        FROM ods_stock_fund_flow_di f
-        WHERE f.trade_date <= '${v_date}'
-          AND f.trade_date > '${v_date_lookback}'
+            a.trade_date,
+            CASE i.index_type
+               WHEN 'I'  THEN '行业'
+               WHEN 'N'  THEN '概念'
+               WHEN 'R'  THEN '地域'
+               WHEN 'S'  THEN '特色'
+               WHEN 'ST' THEN '风格'
+               WHEN 'TH' THEN '主题'
+               WHEN 'BB' THEN '宽基'
+               ELSE i.index_type
+            END AS content_type,
+            a.ts_code AS industry_code,
+            i.name AS industry_name,
+            SUM(st.buy_lg_amount + st.buy_elg_amount - st.sell_lg_amount - st.sell_elg_amount) * 10000 AS net_amount,
+            SUM(st.buy_elg_amount - st.sell_elg_amount) * 10000 AS buy_elg_amount,
+            a.pct_change,
+            SUM(sto.amount) * 1000 AS board_amount
+        FROM ods_ths_daily_di a
+        JOIN member_norm b ON a.ts_code = b.ts_code
+        JOIN ods_ths_index_di  i ON a.ts_code = i.ts_code
+        JOIN ods_stock_fund_flow_di st
+          ON b.stock_code = st.ts_code
+         AND a.trade_date = st.trade_date
+        JOIN ods_stock_detail_di sto
+          ON b.stock_code = sto.ts_code
+         AND a.trade_date = sto.trade_date
+        WHERE a.trade_date <= '${v_date}'
+          AND a.trade_date >= '${v_date_120}'
+        GROUP BY a.trade_date,
+             CASE i.index_type
+               WHEN 'I'  THEN '行业'
+               WHEN 'N'  THEN '概念'
+               WHEN 'R'  THEN '地域'
+               WHEN 'S'  THEN '特色'
+               WHEN 'ST' THEN '风格'
+               WHEN 'TH' THEN '主题'
+               WHEN 'BB' THEN '宽基'
+               ELSE i.index_type
+            END,
+             a.ts_code,
+             i.name,
+             a.pct_change
     ),
-    stock_amt AS (
-        SELECT
-            d.trade_date,
-            d.ts_code,
-            IFNULL(d.amount, 0) * 1000 AS amount_yuan
-        FROM ods_stock_detail_di d
-        WHERE d.trade_date <= '${v_date}'
-          AND d.trade_date > '${v_date_lookback}'
-    ),
-    daily_base AS (
-        SELECT
-            mf.trade_date,
-            mem.content_type,
-            mem.industry_code,
-            MAX(mem.industry_name) AS industry_name,
-            ROUND(SUM(mf.main_net_yuan), 4) AS net_amount,
-            ROUND(SUM(mf.elg_net_yuan), 4) AS buy_elg_amount,
-            ROUND(SUM(IFNULL(sa.amount_yuan, 0)), 4) AS board_amount,
-            COUNT(DISTINCT mf.ts_code) AS matched_stocks
-        FROM ths_member mem
-        INNER JOIN stock_mf mf
-          ON mf.ts_code = mem.con_code
-        LEFT JOIN stock_amt sa
-          ON sa.trade_date = mf.trade_date
-         AND sa.ts_code = mem.con_code
-        GROUP BY mf.trade_date, mem.content_type, mem.industry_code
-        HAVING matched_stocks > 0
-    ),
-    daily_enriched AS (
+    hist AS (
         SELECT
             b.trade_date,
             b.content_type,
@@ -244,28 +174,20 @@ load_ths_industry_fund_flow() {
             b.industry_name,
             b.net_amount,
             b.buy_elg_amount,
+            b.pct_change,
             b.board_amount,
-            td.pct_change,
-            CASE
-                WHEN b.board_amount IS NOT NULL AND b.board_amount <> 0
-                THEN ROUND(b.net_amount / b.board_amount * 100, 6)
-                ELSE NULL
-            END AS net_amount_rate,
             CASE WHEN IFNULL(b.net_amount, 0) <= 0 THEN 1 ELSE 0 END AS is_break
-        FROM daily_base b
-        LEFT JOIN ods_ths_daily_di td
-          ON td.trade_date = b.trade_date
-         AND td.ts_code = b.industry_code
+        FROM base b
     ),
     streak_base AS (
         SELECT
-            e.*,
-            SUM(e.is_break) OVER (
-                PARTITION BY e.industry_code
-                ORDER BY e.trade_date
+            h.*,
+            SUM(h.is_break) OVER (
+                PARTITION BY h.industry_code
+                ORDER BY h.trade_date
                 ROWS UNBOUNDED PRECEDING
             ) AS streak_grp
-        FROM daily_enriched e
+        FROM hist h
     ),
     metrics AS (
         SELECT
@@ -275,9 +197,8 @@ load_ths_industry_fund_flow() {
             s.industry_name,
             s.net_amount,
             s.buy_elg_amount,
-            s.board_amount,
             s.pct_change,
-            s.net_amount_rate,
+            s.board_amount,
             CASE
                 WHEN IFNULL(s.net_amount, 0) <= 0 THEN 0
                 ELSE ROW_NUMBER() OVER (
@@ -291,50 +212,65 @@ load_ths_industry_fund_flow() {
                 ROWS BETWEEN 5 PRECEDING AND 1 PRECEDING
             ) AS net_amount_5d_avg
         FROM streak_base s
+    ),
+    ranked AS (
+        SELECT
+            m.trade_date,
+            m.content_type,
+            m.industry_code,
+            m.industry_name,
+            m.net_amount,
+            m.board_amount,
+            m.buy_elg_amount,
+            m.pct_change,
+            m.net_inflow_days,
+            m.net_amount_5d_avg,
+            CASE
+                WHEN m.net_amount_5d_avg IS NOT NULL
+                THEN ROUND(m.net_amount - m.net_amount_5d_avg, 4)
+                ELSE NULL
+            END AS fund_accel,
+            CASE
+                WHEN m.net_amount IS NOT NULL AND m.net_amount <> 0
+                THEN ROUND(m.buy_elg_amount / m.net_amount, 6)
+                ELSE NULL
+            END AS elg_net_ratio,
+            ROW_NUMBER() OVER (
+                PARTITION BY m.trade_date
+                ORDER BY m.net_amount DESC
+            ) AS dc_rank
+        FROM metrics m
+        WHERE m.trade_date = '${v_date}'
     )
     SELECT
-        m.trade_date,
-        m.content_type,
-        m.industry_code,
-        m.industry_name,
-        m.net_amount,
-        ROUND(m.net_amount / 10000, 4) AS net_amount_wan,
-        m.net_amount_rate,
-        m.buy_elg_amount,
-        m.pct_change,
-        m.board_amount,
+        r.trade_date,
+        r.content_type,
+        r.industry_code,
+        r.industry_name,
+        r.net_amount,
+        ROUND(r.net_amount / 10000, 4) AS net_amount_wan,
         CASE
-            WHEN m.board_amount IS NOT NULL AND m.board_amount <> 0
-            THEN ROUND(m.net_amount / m.board_amount, 8)
+            WHEN r.board_amount IS NOT NULL AND r.board_amount <> 0
+            THEN ROUND(r.net_amount / r.board_amount * 100, 6)
+            ELSE NULL
+        END AS net_amount_rate,
+        r.buy_elg_amount,
+        r.pct_change,
+        r.board_amount,
+        CASE
+            WHEN r.board_amount IS NOT NULL AND r.board_amount <> 0
+            THEN ROUND(r.net_amount / r.board_amount, 8)
             ELSE NULL
         END AS fund_inflow_strength,
-        m.net_inflow_days,
-        m.net_amount_5d_avg,
-        CASE
-            WHEN m.net_amount_5d_avg IS NOT NULL
-            THEN ROUND(m.net_amount - m.net_amount_5d_avg, 4)
-            ELSE NULL
-        END AS fund_accel,
-        CASE
-            WHEN m.net_amount IS NOT NULL AND m.net_amount <> 0
-            THEN ROUND(m.buy_elg_amount / m.net_amount, 6)
-            ELSE NULL
-        END AS elg_net_ratio,
-        RANK() OVER (
-            PARTITION BY m.trade_date
-            ORDER BY m.net_amount DESC
-        ) AS dc_rank
-    FROM metrics m
-    WHERE m.trade_date = '${v_date}';
+        r.net_inflow_days,
+        r.net_amount_5d_avg,
+        r.fund_accel,
+        r.elg_net_ratio,
+        r.dc_rank
+    FROM ranked r;
   "
 
-  local dwm_cnt
-  dwm_cnt="$(${data_mysql} -N -e "
-    SELECT COUNT(*)
-    FROM dwm_ths_industry_fund_flow_di
-    WHERE trade_date = '${v_date}';
-  ")"
-  echo "OK ${v_date} stock_mf_rows=${mf_cnt} ths_boards=${dwm_cnt}"
+  echo "OK ${v_date} ods_rows=${ods_cnt}"
   ${data_mysql} -e "
     SELECT trade_date, content_type, industry_code, industry_name,
            net_amount_wan, fund_inflow_strength, net_inflow_days, fund_accel, dc_rank

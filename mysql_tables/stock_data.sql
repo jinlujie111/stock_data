@@ -451,7 +451,6 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
 -- DWM：同花顺板块资金强度（由 ODS 成分股汇总估算，ETL: dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh）
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
-    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date            DATE           NOT NULL COMMENT '交易日期',
     content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域等)',
     industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(同花顺)',
