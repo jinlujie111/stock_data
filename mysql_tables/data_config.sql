@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS db_sync_task (
     target_table          VARCHAR(128) NOT NULL,
     target_table_describe VARCHAR(128) NOT NULL,
     sync_mode             VARCHAR(16)  NOT NULL DEFAULT 'snapshot' COMMENT 'full/incremental/snapshot',
+    schedule_type         VARCHAR(16)  NOT NULL DEFAULT 'daily'  COMMENT 'daily/monthly，daily每天执行，monthly每月1号执行',
     fetch_config          JSON         NULL COMMENT '拉数参数',
     transform_config      JSON         NULL COMMENT '字段映射',
     status                TINYINT      NOT NULL DEFAULT 1,

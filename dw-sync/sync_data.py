@@ -93,6 +93,14 @@ def run_sync(
     results: list[SyncResult] = []
     failed = 0
     for task in tasks:
+        # monthly 任务：仅在每月 1 号执行
+        if task.get("schedule_type") == "monthly" and date.today().day != 1:
+            logger.info(
+                "跳过 id=%s %s: schedule_type=monthly 且今天不是 1 号",
+                task["id"],
+                task["source_table"],
+            )
+            continue
         try:
             result = run_task(task, trade_date, dry_run)
             results.append(result)
