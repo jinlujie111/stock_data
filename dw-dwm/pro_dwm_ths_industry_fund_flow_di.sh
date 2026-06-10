@@ -55,6 +55,7 @@ echo "======== $(date '+%F %T') pro_dwm_ths_industry_fund_flow_di ${n_date_s} ~ 
 
 ${data_mysql} -e "
 CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date            DATE           NOT NULL COMMENT '交易日期',
     content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域等)',
     industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(同花顺)',

@@ -453,6 +453,7 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
 -- 成分股汇总估算；衍生指标回看窗口 120 自然日，口径与 dwm_dc_industry_fund_flow_di 对齐
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date            DATE           NOT NULL COMMENT '交易日期',
     content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域等)',
     industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(同花顺)',
@@ -473,6 +474,62 @@ CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
     updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_dwm_ths_industry_fund_flow (trade_date, industry_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块资金强度(DWM,成分股资金流汇总估算)';
+
+-- -----------------------------------------------------------------------------
+-- DWM：东财板块趋势强度（ETL: dw-dwm/pro_dwm_dc_industry_trend_strength_di.sh）
+-- 衍生指标回看窗口 120 自然日；RS 基准=沪深300(000300.SH)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwm_dc_industry_trend_strength_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    close                 DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    pct_change            DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    rs_5d                 DECIMAL(20, 6) NULL COMMENT '5日相对强度=板块5日涨幅累计-沪深300(%)',
+    rs_20d                DECIMAL(20, 6) NULL COMMENT '20日相对强度=板块20日涨幅累计-沪深300(%)',
+    ma5                   DECIMAL(20, 6) NULL COMMENT '5日均线',
+    ma10                  DECIMAL(20, 6) NULL COMMENT '10日均线',
+    ma20                  DECIMAL(20, 6) NULL COMMENT '20日均线',
+    ma_bullish            TINYINT        NOT NULL DEFAULT 0 COMMENT '均线多头MA5>MA10>MA20(1/0)',
+    high_60d              DECIMAL(20, 6) NULL COMMENT '近60交易日最高收盘',
+    is_new_high_60d       TINYINT        NOT NULL DEFAULT 0 COMMENT '是否创60日新高(1/0)',
+    drawdown_pct          DECIMAL(20, 6) NULL COMMENT '相对60日高点回撤(%)',
+    recovery_days         INT            NOT NULL DEFAULT 0 COMMENT '回撤>=3%时距最近高点交易日数否则0',
+    rs_rank               INT            NULL COMMENT '当日rs_5d排名(同类型内)',
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_dc_industry_trend (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块趋势强度(DWM,来源ods_dc_daily_di+ods_index_daily_di)';
+
+-- -----------------------------------------------------------------------------
+-- DWM：同花顺板块趋势强度（ETL: dw-dwm/pro_dwm_ths_industry_trend_strength_di.sh）
+-- 口径与 dwm_dc_industry_trend_strength_di 对齐；板块范围 I/N/R
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwm_ths_industry_trend_strength_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(同花顺)',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    close                 DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    pct_change            DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    rs_5d                 DECIMAL(20, 6) NULL COMMENT '5日相对强度=板块5日涨幅累计-沪深300(%)',
+    rs_20d                DECIMAL(20, 6) NULL COMMENT '20日相对强度=板块20日涨幅累计-沪深300(%)',
+    ma5                   DECIMAL(20, 6) NULL COMMENT '5日均线',
+    ma10                  DECIMAL(20, 6) NULL COMMENT '10日均线',
+    ma20                  DECIMAL(20, 6) NULL COMMENT '20日均线',
+    ma_bullish            TINYINT        NOT NULL DEFAULT 0 COMMENT '均线多头MA5>MA10>MA20(1/0)',
+    high_60d              DECIMAL(20, 6) NULL COMMENT '近60交易日最高收盘',
+    is_new_high_60d       TINYINT        NOT NULL DEFAULT 0 COMMENT '是否创60日新高(1/0)',
+    drawdown_pct          DECIMAL(20, 6) NULL COMMENT '相对60日高点回撤(%)',
+    recovery_days         INT            NOT NULL DEFAULT 0 COMMENT '回撤>=3%时距最近高点交易日数否则0',
+    rs_rank               INT            NULL COMMENT '当日rs_5d排名(同类型内)',
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_ths_industry_trend (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同花顺板块趋势强度(DWM,来源ods_ths_daily_di+ods_index_daily_di)';
 
 -- -----------------------------------------------------------------------------
 -- DIM：行业-ETF 映射（ETL: dw-dim/pro_dim_industry_etf_map.sh）
