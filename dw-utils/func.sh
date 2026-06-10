@@ -157,6 +157,33 @@ run_dwm_ths_industry_trend_strength() {
     bash "${runner}" "$@"
 }
 
+run_dwm_dc_industry_prosperity() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_prosperity_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dwm_ths_industry_prosperity() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_prosperity_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dwm_sw_industry_prosperity() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_sw_industry_prosperity_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_dwd_market_breadth() {
     run_dwm_market_breadth "$@"
 }
