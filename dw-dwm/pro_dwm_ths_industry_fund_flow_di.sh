@@ -11,12 +11,19 @@
 #   board_amount(元)   = SUM(成分股成交额千元)*1000（无 ths 板块成交额时的估算）
 #   pct_change         = ods_ths_daily_di.pct_change
 #   dc_rank            = 当日 net_amount 降序排名（结构对齐东财表）
+#   板块范围           = 仅 index_type I/N/R（行业/概念/地域），与东财 moneyflow_ind_dc 对齐
+#
+# 衍生指标口径（与东财 DWM 对齐）：
+#   net_amount / buy_elg_amount / board_amount / pct_change → 成分股汇总估算（见上）
+#   fund_inflow_strength / net_inflow_days / net_amount_5d_avg / fund_accel
+#     → 基于 trade_date 起向前 120 自然日（≈85 交易日）回看窗口计算
+#   dc_rank / elg_net_ratio → 当日计算
 #
 # 要点：
-#   - ths_member.con_code 可能不含交易所后缀(.SZ/.SH)，程序自动补全
-#   - 回看窗口 730 天（≈500 交易日），过大窗口会导致查询超时
-#   - 含诊断：执行前检查代码格式匹配，不匹配时报错并给出样例
-#
+#   - ths_member.con_code 可能不含交易所后缀，程序补全 .SH/.SZ/.BJ
+#   - moneyflow 与 daily 分别 LEFT JOIN 汇总，避免一侧缺失导致整股丢失
+#   - 与东财 DWM 板块代码体系不同(BK*.DC vs *.TI)，数值不应直接按 code 对比
+#   - 回看窗口 120 自然日，过大窗口会导致查询超时
 # 用法（必须用 bash，不要用 sh）:
 #   bash dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh              # 默认昨日
 #   bash dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh 20260527
@@ -59,9 +66,9 @@ CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
     pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
     board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,成分股成交额汇总估算)',
     fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
-    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
-    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
-    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg',
+    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(120自然日窗口内重算)',
+    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日,120日窗口)',
+    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg(120日窗口)',
     elg_net_ratio         DECIMAL(20, 6) NULL COMMENT '超大单占主力净流入比',
     dc_rank               INT            NULL COMMENT '当日主力净流入排名(估算)',
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -116,55 +123,72 @@ load_ths_industry_fund_flow() {
             CASE
                 WHEN INSTR(m.con_code, '.') > 0 THEN m.con_code
                 WHEN LEFT(m.con_code, 1) IN ('6', '5', '9') THEN CONCAT(m.con_code, '.SH')
+                WHEN LEFT(m.con_code, 1) IN ('8', '4') THEN CONCAT(m.con_code, '.BJ')
                 ELSE CONCAT(m.con_code, '.SZ')
             END AS stock_code
         FROM ods_ths_member_di m
     ),
-    base AS (
-        -- 同花顺板块基础指标：成分股资金流汇总
+    mf_by_board AS (
         SELECT
             a.trade_date,
-            CASE i.index_type
-               WHEN 'I'  THEN '行业'
-               WHEN 'N'  THEN '概念'
-               WHEN 'R'  THEN '地域'
-               WHEN 'S'  THEN '特色'
-               WHEN 'ST' THEN '风格'
-               WHEN 'TH' THEN '主题'
-               WHEN 'BB' THEN '宽基'
-               ELSE i.index_type
-            END AS content_type,
-            a.ts_code AS industry_code,
-            i.name AS industry_name,
-            SUM(st.buy_lg_amount + st.buy_elg_amount - st.sell_lg_amount - st.sell_elg_amount) * 10000 AS net_amount,
-            SUM(st.buy_elg_amount - st.sell_elg_amount) * 10000 AS buy_elg_amount,
-            a.pct_change,
-            SUM(sto.amount) * 1000 AS board_amount
+            b.ts_code AS industry_code,
+            SUM((st.buy_lg_amount + st.buy_elg_amount - st.sell_lg_amount - st.sell_elg_amount) * 10000) AS net_amount,
+            SUM((st.buy_elg_amount - st.sell_elg_amount) * 10000) AS buy_elg_amount
         FROM ods_ths_daily_di a
+        JOIN ods_ths_index_di i
+          ON a.ts_code = i.ts_code
+         AND i.index_type IN ('I', 'N', 'R')
         JOIN member_norm b ON a.ts_code = b.ts_code
-        JOIN ods_ths_index_di  i ON a.ts_code = i.ts_code
-        JOIN ods_stock_fund_flow_di st
+        LEFT JOIN ods_stock_fund_flow_di st
           ON b.stock_code = st.ts_code
          AND a.trade_date = st.trade_date
-        JOIN ods_stock_detail_di sto
+        WHERE a.trade_date <= '${v_date}'
+          AND a.trade_date >= '${v_date_120}'
+        GROUP BY a.trade_date, b.ts_code
+    ),
+    amt_by_board AS (
+        SELECT
+            a.trade_date,
+            b.ts_code AS industry_code,
+            SUM(sto.amount * 1000) AS board_amount
+        FROM ods_ths_daily_di a
+        JOIN ods_ths_index_di i
+          ON a.ts_code = i.ts_code
+         AND i.index_type IN ('I', 'N', 'R')
+        JOIN member_norm b ON a.ts_code = b.ts_code
+        LEFT JOIN ods_stock_detail_di sto
           ON b.stock_code = sto.ts_code
          AND a.trade_date = sto.trade_date
         WHERE a.trade_date <= '${v_date}'
           AND a.trade_date >= '${v_date_120}'
-        GROUP BY a.trade_date,
-             CASE i.index_type
-               WHEN 'I'  THEN '行业'
-               WHEN 'N'  THEN '概念'
-               WHEN 'R'  THEN '地域'
-               WHEN 'S'  THEN '特色'
-               WHEN 'ST' THEN '风格'
-               WHEN 'TH' THEN '主题'
-               WHEN 'BB' THEN '宽基'
-               ELSE i.index_type
-            END,
-             a.ts_code,
-             i.name,
-             a.pct_change
+        GROUP BY a.trade_date, b.ts_code
+    ),
+    base AS (
+        SELECT
+            a.trade_date,
+            CASE i.index_type
+               WHEN 'I' THEN '行业'
+               WHEN 'N' THEN '概念'
+               WHEN 'R' THEN '地域'
+            END AS content_type,
+            a.ts_code AS industry_code,
+            i.name AS industry_name,
+            mf.net_amount,
+            mf.buy_elg_amount,
+            a.pct_change,
+            amt.board_amount
+        FROM ods_ths_daily_di a
+        JOIN ods_ths_index_di i
+          ON a.ts_code = i.ts_code
+         AND i.index_type IN ('I', 'N', 'R')
+        LEFT JOIN mf_by_board mf
+          ON a.trade_date = mf.trade_date
+         AND a.ts_code = mf.industry_code
+        LEFT JOIN amt_by_board amt
+          ON a.trade_date = amt.trade_date
+         AND a.ts_code = amt.industry_code
+        WHERE a.trade_date <= '${v_date}'
+          AND a.trade_date >= '${v_date_120}'
     ),
     hist AS (
         SELECT
@@ -272,12 +296,29 @@ load_ths_industry_fund_flow() {
 
   echo "OK ${v_date} ods_rows=${ods_cnt}"
   ${data_mysql} -e "
+    SELECT content_type, COUNT(*) AS cnt,
+           ROUND(SUM(net_amount)/1e8, 2) AS net_yi,
+           ROUND(AVG(fund_inflow_strength), 6) AS avg_strength
+    FROM dwm_ths_industry_fund_flow_di
+    WHERE trade_date = '${v_date}'
+    GROUP BY content_type
+    ORDER BY content_type;
+  "
+  ${data_mysql} -e "
     SELECT trade_date, content_type, industry_code, industry_name,
            net_amount_wan, fund_inflow_strength, net_inflow_days, fund_accel, dc_rank
     FROM dwm_ths_industry_fund_flow_di
     WHERE trade_date = '${v_date}'
     ORDER BY net_amount DESC
     LIMIT 5;
+  "
+  ${data_mysql} -e "
+    SELECT 'ths' AS src, content_type, COUNT(*) cnt, ROUND(SUM(net_amount)/1e8,2) sum_yi
+    FROM dwm_ths_industry_fund_flow_di WHERE trade_date = '${v_date}' GROUP BY content_type
+    UNION ALL
+    SELECT 'dc', content_type, COUNT(*), ROUND(SUM(net_amount)/1e8,2)
+    FROM dwm_dc_industry_fund_flow_di WHERE trade_date = '${v_date}' GROUP BY content_type
+    ORDER BY content_type, src;
   "
 }
 

@@ -4,6 +4,17 @@
 # source_table: ods_industry_fund_flow_di, ods_dc_daily_di
 # 东财板块资金强度基本因子：流入强度、连续净流入天数、资金加速度
 #
+# 衍生指标口径（与同花顺 DWM 对齐）：
+#   net_amount / net_amount_rate / buy_elg_amount / pct_change / dc_rank → 当日 ODS 原值
+#   board_amount → 当日 ods_dc_daily_di.amount（元）
+#   fund_inflow_strength / net_inflow_days / net_amount_5d_avg / fund_accel
+#     → 基于 trade_date 起向前 120 自然日（≈85 交易日）回看窗口计算
+#   elg_net_ratio → 当日 buy_elg_amount / net_amount
+#
+# 要点：
+#   - 数据来源为东财官方 moneyflow_ind_dc，与同花顺成分为估算口径不同
+#   - 板块代码 BK*.DC，不可与同花顺 *.TI 直接按 code 对比
+#   - 回看窗口 120 自然日，过大窗口会导致查询超时
 # 用法（必须用 bash，不要用 sh）:
 #   bash dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh              # 默认昨日
 #   bash dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh 20260527
@@ -46,9 +57,9 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
     pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
     board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,来源ods_dc_daily_di)',
     fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
-    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
-    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
-    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg',
+    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(120自然日窗口内重算)',
+    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日,120日窗口)',
+    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg(120日窗口)',
     elg_net_ratio         DECIMAL(20, 6) NULL COMMENT '超大单占主力净流入比',
     dc_rank               INT            NULL COMMENT '东财资金流排名',
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,8 +70,10 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
 
 load_dc_industry_fund_flow() {
   local n_date="$1"
-  local v_date
+  local v_date v_date_120
   v_date="$(format_date "${n_date}")"
+  v_date_120="$(date -d "${n_date} 120 day ago" +%Y-%m-%d)"
+  echo "DEBUG load_dc_industry_fund_flow: n_date=${n_date} v_date=${v_date} v_date_120=${v_date_120}"
 
   local ods_cnt
   ods_cnt="$(${data_mysql} -N -e "
@@ -108,6 +121,7 @@ load_dc_industry_fund_flow() {
             CASE WHEN IFNULL(f.net_amount, 0) <= 0 THEN 1 ELSE 0 END AS is_break
         FROM ods_industry_fund_flow_di f
         WHERE f.trade_date <= '${v_date}'
+          AND f.trade_date >= '${v_date_120}'
     ),
     streak_base AS (
         SELECT
@@ -182,12 +196,29 @@ load_dc_industry_fund_flow() {
 
   echo "OK ${v_date} ods_rows=${ods_cnt}"
   ${data_mysql} -e "
+    SELECT content_type, COUNT(*) AS cnt,
+           ROUND(SUM(net_amount)/1e8, 2) AS net_yi,
+           ROUND(AVG(fund_inflow_strength), 6) AS avg_strength
+    FROM dwm_dc_industry_fund_flow_di
+    WHERE trade_date = '${v_date}'
+    GROUP BY content_type
+    ORDER BY content_type;
+  "
+  ${data_mysql} -e "
     SELECT trade_date, content_type, industry_code, industry_name,
            net_amount_wan, fund_inflow_strength, net_inflow_days, fund_accel
     FROM dwm_dc_industry_fund_flow_di
     WHERE trade_date = '${v_date}'
     ORDER BY net_amount DESC
     LIMIT 5;
+  "
+  ${data_mysql} -e "
+    SELECT 'ths' AS src, content_type, COUNT(*) cnt, ROUND(SUM(net_amount)/1e8,2) sum_yi
+    FROM dwm_ths_industry_fund_flow_di WHERE trade_date = '${v_date}' GROUP BY content_type
+    UNION ALL
+    SELECT 'dc', content_type, COUNT(*), ROUND(SUM(net_amount)/1e8,2)
+    FROM dwm_dc_industry_fund_flow_di WHERE trade_date = '${v_date}' GROUP BY content_type
+    ORDER BY content_type, src;
   "
 }
 

@@ -422,7 +422,8 @@ CREATE TABLE IF NOT EXISTS dwm_market_breadth_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='全市场广度(DWM,来源ods_stock_detail_di+ods_limit_list_di)';
 
 -- -----------------------------------------------------------------------------
--- DWM：东财板块资金强度（由 ODS 聚合，ETL: dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh）
+-- DWM：东财板块资金强度（ETL: dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh）
+-- 衍生指标 net_inflow_days / net_amount_5d_avg / fund_accel 等基于 120 自然日回看窗口
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
     id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -437,9 +438,9 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
     pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
     board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,来源ods_dc_daily_di)',
     fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
-    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
-    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
-    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg',
+    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(120自然日窗口内重算)',
+    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日,120日窗口)',
+    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg(120日窗口)',
     elg_net_ratio         DECIMAL(20, 6) NULL COMMENT '超大单占主力净流入比',
     dc_rank               INT            NULL COMMENT '东财资金流排名',
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -448,7 +449,8 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_fund_flow_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块资金强度(DWM,来源ods_industry_fund_flow_di+ods_dc_daily_di)';
 
 -- -----------------------------------------------------------------------------
--- DWM：同花顺板块资金强度（由 ODS 成分股汇总估算，ETL: dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh）
+-- DWM：同花顺板块资金强度（ETL: dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh）
+-- 成分股汇总估算；衍生指标回看窗口 120 自然日，口径与 dwm_dc_industry_fund_flow_di 对齐
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
     trade_date            DATE           NOT NULL COMMENT '交易日期',
@@ -462,9 +464,9 @@ CREATE TABLE IF NOT EXISTS dwm_ths_industry_fund_flow_di (
     pct_change            DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
     board_amount          DECIMAL(20, 4) NULL COMMENT '板块成交额(元,成分股成交额汇总估算)',
     fund_inflow_strength  DECIMAL(20, 8) NULL COMMENT '资金流入强度=net_amount/board_amount',
-    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(资金连续性)',
-    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日)',
-    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg',
+    net_inflow_days       INT            NOT NULL DEFAULT 0 COMMENT '连续净流入天数(120自然日窗口内重算)',
+    net_amount_5d_avg     DECIMAL(20, 4) NULL COMMENT '近5交易日平均净流入(元,不含当日,120日窗口)',
+    fund_accel            DECIMAL(20, 4) NULL COMMENT '资金加速度=net_amount-net_amount_5d_avg(120日窗口)',
     elg_net_ratio         DECIMAL(20, 6) NULL COMMENT '超大单占主力净流入比',
     dc_rank               INT            NULL COMMENT '当日主力净流入排名(估算)',
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
