@@ -184,6 +184,105 @@ run_dwm_sw_industry_prosperity() {
     bash "${runner}" "$@"
 }
 
+run_dwm_dc_industry_market_heat() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_market_heat_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dwm_ths_industry_market_heat() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_market_heat_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dwm_dc_industry_diffusion() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_diffusion_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dwm_ths_industry_diffusion() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_diffusion_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dwm_sw_industry_diffusion() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_sw_industry_diffusion_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dws_dc_industry_mainline_score() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_score_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dws_ths_industry_mainline_score() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_ths_industry_mainline_score_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dws_sw_industry_mainline_score() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_sw_industry_mainline_score_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dws_dc_industry_mainline_monitor() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_monitor_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dws_ths_industry_mainline_monitor() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_ths_industry_mainline_monitor_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dws_sw_industry_mainline_monitor() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_sw_industry_mainline_monitor_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_dwd_market_breadth() {
     run_dwm_market_breadth "$@"
 }
