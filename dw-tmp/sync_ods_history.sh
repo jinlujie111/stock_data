@@ -8,6 +8,13 @@
 #   bash dw-tmp/sync_ods_history.sh --start 20250101 --end 20260609
 #   bash dw-tmp/sync_ods_history.sh --tables ods_stock_detail_di,ods_limit_list_di
 #   bash dw-tmp/sync_ods_history.sh --only-snapshot --continue-on-error
+#   bash dw-tmp/sync_ods_history.sh --tables ods_dc_daily_di --sleep-task 2 --sleep-day 1
+#
+# 休眠参数（秒，默认 task=1 day=1 full=2 fina=0.8）：
+#   --sleep-task  每次任务（表×交易日）完成后
+#   --sleep-day   每个交易日全部 snapshot 完成后（额外）
+#   --sleep-full  每张 full 表完成后（额外）
+#   --sleep-fina  fina_indicator 每季 API 间隔
 #
 # 说明：
 #   - 全量 22 表逐日回补 API 量极大，建议按 --tables 分批或夜间跑

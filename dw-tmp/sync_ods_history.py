@@ -15,8 +15,10 @@ ODS 历史数据回补：按 db_sync_task 配置，将指定目标表从 start~e
   python dw-tmp/sync_ods_history.py --tables ods_stock_detail_di,ods_limit_list_di
   python dw-tmp/sync_ods_history.py --only-full
   python dw-tmp/sync_ods_history.py --only-snapshot --continue-on-error
+  python dw-tmp/sync_ods_history.py --tables ods_dc_daily_di --sleep-task 2 --sleep-day 1
 
 注意：snapshot 全表逐日回补 API 调用量大、耗时长，建议按表拆分或使用 --tables。
+默认每次任务后休眠 1s、每个交易日后额外休眠 1s，可用 --sleep-task / --sleep-day 调整。
 """
 from __future__ import annotations
 
@@ -104,6 +106,18 @@ SNAPSHOT_TABLE_ORDER: tuple[str, ...] = (
 
 FINA_TABLE = "ods_fina_indicator"
 
+# 历史回补默认休眠（秒），降低 Tushare 限流风险
+DEFAULT_SLEEP_TASK = 1.0
+DEFAULT_SLEEP_DAY = 1.0
+DEFAULT_SLEEP_FULL = 2.0
+DEFAULT_SLEEP_FINA = 0.8
+
+
+def _sleep(seconds: float, reason: str) -> None:
+    if seconds > 0:
+        logger.info("休眠 %.2fs (%s)", seconds, reason)
+        time.sleep(seconds)
+
 
 def parse_yyyymmdd(s: str) -> date:
     s = s.strip()
@@ -153,7 +167,9 @@ def run_one_task(
     *,
     dry_run: bool,
     continue_on_error: bool,
+    sleep_task: float = 0.0,
 ) -> bool:
+    ok = False
     try:
         result: SyncResult = run_task(task, trade_date, dry_run)
         if result.ok:
@@ -164,13 +180,14 @@ def run_one_task(
                 result.rows_affected,
                 result.message or "",
             )
-            return True
-        logger.error(
-            "FAIL %s -> %s: %s",
-            result.source_table,
-            result.target_table,
-            result.message,
-        )
+            ok = True
+        else:
+            logger.error(
+                "FAIL %s -> %s: %s",
+                result.source_table,
+                result.target_table,
+                result.message,
+            )
     except Exception as exc:  # noqa: BLE001
         logger.exception(
             "FAIL %s -> %s: %s",
@@ -178,9 +195,11 @@ def run_one_task(
             task.get("target_table"),
             exc,
         )
-    if not continue_on_error:
+    td_label = trade_date.isoformat() if trade_date else "full"
+    _sleep(sleep_task, f"任务完成 {task.get('target_table')} {td_label}")
+    if not ok and not continue_on_error:
         raise SystemExit(1)
-    return False
+    return ok
 
 
 def run_full_phase(
@@ -190,9 +209,12 @@ def run_full_phase(
     *,
     dry_run: bool,
     continue_on_error: bool,
+    sleep_task: float,
+    sleep_full: float,
 ) -> None:
     full_tables = [t for t in tables if t in FULL_TABLE_ORDER]
-    for target in ordered_tables(full_tables, FULL_TABLE_ORDER):
+    ordered = ordered_tables(full_tables, FULL_TABLE_ORDER)
+    for idx, target in enumerate(ordered):
         task = task_map.get(target)
         if not task:
             logger.warning("跳过 full %s: 未找到 db_sync_task", target)
@@ -202,7 +224,15 @@ def run_full_phase(
             logger.warning("跳过 %s: sync_mode=%s 非 full", target, mode)
             continue
         logger.info("=== FULL %s (%s) ===", target, task["source_table"])
-        run_one_task(task, end, dry_run=dry_run, continue_on_error=continue_on_error)
+        run_one_task(
+            task,
+            end,
+            dry_run=dry_run,
+            continue_on_error=continue_on_error,
+            sleep_task=sleep_task,
+        )
+        if sleep_full > 0 and idx + 1 < len(ordered):
+            _sleep(sleep_full, f"full 表间隔 {target}")
 
 
 def run_fina_phase(
@@ -237,6 +267,7 @@ def run_snapshot_phase(
     trading_days: list[date],
     *,
     dry_run: bool,
+    sleep_task: float,
     sleep_day: float,
     continue_on_error: bool,
 ) -> None:
@@ -259,9 +290,15 @@ def run_snapshot_phase(
                 logger.warning("跳过 %s: sync_mode=%s 非 snapshot", target, mode)
                 continue
             logger.info("SNAPSHOT %s (%s) trade_date=%s", target, task["source_table"], td)
-            run_one_task(task, td, dry_run=dry_run, continue_on_error=continue_on_error)
+            run_one_task(
+                task,
+                td,
+                dry_run=dry_run,
+                continue_on_error=continue_on_error,
+                sleep_task=sleep_task,
+            )
         if sleep_day > 0 and di < total_days:
-            time.sleep(sleep_day)
+            _sleep(sleep_day, f"交易日 {td} 全部 snapshot 完成")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -283,16 +320,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="单日/单表失败不中断（默认遇错退出）",
     )
     parser.add_argument(
+        "--sleep-task",
+        type=float,
+        default=DEFAULT_SLEEP_TASK,
+        help=f"每次任务（表×交易日）完成后的休眠秒数，默认 {DEFAULT_SLEEP_TASK}",
+    )
+    parser.add_argument(
         "--sleep-day",
         type=float,
-        default=0.3,
-        help="每个交易日全部 snapshot 任务完成后的间隔秒数",
+        default=DEFAULT_SLEEP_DAY,
+        help=f"每个交易日全部 snapshot 任务完成后的额外休眠秒数，默认 {DEFAULT_SLEEP_DAY}",
+    )
+    parser.add_argument(
+        "--sleep-full",
+        type=float,
+        default=DEFAULT_SLEEP_FULL,
+        help=f"每张 full 表同步完成后的额外休眠秒数，默认 {DEFAULT_SLEEP_FULL}",
     )
     parser.add_argument(
         "--sleep-fina",
         type=float,
-        default=0.5,
-        help="fina_indicator 每季 API 间隔",
+        default=DEFAULT_SLEEP_FINA,
+        help=f"fina_indicator 每季 API 间隔，默认 {DEFAULT_SLEEP_FINA}",
     )
     return parser.parse_args(argv)
 
@@ -310,7 +359,16 @@ def main(argv: list[str] | None = None) -> int:
     else:
         tables = list(DEFAULT_TARGET_TABLES)
 
-    logger.info("ODS 历史回补: %s ~ %s, 表数=%s", start, end, len(tables))
+    logger.info(
+        "ODS 历史回补: %s ~ %s, 表数=%s, sleep_task=%s sleep_day=%s sleep_full=%s sleep_fina=%s",
+        start,
+        end,
+        len(tables),
+        args.sleep_task,
+        args.sleep_day,
+        args.sleep_full,
+        args.sleep_fina,
+    )
     prime_proxy_host()
     task_map = build_task_map()
 
@@ -329,6 +387,8 @@ def main(argv: list[str] | None = None) -> int:
             end,
             dry_run=args.dry_run,
             continue_on_error=args.continue_on_error,
+            sleep_task=args.sleep_task,
+            sleep_full=args.sleep_full,
         )
 
     trading_days: list[date] = []
@@ -345,6 +405,7 @@ def main(argv: list[str] | None = None) -> int:
                         end,
                         dry_run=args.dry_run,
                         continue_on_error=args.continue_on_error,
+                        sleep_task=args.sleep_task,
                     )
             trading_days = load_trading_days(start, end)
         if not trading_days:
@@ -361,6 +422,7 @@ def main(argv: list[str] | None = None) -> int:
             tables,
             trading_days,
             dry_run=args.dry_run,
+            sleep_task=args.sleep_task,
             sleep_day=args.sleep_day,
             continue_on_error=args.continue_on_error,
         )
