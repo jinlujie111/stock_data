@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass
 from datetime import date
@@ -53,6 +54,34 @@ def register(proxy_source: str, source_table: str) -> Callable[[TaskHandler], Ta
     return decorator
 
 
+def _fetch_retry_count() -> int:
+    try:
+        return max(1, int(os.getenv("TUSHARE_FETCH_RETRIES", "3")))
+    except ValueError:
+        return 3
+
+
+def _fetch_retry_sleep() -> float:
+    try:
+        return max(0.0, float(os.getenv("TUSHARE_FETCH_RETRY_SLEEP", "5")))
+    except ValueError:
+        return 5.0
+
+
+def _is_retryable_fetch_error(exc: BaseException) -> bool:
+    import requests
+
+    retryable = (
+        requests.exceptions.Timeout,
+        requests.exceptions.ConnectionError,
+        TimeoutError,
+    )
+    if isinstance(exc, retryable):
+        return True
+    cause = getattr(exc, "__cause__", None)
+    return isinstance(cause, retryable) if cause else False
+
+
 def fetch_tushare(
     source_table: str, token_type: str = "tushare", **kwargs: Any
 ) -> pd.DataFrame:
@@ -62,12 +91,36 @@ def fetch_tushare(
     fn = getattr(pro, source_table, None)
     if fn is None or not callable(fn):
         raise ValueError(f"tushare 未找到接口: {source_table}")
-    df = fn(**kwargs)
-    if df is None:
-        return pd.DataFrame()
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError(f"{source_table} 返回值不是 DataFrame")
-    return df
+
+    retries = _fetch_retry_count()
+    retry_sleep = _fetch_retry_sleep()
+    last_exc: BaseException | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            df = fn(**kwargs)
+            if df is None:
+                return pd.DataFrame()
+            if not isinstance(df, pd.DataFrame):
+                raise TypeError(f"{source_table} 返回值不是 DataFrame")
+            return df
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            if attempt >= retries or not _is_retryable_fetch_error(exc):
+                raise
+            wait = retry_sleep * attempt
+            logger.warning(
+                "%s 第 %s/%s 次请求失败(%s)，%.1fs 后重试 params=%s",
+                source_table,
+                attempt,
+                retries,
+                exc,
+                wait,
+                kwargs,
+            )
+            time.sleep(wait)
+    if last_exc:
+        raise last_exc
+    return pd.DataFrame()
 
 
 def fetch_akshare(source_table: str, **kwargs: Any) -> pd.DataFrame:
@@ -107,6 +160,7 @@ def fetch_task_dataframe(task: TaskDict, trade_date: date | None) -> pd.DataFram
     if not param_list:
         param_list = [{}]
 
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0)
     frames: list[pd.DataFrame] = []
     for i, params in enumerate(param_list):
         logger.info("拉取 %s:%s 第%s次 params=%s", proxy, api_name, i + 1, params)
@@ -114,6 +168,8 @@ def fetch_task_dataframe(task: TaskDict, trade_date: date | None) -> pd.DataFram
         logger.info("返回 %s 行", len(part))
         if not part.empty:
             frames.append(part)
+        if sleep_s > 0 and i + 1 < len(param_list):
+            time.sleep(sleep_s)
 
     if not frames:
         return pd.DataFrame()

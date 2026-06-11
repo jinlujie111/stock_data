@@ -37,7 +37,7 @@ for _p in (_DW_ROOT / "dw-utils", _DW_ROOT / "dw-sync", _DW_ROOT / "dw-tmp"):
         sys.path.insert(0, str(_p))
 
 from mysql_config import get_engine, load_sync_tasks  # noqa: E402
-from task_registry import SyncResult, run_task  # noqa: E402
+from task_registry import SyncResult, _is_retryable_fetch_error, run_task  # noqa: E402
 from tushare_client import prime_proxy_host  # noqa: E402
 
 logging.basicConfig(
@@ -111,6 +111,8 @@ DEFAULT_SLEEP_TASK = 1.0
 DEFAULT_SLEEP_DAY = 1.0
 DEFAULT_SLEEP_FULL = 2.0
 DEFAULT_SLEEP_FINA = 0.8
+DEFAULT_TASK_RETRY = 2
+DEFAULT_RETRY_SLEEP = 10.0
 
 
 def _sleep(seconds: float, reason: str) -> None:
@@ -168,35 +170,58 @@ def run_one_task(
     dry_run: bool,
     continue_on_error: bool,
     sleep_task: float = 0.0,
+    task_retry: int = 0,
+    retry_sleep: float = 0.0,
 ) -> bool:
     ok = False
-    try:
-        result: SyncResult = run_task(task, trade_date, dry_run)
-        if result.ok:
-            logger.info(
-                "OK %s -> %s rows=%s %s",
-                result.source_table,
-                result.target_table,
-                result.rows_affected,
-                result.message or "",
-            )
-            ok = True
-        else:
+    max_attempts = max(1, task_retry + 1)
+    td_label = trade_date.isoformat() if trade_date else "full"
+    target_table = task.get("target_table")
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result: SyncResult = run_task(task, trade_date, dry_run)
+            if result.ok:
+                logger.info(
+                    "OK %s -> %s rows=%s %s",
+                    result.source_table,
+                    result.target_table,
+                    result.rows_affected,
+                    result.message or "",
+                )
+                ok = True
+                break
             logger.error(
                 "FAIL %s -> %s: %s",
                 result.source_table,
                 result.target_table,
                 result.message,
             )
-    except Exception as exc:  # noqa: BLE001
-        logger.exception(
-            "FAIL %s -> %s: %s",
-            task.get("source_table"),
-            task.get("target_table"),
-            exc,
-        )
-    td_label = trade_date.isoformat() if trade_date else "full"
-    _sleep(sleep_task, f"任务完成 {task.get('target_table')} {td_label}")
+            break
+        except Exception as exc:  # noqa: BLE001
+            retryable = _is_retryable_fetch_error(exc)
+            if attempt < max_attempts and retryable:
+                wait = retry_sleep * attempt
+                logger.warning(
+                    "任务 %s %s 第 %s/%s 次失败(%s)，%.1fs 后整任务重试",
+                    target_table,
+                    td_label,
+                    attempt,
+                    max_attempts,
+                    exc,
+                    wait,
+                )
+                _sleep(wait, f"超时/连接失败重试 {target_table}")
+                continue
+            logger.exception(
+                "FAIL %s -> %s: %s",
+                task.get("source_table"),
+                target_table,
+                exc,
+            )
+            break
+
+    _sleep(sleep_task, f"任务完成 {target_table} {td_label}")
     if not ok and not continue_on_error:
         raise SystemExit(1)
     return ok
@@ -211,6 +236,8 @@ def run_full_phase(
     continue_on_error: bool,
     sleep_task: float,
     sleep_full: float,
+    task_retry: int,
+    retry_sleep: float,
 ) -> None:
     full_tables = [t for t in tables if t in FULL_TABLE_ORDER]
     ordered = ordered_tables(full_tables, FULL_TABLE_ORDER)
@@ -230,6 +257,8 @@ def run_full_phase(
             dry_run=dry_run,
             continue_on_error=continue_on_error,
             sleep_task=sleep_task,
+            task_retry=task_retry,
+            retry_sleep=retry_sleep,
         )
         if sleep_full > 0 and idx + 1 < len(ordered):
             _sleep(sleep_full, f"full 表间隔 {target}")
@@ -270,6 +299,8 @@ def run_snapshot_phase(
     sleep_task: float,
     sleep_day: float,
     continue_on_error: bool,
+    task_retry: int,
+    retry_sleep: float,
 ) -> None:
     snap_tables = [t for t in tables if t not in FULL_TABLE_ORDER and t != FINA_TABLE]
     snap_tables = ordered_tables(snap_tables, SNAPSHOT_TABLE_ORDER)
@@ -296,6 +327,8 @@ def run_snapshot_phase(
                 dry_run=dry_run,
                 continue_on_error=continue_on_error,
                 sleep_task=sleep_task,
+                task_retry=task_retry,
+                retry_sleep=retry_sleep,
             )
         if sleep_day > 0 and di < total_days:
             _sleep(sleep_day, f"交易日 {td} 全部 snapshot 完成")
@@ -343,6 +376,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_SLEEP_FINA,
         help=f"fina_indicator 每季 API 间隔，默认 {DEFAULT_SLEEP_FINA}",
     )
+    parser.add_argument(
+        "--retry",
+        type=int,
+        default=DEFAULT_TASK_RETRY,
+        help=f"超时/连接失败后整任务重试次数（不含首次），默认 {DEFAULT_TASK_RETRY}",
+    )
+    parser.add_argument(
+        "--retry-sleep",
+        type=float,
+        default=DEFAULT_RETRY_SLEEP,
+        help=f"整任务重试基础间隔秒数（逐次递增），默认 {DEFAULT_RETRY_SLEEP}",
+    )
     return parser.parse_args(argv)
 
 
@@ -360,7 +405,8 @@ def main(argv: list[str] | None = None) -> int:
         tables = list(DEFAULT_TARGET_TABLES)
 
     logger.info(
-        "ODS 历史回补: %s ~ %s, 表数=%s, sleep_task=%s sleep_day=%s sleep_full=%s sleep_fina=%s",
+        "ODS 历史回补: %s ~ %s, 表数=%s, sleep_task=%s sleep_day=%s sleep_full=%s "
+        "sleep_fina=%s retry=%s retry_sleep=%s",
         start,
         end,
         len(tables),
@@ -368,6 +414,8 @@ def main(argv: list[str] | None = None) -> int:
         args.sleep_day,
         args.sleep_full,
         args.sleep_fina,
+        args.retry,
+        args.retry_sleep,
     )
     prime_proxy_host()
     task_map = build_task_map()
@@ -389,6 +437,8 @@ def main(argv: list[str] | None = None) -> int:
             continue_on_error=args.continue_on_error,
             sleep_task=args.sleep_task,
             sleep_full=args.sleep_full,
+            task_retry=args.retry,
+            retry_sleep=args.retry_sleep,
         )
 
     trading_days: list[date] = []
@@ -406,6 +456,8 @@ def main(argv: list[str] | None = None) -> int:
                         dry_run=args.dry_run,
                         continue_on_error=args.continue_on_error,
                         sleep_task=args.sleep_task,
+                        task_retry=args.retry,
+                        retry_sleep=args.retry_sleep,
                     )
             trading_days = load_trading_days(start, end)
         if not trading_days:
@@ -425,6 +477,8 @@ def main(argv: list[str] | None = None) -> int:
             sleep_task=args.sleep_task,
             sleep_day=args.sleep_day,
             continue_on_error=args.continue_on_error,
+            task_retry=args.retry,
+            retry_sleep=args.retry_sleep,
         )
 
     logger.info("ODS 历史回补完成")

@@ -159,13 +159,28 @@ def _configure_proxy_url(api_url: str) -> str:
     return new_url
 
 
+def get_http_timeout() -> int:
+    """Tushare HTTP 读超时（秒）；历史补数接口较慢时适当加大。"""
+    try:
+        return max(10, int(os.getenv("TUSHARE_HTTP_TIMEOUT", "90")))
+    except ValueError:
+        return 90
+
+
 def _apply_proxy_to_pro(pro: Any, api_url: str | None, token_type: str) -> None:
+    timeout = get_http_timeout()
+    pro._DataApi__timeout = timeout
     if api_url:
         configured = _configure_proxy_url(api_url)
         pro._DataApi__http_url = configured
-        logger.info("Tushare 使用代理 API: %s (token_type=%s)", configured, token_type)
+        logger.info(
+            "Tushare 使用代理 API: %s (token_type=%s, timeout=%ss)",
+            configured,
+            token_type,
+            timeout,
+        )
     else:
-        logger.info("Tushare 使用官方 API (token_type=%s)", token_type)
+        logger.info("Tushare 使用官方 API (token_type=%s, timeout=%ss)", token_type, timeout)
 
 
 def get_tushare_pro(token_type: str = "tushare") -> Any:
