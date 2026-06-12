@@ -10,13 +10,14 @@ class ColumnDef(TypedDict):
     fmt: str  # text | num | pct | int | bool
 
 
-class DimensionDef(TypedDict):
+class DimensionDef(TypedDict, total=False):
     slug: str
     title: str
     subtitle: str
     table: str
     order_by: str
     columns: list[ColumnDef]
+    sort_hint: str
 
 
 _COMMON: list[ColumnDef] = [
@@ -31,7 +32,8 @@ DC_DIMENSIONS: dict[str, DimensionDef] = {
         "title": "资金强度",
         "subtitle": "东方财富 · 板块主力资金与流入强度",
         "table": "dwm_dc_industry_fund_flow_di",
-        "order_by": "dc_rank IS NULL, dc_rank ASC",
+        "order_by": "net_amount IS NULL, net_amount ASC",
+        "sort_hint": "默认按主力净流入从小到大排序，未选板块表示全部",
         "columns": _COMMON
         + [
             {"key": "net_amount_wan", "label": "主力净流入(万)", "fmt": "num"},

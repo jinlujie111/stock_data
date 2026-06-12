@@ -76,6 +76,7 @@ def list_boards(
     slug: str,
     trade_date: str,
     content_types: list[str] | None = None,
+    keyword: str | None = None,
 ) -> list[dict]:
     dim = get_dimension(slug)
     sql = f"""
@@ -88,6 +89,10 @@ def list_boards(
         clause, extra = _in_clause("content_type", content_types, "ct")
         sql += clause
         params.update(extra)
+    kw = (keyword or "").strip()
+    if kw:
+        sql += " AND (industry_name LIKE :kw OR industry_code LIKE :kw)"
+        params["kw"] = f"%{kw}%"
     sql += " ORDER BY content_type, industry_name"
     rows = fetch_all_stock(sql, params)
     return [_serialize_row(r) for r in rows]

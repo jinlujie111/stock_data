@@ -2,8 +2,26 @@
 {% block app_content %}
 <div class="page-head">
   <h1>欢迎，{{ user.username }}</h1>
-  <p class="muted">东方财富五维板块数据：资金强度、趋势强度、市场热度、产业景气、扩散效应。</p>
+  <p class="muted">市场广度与东方财富五维板块数据一览。</p>
 </div>
+
+<section class="card breadth-card">
+  <div class="breadth-head">
+    <div>
+      <h2 class="section-title">市场广度</h2>
+      <p id="breadth-summary" class="muted section-desc">加载中…</p>
+    </div>
+    <label class="filter-field breadth-date-field">
+      <span>交易日期</span>
+      <select id="breadth-date"></select>
+    </label>
+  </div>
+  <div id="breadth-error" class="alert alert-error hidden"></div>
+  <div id="breadth-metrics" class="metric-grid"></div>
+  <div id="breadth-empty" class="table-empty hidden">该交易日暂无市场广度数据</div>
+</section>
+
+<h2 class="section-title section-title--spaced">板块五维分析</h2>
 <div class="dash-grid">
   {% for item in nav_items %}
   <a href="{{ item.href }}" class="dash-card">
@@ -12,4 +30,7 @@
   </a>
   {% endfor %}
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/home.js"></script>
 {% endblock %}

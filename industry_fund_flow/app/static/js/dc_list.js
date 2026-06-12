@@ -2,9 +2,13 @@
   const cfg = window.__DC_PAGE__;
   const slug = cfg.slug;
   const columns = cfg.columns;
+  const sortHint = cfg.sort_hint || "";
 
   const elDate = document.getElementById("trade-date");
-  const elBoards = document.getElementById("board-select");
+  const elSearch = document.getElementById("board-search");
+  const elDropdown = document.getElementById("board-dropdown");
+  const elSelected = document.getElementById("board-selected");
+  const elPicker = document.getElementById("board-picker");
   const elHead = document.getElementById("table-head");
   const elBody = document.getElementById("table-body");
   const elSummary = document.getElementById("result-summary");
@@ -14,6 +18,9 @@
   const chipGroup = document.getElementById("content-type-chips");
 
   let selectedContentTypes = [];
+  let allBoards = [];
+  /** @type {Map<string, {industry_code: string, industry_name: string, content_type: string}>} */
+  const selectedBoards = new Map();
 
   function fmtCell(val, fmt) {
     if (val === null || val === undefined || val === "") return "—";
@@ -28,11 +35,81 @@
   }
 
   function selectedBoardCodes() {
-    return Array.from(elBoards.selectedOptions).map((o) => o.value);
+    return Array.from(selectedBoards.keys());
   }
 
   function getContentTypesParam() {
     return selectedContentTypes.length ? selectedContentTypes.join(",") : "";
+  }
+
+  function boardLabel(b) {
+    return `[${b.content_type}] ${b.industry_name} (${b.industry_code})`;
+  }
+
+  function matchBoard(board, q) {
+    const text = `${board.industry_name} ${board.industry_code} ${board.content_type}`.toLowerCase();
+    const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return true;
+    return tokens.every((t) => text.includes(t));
+  }
+
+  function renderSelectedTags() {
+    if (!selectedBoards.size) {
+      elSelected.innerHTML = '<span class="board-placeholder">未选择板块（展示全部）</span>';
+      return;
+    }
+    elSelected.innerHTML = Array.from(selectedBoards.values())
+      .map(
+        (b) =>
+          `<span class="board-tag" data-code="${b.industry_code}">` +
+          `${boardLabel(b)}<button type="button" aria-label="移除">×</button></span>`
+      )
+      .join("");
+  }
+
+  function renderDropdown(matches) {
+    if (!matches.length) {
+      elDropdown.innerHTML = '<div class="board-option board-option--empty">无匹配板块</div>';
+      elDropdown.classList.remove("hidden");
+      return;
+    }
+    elDropdown.innerHTML = matches
+      .slice(0, 50)
+      .map(
+        (b) =>
+          `<button type="button" class="board-option" data-code="${b.industry_code}">` +
+          `${boardLabel(b)}</button>`
+      )
+      .join("");
+    elDropdown.classList.remove("hidden");
+  }
+
+  function hideDropdown() {
+    elDropdown.classList.add("hidden");
+  }
+
+  function onSearchInput() {
+    const q = elSearch.value;
+    if (!q.trim()) {
+      hideDropdown();
+      return;
+    }
+    const matches = allBoards.filter((b) => !selectedBoards.has(b.industry_code) && matchBoard(b, q));
+    renderDropdown(matches);
+  }
+
+  function addBoard(code) {
+    const board = allBoards.find((b) => b.industry_code === code);
+    if (!board) return;
+    selectedBoards.set(code, board);
+    renderSelectedTags();
+    elSearch.value = "";
+    hideDropdown();
+  }
+
+  function removeBoard(code) {
+    selectedBoards.delete(code);
+    renderSelectedTags();
   }
 
   async function apiGet(path) {
@@ -90,16 +167,16 @@
     let url = `/api/dc/meta/boards?slug=${encodeURIComponent(slug)}&trade_date=${encodeURIComponent(td)}`;
     if (ct) url += `&content_types=${encodeURIComponent(ct)}`;
     const data = await apiGet(url);
-    const prev = new Set(selectedBoardCodes());
-    elBoards.innerHTML = data.boards
-      .map(
-        (b) =>
-          `<option value="${b.industry_code}"${prev.has(b.industry_code) ? " selected" : ""}>` +
-          `[${b.content_type}] ${b.industry_name} (${b.industry_code})` +
-          `</option>`
-      )
-      .join("");
-    elHint.textContent = `共 ${data.boards.length} 个板块可选；不选表示全部`;
+    allBoards = data.boards;
+    const keep = new Map();
+    selectedBoards.forEach((b, code) => {
+      if (allBoards.some((x) => x.industry_code === code)) keep.set(code, b);
+    });
+    selectedBoards.clear();
+    keep.forEach((b, code) => selectedBoards.set(code, b));
+    renderSelectedTags();
+    const sortPart = sortHint ? `；${sortHint}` : "";
+    elHint.textContent = `共 ${allBoards.length} 个板块；未选板块表示全部${sortPart}`;
   }
 
   async function loadData() {
@@ -144,14 +221,37 @@
   });
 
   document.getElementById("btn-reset-boards").addEventListener("click", () => {
-    Array.from(elBoards.options).forEach((o) => (o.selected = false));
+    selectedBoards.clear();
+    elSearch.value = "";
+    hideDropdown();
+    renderSelectedTags();
   });
 
   elDate.addEventListener("change", () => {
     loadBoards().then(() => loadData()).catch((err) => showError(err.message));
   });
 
+  elSearch.addEventListener("input", onSearchInput);
+  elSearch.addEventListener("focus", onSearchInput);
+
+  elDropdown.addEventListener("click", (e) => {
+    const btn = e.target.closest(".board-option[data-code]");
+    if (!btn) return;
+    addBoard(btn.dataset.code);
+  });
+
+  elSelected.addEventListener("click", (e) => {
+    const tag = e.target.closest(".board-tag");
+    if (!tag) return;
+    if (e.target.tagName === "BUTTON") removeBoard(tag.dataset.code);
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!elPicker.contains(e.target)) hideDropdown();
+  });
+
   renderHead();
+  renderSelectedTags();
   loadTradeDates()
     .then(() => loadBoards())
     .then(() => loadData())

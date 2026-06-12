@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,6 +14,7 @@ from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
 from app.deps import current_user, require_user
 from app.dc_registry import NAV_ITEMS
+from app import market_breadth_service as mb_svc
 
 logger = logging.getLogger(__name__)
 
@@ -151,3 +152,29 @@ def api_me(user: dict = Depends(require_user)):
         "username": user["username"],
         "email": user.get("email"),
     }
+
+
+@app.get("/api/market-breadth/trade-dates")
+def api_market_breadth_dates(
+    limit: int = Query(60, ge=1, le=365),
+    _user: dict = Depends(require_user),
+):
+    try:
+        dates = mb_svc.list_trade_dates(limit)
+        latest = dates[0] if dates else mb_svc.latest_trade_date()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询交易日失败: {exc}") from exc
+    return {"latest": latest, "dates": dates}
+
+
+@app.get("/api/market-breadth")
+def api_market_breadth(
+    trade_date: str | None = Query(None),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return mb_svc.get_market_breadth(trade_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询市场广度失败: {exc}") from exc

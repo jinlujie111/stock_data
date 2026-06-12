@@ -23,8 +23,18 @@
       </div>
     </label>
     <label class="filter-field filter-field--grow">
-      <span>板块（可多选，默认全部）</span>
-      <select id="board-select" multiple size="6"></select>
+      <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
+      <div class="board-picker" id="board-picker">
+        <div class="board-selected" id="board-selected"></div>
+        <input
+          type="text"
+          id="board-search"
+          class="board-search"
+          placeholder="输入板块名称或代码，模糊匹配…"
+          autocomplete="off"
+        />
+        <div class="board-dropdown hidden" id="board-dropdown"></div>
+      </div>
     </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>

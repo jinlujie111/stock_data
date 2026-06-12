@@ -53,7 +53,12 @@ def dc_list_page(slug: str, request: Request, user: dict = Depends(require_user)
             slug,
             dimension=dim,
             dimension_json=json.dumps(
-                {"slug": dim["slug"], "title": dim["title"], "columns": dim["columns"]},
+                {
+                    "slug": dim["slug"],
+                    "title": dim["title"],
+                    "columns": dim["columns"],
+                    "sort_hint": dim.get("sort_hint", ""),
+                },
                 ensure_ascii=False,
             ),
         ),
@@ -96,6 +101,7 @@ def api_boards(
     slug: str = Query(...),
     trade_date: str = Query(...),
     content_types: str | None = Query(None),
+    keyword: str | None = Query(None),
     _user: dict = Depends(require_user),
 ):
     try:
@@ -104,7 +110,7 @@ def api_boards(
         if not td:
             raise ValueError("trade_date 必填")
         cts = parse_csv_list(content_types) or None
-        boards = list_boards(slug, td, cts)
+        boards = list_boards(slug, td, cts, keyword)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="未知维度") from exc
     except ValueError as exc:
