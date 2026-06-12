@@ -234,24 +234,6 @@ run_dwm_sw_industry_diffusion() {
     bash "${runner}" "$@"
 }
 
-run_dwm_history() {
-    local runner="${DW_ROOT}/dw-tmp/run_dwm_history.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-check_dwm_gaps() {
-    local runner="${DW_ROOT}/dw-tmp/check_dwm_gaps.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_dws_dc_industry_mainline_score() {
     local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_score_di.sh"
     if [[ ! -f "${runner}" ]]; then
@@ -574,7 +556,7 @@ run_dwm_by_trading_day() {
     return 1
   fi
   if [[ "${skip_cnt}" -gt 0 ]]; then
-    echo "WARN: ${skip_cnt} 个交易日 skip（多为 ODS 无数据，可用 check_dwm_gaps 查缺口）"
+    echo "WARN: ${skip_cnt} 个交易日 skip（多为 ODS 无数据）"
   else
     echo "DONE all trading days"
   fi
