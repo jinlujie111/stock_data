@@ -6,8 +6,8 @@
   <title>{{ title }}</title>
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
-<body>
-  <div class="page">
+<body class="{% block body_class %}{% endblock %}">
+  <div class="page{% block page_class %}{% endblock %}">
     <header class="header">
       <a class="brand" href="/">行业资金流</a>
       {% block header_extra %}{% endblock %}

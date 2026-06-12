@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block body_class %}body-app{% endblock %}
+{% block page_class %} page--app{% endblock %}
+{% block header_extra %}
+<form method="post" action="/logout" class="logout-form">
+  <span class="user-badge">{{ user.username }}</span>
+  <button type="submit" class="btn btn-ghost">退出</button>
+</form>
+{% endblock %}
+{% block content %}
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-title">业务菜单</div>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item{% if active_nav == 'home' %} active{% endif %}">首页</a>
+      {% for item in nav_items %}
+      <a href="{{ item.href }}" class="nav-item{% if active_nav == item.slug %} active{% endif %}">{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">数据源 · 东方财富</div>
+  </aside>
+  <section class="app-content">
+    {% block app_content %}{% endblock %}
+  </section>
+</div>
+{% endblock %}

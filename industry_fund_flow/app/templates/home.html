@@ -1,23 +1,15 @@
-{% extends "base.html" %}
-{% block header_extra %}
-<form method="post" action="/logout" class="logout-form">
-  <span class="user-badge">{{ user.username }}</span>
-  <button type="submit" class="btn btn-ghost">退出</button>
-</form>
-{% endblock %}
-{% block content %}
-<div class="card welcome-card">
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head">
   <h1>欢迎，{{ user.username }}</h1>
-  <p class="muted">您已成功登录。后续将在此展示行业资金流、主线板块等数据能力。</p>
-  <div class="stats-placeholder">
-    <div class="stat-box">
-      <div class="stat-label">账号状态</div>
-      <div class="stat-value">正常</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-label">用户 ID</div>
-      <div class="stat-value">{{ user.id }}</div>
-    </div>
-  </div>
+  <p class="muted">东方财富五维板块数据：资金强度、趋势强度、市场热度、产业景气、扩散效应。</p>
+</div>
+<div class="dash-grid">
+  {% for item in nav_items %}
+  <a href="{{ item.href }}" class="dash-card">
+    <div class="dash-card-title">{{ item.label }}</div>
+    <div class="dash-card-desc">查看东财板块明细列表</div>
+  </a>
+  {% endfor %}
 </div>
 {% endblock %}

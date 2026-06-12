@@ -1,0 +1,56 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head">
+  <div>
+    <h1>{{ dimension.title }}</h1>
+    <p class="muted">{{ dimension.subtitle }}</p>
+  </div>
+</div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <select id="trade-date"></select>
+    </label>
+    <label class="filter-field filter-field--wide">
+      <span>板块类型</span>
+      <div class="chip-group" id="content-type-chips">
+        <button type="button" class="chip active" data-value="">全部</button>
+        {% for ct in content_types %}
+        <button type="button" class="chip" data-value="{{ ct }}">{{ ct }}</button>
+        {% endfor %}
+      </div>
+    </label>
+    <label class="filter-field filter-field--grow">
+      <span>板块（可多选，默认全部）</span>
+      <select id="board-select" multiple size="6"></select>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
+    </div>
+  </div>
+  <div id="filter-hint" class="filter-hint muted"></div>
+</div>
+
+<div class="card table-card">
+  <div class="table-toolbar">
+    <span id="result-summary" class="muted">加载中…</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="data-table">
+      <thead><tr id="table-head"></tr></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+  <div id="table-empty" class="table-empty hidden">暂无数据，请换交易日或放宽筛选条件</div>
+  <div id="table-error" class="alert alert-error hidden"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.__DC_PAGE__ = {{ dimension_json | safe }}
+</script>
+<script src="/static/js/dc_list.js"></script>
+{% endblock %}

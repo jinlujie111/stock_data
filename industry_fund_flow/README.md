@@ -72,7 +72,7 @@ init_data_industry_schema
 
 # 或仅建表（库已存在时）:
 
-${data_industry} < industry_fund_flow/sql/app_user.sql
+data_industry < industry_fund_flow/sql/app_user.sql
 
 ```
 

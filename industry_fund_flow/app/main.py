@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Annotated
 
-from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy.exc import SQLAlchemyError
-
-logger = logging.getLogger(__name__)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.exc import SQLAlchemyError
 
-from app import auth_service
+from app import auth_service, routes_dc
 from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
+from app.deps import current_user, require_user
+from app.dc_registry import NAV_ITEMS
+
+logger = logging.getLogger(__name__)
 
 _BASE = Path(__file__).resolve().parent
 _STATIC = _BASE / "static"
@@ -22,6 +23,10 @@ _TEMPLATES = Jinja2Templates(directory=str(_BASE / "templates"))
 
 app = FastAPI(title=APP_TITLE)
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+
+routes_dc.init_dc_routes(_TEMPLATES)
+app.include_router(routes_dc.page_router)
+app.include_router(routes_dc.api_router)
 
 
 @app.on_event("startup")
@@ -47,22 +52,6 @@ async def generic_error_handler(_request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": str(exc) or "服务器内部错误"})
 
 
-def current_user(iff_token: Annotated[str | None, Cookie(alias=COOKIE_NAME)] = None) -> dict | None:
-    if not iff_token:
-        return None
-    payload = auth_service.decode_token(iff_token)
-    if not payload:
-        return None
-    user = auth_service.get_user_by_id(int(payload["sub"]))
-    return user
-
-
-def require_user(user: dict | None = Depends(current_user)) -> dict:
-    if not user:
-        raise HTTPException(status_code=401, detail="未登录")
-    return user
-
-
 def _set_auth_cookie(response: Response, user: dict) -> None:
     token = auth_service.create_access_token(user["id"], user["username"])
     response.set_cookie(
@@ -82,7 +71,12 @@ def home(request: Request, user: dict | None = Depends(current_user)):
     return _TEMPLATES.TemplateResponse(
         request,
         "home.html",
-        {"title": APP_TITLE, "user": user},
+        {
+            "title": APP_TITLE,
+            "user": user,
+            "nav_items": NAV_ITEMS,
+            "active_nav": "home",
+        },
     )
 
 

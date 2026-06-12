@@ -9,6 +9,13 @@ MYSQL_USER = os.getenv("IFF_MYSQL_USER", "data_industry")
 MYSQL_PASSWORD = os.getenv("IFF_MYSQL_PASSWORD", "")
 MYSQL_DATABASE = os.getenv("IFF_MYSQL_DATABASE", "data_industry")
 
+# stock_data 业务库（东财 DWM 只读）
+STOCK_MYSQL_HOST = os.getenv("IFF_STOCK_MYSQL_HOST", os.getenv("STOCK_MYSQL_HOST", "localhost"))
+STOCK_MYSQL_PORT = int(os.getenv("IFF_STOCK_MYSQL_PORT", os.getenv("STOCK_MYSQL_PORT", "3306")))
+STOCK_MYSQL_USER = os.getenv("IFF_STOCK_MYSQL_USER", os.getenv("STOCK_MYSQL_USER", "app_user"))
+STOCK_MYSQL_PASSWORD = os.getenv("IFF_STOCK_MYSQL_PASSWORD", os.getenv("STOCK_MYSQL_PASSWORD", ""))
+STOCK_MYSQL_DATABASE = os.getenv("IFF_STOCK_MYSQL_DATABASE", os.getenv("STOCK_MYSQL_DATABASE", "stock_data"))
+
 JWT_SECRET = os.getenv("IFF_JWT_SECRET", "iff-dev-secret-change-in-prod")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("IFF_JWT_EXPIRE_HOURS", "168"))
