@@ -234,6 +234,15 @@ run_dwm_sw_industry_diffusion() {
     bash "${runner}" "$@"
 }
 
+run_industry_fund_flow_web() {
+    local runner="${DW_ROOT}/industry_fund_flow/run.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_dws_dc_industry_mainline_score() {
     local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_score_di.sh"
     if [[ ! -f "${runner}" ]]; then

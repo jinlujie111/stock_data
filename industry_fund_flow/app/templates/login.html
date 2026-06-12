@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card auth-card">
+  <h1>登录</h1>
+  <p class="muted">使用已注册账号进入系统</p>
+  <div id="error" class="alert alert-error hidden"></div>
+  <form id="login-form" class="form" method="post" action="/login">
+    <label>
+      <span>用户名</span>
+      <input type="text" name="username" required autocomplete="username" placeholder="3–32 位字母数字下划线" />
+    </label>
+    <label>
+      <span>密码</span>
+      <input type="password" name="password" required autocomplete="current-password" placeholder="至少 8 位" />
+    </label>
+    <button type="submit" class="btn btn-primary">登录</button>
+  </form>
+  <p class="switch-link">还没有账号？<a href="/register">立即注册</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/auth.js"></script>
+{% endblock %}

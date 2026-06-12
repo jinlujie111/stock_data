@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card auth-card">
+  <h1>注册</h1>
+  <p class="muted">创建账号以使用行业资金流分析</p>
+  <div id="error" class="alert alert-error hidden"></div>
+  <form id="register-form" class="form" method="post" action="/register">
+    <label>
+      <span>用户名</span>
+      <input type="text" name="username" required autocomplete="username" placeholder="3–32 位字母数字下划线" />
+    </label>
+    <label>
+      <span>邮箱（选填）</span>
+      <input type="email" name="email" autocomplete="email" placeholder="name@example.com" />
+    </label>
+    <label>
+      <span>密码</span>
+      <input type="password" name="password" required autocomplete="new-password" placeholder="至少 8 位" />
+    </label>
+    <label>
+      <span>确认密码</span>
+      <input type="password" name="password2" required autocomplete="new-password" placeholder="再次输入密码" />
+    </label>
+    <button type="submit" class="btn btn-primary">注册</button>
+  </form>
+  <p class="switch-link">已有账号？<a href="/login">去登录</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/auth.js"></script>
+{% endblock %}

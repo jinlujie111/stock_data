@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <a class="brand" href="/">行业资金流</a>
+      {% block header_extra %}{% endblock %}
+    </header>
+    <main class="main">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="footer">stock_data · industry_fund_flow</footer>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block header_extra %}
+<form method="post" action="/logout" class="logout-form">
+  <span class="user-badge">{{ user.username }}</span>
+  <button type="submit" class="btn btn-ghost">退出</button>
+</form>
+{% endblock %}
+{% block content %}
+<div class="card welcome-card">
+  <h1>欢迎，{{ user.username }}</h1>
+  <p class="muted">您已成功登录。后续将在此展示行业资金流、主线板块等数据能力。</p>
+  <div class="stats-placeholder">
+    <div class="stat-box">
+      <div class="stat-label">账号状态</div>
+      <div class="stat-value">正常</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">用户 ID</div>
+      <div class="stat-value">{{ user.id }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
