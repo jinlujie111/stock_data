@@ -16,4 +16,5 @@ COOKIE_NAME = "iff_token"
 
 APP_TITLE = "行业资金流"
 APP_HOST = os.getenv("IFF_HOST", "0.0.0.0")
-APP_PORT = int(os.getenv("IFF_PORT", "8080"))
+# 默认 8081，避免与 XXL-JOB 等占用 8080 的服务冲突
+APP_PORT = int(os.getenv("IFF_PORT", "8081"))

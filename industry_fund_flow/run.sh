@@ -18,7 +18,18 @@ if [[ -f "${REQ}" ]]; then
 fi
 
 export IFF_HOST="${IFF_HOST:-0.0.0.0}"
-export IFF_PORT="${IFF_PORT:-8080}"
+# 8080 常被 XXL-JOB 占用，默认改用 8081
+export IFF_PORT="${IFF_PORT:-8081}"
+
+if command -v ss >/dev/null 2>&1; then
+  if ss -lnt | awk '{print $4}' | grep -qE ":${IFF_PORT}$"; then
+    echo "ERROR: 端口 ${IFF_PORT} 已被占用。可换端口启动，例如: IFF_PORT=8082 bash industry_fund_flow/run.sh" >&2
+    ss -lntp | grep ":${IFF_PORT} " || true
+    exit 1
+  fi
+fi
+
+echo "启动行业资金流网站: http://${IFF_HOST}:${IFF_PORT} （外网: http://<公网IP>:${IFF_PORT}）"
 cd "${SCRIPT_PATH}"
 
 exec "${PYTHON_BIN}" -m uvicorn app.main:app --host "${IFF_HOST}" --port "${IFF_PORT}" --reload

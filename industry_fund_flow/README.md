@@ -17,7 +17,7 @@ export IFF_JWT_SECRET='请改为随机长字符串'   # 生产环境必设
 bash industry_fund_flow/run.sh
 ```
 
-浏览器访问：`http://localhost:8080`
+浏览器访问：`http://localhost:8081`（默认 8081，避免与 XXL-JOB 的 8080 冲突）
 
 - `/register` — 注册
 - `/login` — 登录
