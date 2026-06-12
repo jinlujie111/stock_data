@@ -243,6 +243,15 @@ run_dwm_history() {
     bash "${runner}" "$@"
 }
 
+check_dwm_gaps() {
+    local runner="${DW_ROOT}/dw-tmp/check_dwm_gaps.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_dws_dc_industry_mainline_score() {
     local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_score_di.sh"
     if [[ ! -f "${runner}" ]]; then
