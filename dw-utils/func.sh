@@ -528,6 +528,59 @@ get_continuous_date(){
   echo "${n_date_list[*]}"
 }
 
+# 区间内 A 股交易日（ods_trading_day）；无日历时 fallback 自然日
+get_trading_dates() {
+  local startdate enddate v_start v_end cnt
+  startdate=$(get_date "$1")
+  enddate=$(get_date "$2" "$1")
+  v_start=$(format_date "${startdate}")
+  v_end=$(format_date "${enddate}")
+  cnt="$(${data_mysql} -N -e "
+    SELECT COUNT(*)
+    FROM ods_trading_day
+    WHERE trade_date >= '${v_start}' AND trade_date <= '${v_end}';
+  " 2>/dev/null || echo 0)"
+  if [[ -z "${cnt}" || "${cnt}" -eq 0 ]]; then
+    echo "WARN: ods_trading_day ${v_start}~${v_end} 无记录，fallback get_continuous_date" >&2
+    get_continuous_date "$1" "$2"
+    return
+  fi
+  ${data_mysql} -N -e "
+    SELECT DATE_FORMAT(trade_date, '%Y%m%d')
+    FROM ods_trading_day
+    WHERE trade_date >= '${v_start}' AND trade_date <= '${v_end}'
+    ORDER BY trade_date;
+  "
+}
+
+# DWM 按交易日循环：loader 返回非 0 视为 skip（ODS 无数据），仅全无成功时 exit 1
+run_dwm_by_trading_day() {
+  local n_date_s="$1" n_date_e="$2" loader="$3"
+  local ok_cnt=0 skip_cnt=0 cur_date
+  if [[ -z "${loader}" ]] || ! declare -f "${loader}" >/dev/null 2>&1; then
+    echo "ERROR: run_dwm_by_trading_day 未找到函数 ${loader}" >&2
+    return 1
+  fi
+  for cur_date in $(get_trading_dates "${n_date_s}" "${n_date_e}"); do
+    if "${loader}" "${cur_date}"; then
+      ok_cnt=$((ok_cnt + 1))
+    else
+      skip_cnt=$((skip_cnt + 1))
+    fi
+  done
+  echo "SUMMARY ${loader}: ok=${ok_cnt} skipped=${skip_cnt} total=$((ok_cnt + skip_cnt))"
+  if [[ "${ok_cnt}" -eq 0 ]]; then
+    echo "ERROR: 区间内无任何交易日写入成功" >&2
+    return 1
+  fi
+  if [[ "${skip_cnt}" -gt 0 ]]; then
+    echo "WARN: ${skip_cnt} 个交易日 skip（多为 ODS 无数据，可用 check_dwm_gaps 查缺口）"
+  else
+    echo "DONE all trading days"
+  fi
+  return 0
+}
+
 #得到连续的统计月：YYYYMM ： 202001 202002
 get_continuous_month(){
   startdate=$(get_date $1)

@@ -8,7 +8,8 @@
 #   bash dw-tmp/run_dwm_history.sh --group dc
 #   bash dw-tmp/run_dwm_history.sh --jobs market_breadth,dc_fund_flow,dc_trend
 #   bash dw-tmp/run_dwm_history.sh --list-jobs
-#   bash dw-tmp/run_dwm_history.sh --continue-on-error --sleep-job 3
+#   bash dw-tmp/run_dwm_history.sh --sleep-job 3
+#   bash dw-tmp/run_dwm_history.sh --strict   # 遇错即停（默认会继续跑后续任务）
 #
 # 说明：
 #   - 先确保 ODS 层对应日期已回补（尤其 stock_detail、板块行情/成分、财务等）

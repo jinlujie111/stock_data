@@ -192,7 +192,11 @@ def run_job(
     if proc.returncode == 0:
         logger.info("OK %s", job.job_id)
     else:
-        logger.error("FAIL %s exit_code=%s", job.job_id, proc.returncode)
+        logger.error(
+            "FAIL %s exit_code=%s（详情见 /root/log/stock_log/{end}/pro_dwm_*_{end}.log）",
+            job.job_id,
+            proc.returncode,
+        )
     return proc.returncode
 
 
@@ -220,7 +224,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--continue-on-error",
         action="store_true",
-        help="单个 DWM 脚本失败不中断后续任务",
+        help="单个 DWM 脚本失败仍继续（默认即继续，一般无需显式指定）",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="严格模式：任一 DWM 脚本 exit!=0 立即中止",
     )
     parser.add_argument(
         "--sleep-job",
@@ -233,6 +242,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    continue_on_error = not args.strict
     if args.list_jobs:
         for j in DWM_JOBS:
             groups = ",".join(sorted(j.groups))
@@ -262,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
         code = run_job(job, start_s, end_s, dry_run=args.dry_run)
         if code != 0:
             fail_cnt += 1
-            if not args.continue_on_error:
+            if not continue_on_error:
                 logger.error("任务 %s 失败，已中止", job.job_id)
                 return code if code != 0 else 1
         if args.sleep_job > 0 and idx + 1 < len(jobs) and not args.dry_run:

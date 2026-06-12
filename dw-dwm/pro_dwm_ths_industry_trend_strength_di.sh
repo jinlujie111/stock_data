@@ -280,15 +280,4 @@ load_ths_industry_trend_strength() {
   "
 }
 
-fail_cnt=0
-for cur_date in $(get_continuous_date "${n_date_s}" "${n_date_e}"); do
-  if ! load_ths_industry_trend_strength "${cur_date}"; then
-    fail_cnt=$((fail_cnt + 1))
-  fi
-done
-
-if [[ "${fail_cnt}" -gt 0 ]]; then
-  echo "DONE with ${fail_cnt} skipped day(s)"
-  exit 1
-fi
-echo "DONE all days"
+run_dwm_by_trading_day "${n_date_s}" "${n_date_e}" load_ths_industry_trend_strength || exit $?
