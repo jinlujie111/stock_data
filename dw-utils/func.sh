@@ -5,13 +5,15 @@
 #
 # 用法：source dw-utils/func.sh
 # 业务库: mysql -h localhost -P 3306 -u app_user -pjinlujie -D stock_data
-# 网站库: mysql -h localhost -P 3306 -u data_industry -p'1qaz!QAZjinlujie' -D data_industry
+# 网站库: mysql -h 127.0.0.1 -P 3306 -u data_industry -p'1qaz!QAZjinlujie' -D data_industry
 # 配置库: mysql -h localhost -P 3306 -u data_config -p'1qaz!QAZjinlujie' -D data_config
 # =============================================================================
 
 _FUNC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DW_ROOT="$(cd "${_FUNC_DIR}/.." && pwd)"
 path_git_utils="${path_git_utils:-${_FUNC_DIR}}"
+# 密码含 ! 时避免 bash 历史展开篡改
+set +o histexpand 2>/dev/null || true
 
 # --- data_config 库（Token、db_sync_task）---
 CONFIG_MYSQL_HOST="${CONFIG_MYSQL_HOST:-localhost}"
@@ -28,7 +30,8 @@ STOCK_MYSQL_PASSWORD="${STOCK_MYSQL_PASSWORD:-jinlujie}"
 STOCK_MYSQL_DATABASE="${STOCK_MYSQL_DATABASE:-stock_data}"
 
 # --- data_industry 网站库（行业资金流 Web 用户等业务，与 stock_data 分离）---
-INDUSTRY_MYSQL_HOST="${INDUSTRY_MYSQL_HOST:-localhost}"
+# 用 127.0.0.1 走 TCP，避免 localhost 套接字匹配 @'localhost' 账号不一致
+INDUSTRY_MYSQL_HOST="${INDUSTRY_MYSQL_HOST:-127.0.0.1}"
 INDUSTRY_MYSQL_PORT="${INDUSTRY_MYSQL_PORT:-3306}"
 INDUSTRY_MYSQL_USER="${INDUSTRY_MYSQL_USER:-data_industry}"
 INDUSTRY_MYSQL_PASSWORD="${INDUSTRY_MYSQL_PASSWORD:-1qaz!QAZjinlujie}"
@@ -99,6 +102,12 @@ show_dw_env() {
     echo "  CLI: data_config | data_mysql | data_industry"
 }
 
+_run_industry_mysql() {
+  MYSQL_PWD="${INDUSTRY_MYSQL_PASSWORD}" mysql \
+    -h "${INDUSTRY_MYSQL_HOST}" -P "${INDUSTRY_MYSQL_PORT}" \
+    -u "${INDUSTRY_MYSQL_USER}" "$@"
+}
+
 init_data_industry_schema() {
     local sql_file="${1:-${DW_ROOT}/mysql_tables/data_industry.sql}"
     if [[ ! -f "${sql_file}" ]]; then
@@ -106,7 +115,7 @@ init_data_industry_schema() {
         return 1
     fi
     echo "初始化 data_industry: ${sql_file}"
-    ${data_industry} < "${sql_file}"
+    _run_industry_mysql -D "${INDUSTRY_MYSQL_DATABASE}" < "${sql_file}"
 }
 
 init_data_config_schema() {
