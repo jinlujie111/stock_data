@@ -3,6 +3,20 @@
   const errorEl = document.getElementById("error");
   if (!form || !errorEl) return;
 
+  function formatDetail(data) {
+    if (!data || data.detail === undefined || data.detail === null) {
+      return "操作失败，请重试";
+    }
+    const d = data.detail;
+    if (typeof d === "string") return d;
+    if (Array.isArray(d)) {
+      return d.map(function (item) {
+        return item.msg || item.message || JSON.stringify(item);
+      }).join("；");
+    }
+    return JSON.stringify(d);
+  }
+
   form.addEventListener("submit", async function (e) {
     e.preventDefault();
     errorEl.classList.add("hidden");
@@ -17,19 +31,24 @@
         redirect: "manual",
       });
 
-      if (res.status === 303 || res.status === 0) {
+      if (res.status === 303 || res.status === 302 || res.status === 307 || res.status === 0) {
+        window.location.href = "/";
+        return;
+      }
+
+      if (res.ok) {
         window.location.href = "/";
         return;
       }
 
       let detail = "操作失败，请重试";
+      const text = await res.text();
       try {
-        const data = await res.json();
-        detail = data.detail || detail;
+        detail = formatDetail(JSON.parse(text));
       } catch (_) {
-        /* 非 JSON 响应 */
+        if (text && text.length < 200) detail = text;
       }
-      errorEl.textContent = typeof detail === "string" ? detail : JSON.stringify(detail);
+      errorEl.textContent = detail;
       errorEl.classList.remove("hidden");
     } catch (err) {
       errorEl.textContent = "网络错误，请稍后重试";

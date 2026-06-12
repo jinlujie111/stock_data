@@ -5,6 +5,7 @@
 #
 # 用法：source dw-utils/func.sh
 # 业务库: mysql -h localhost -P 3306 -u app_user -pjinlujie -D stock_data
+# 网站库: mysql -h localhost -P 3306 -u data_industry -p'1qaz!QAZjinlujie' -D data_industry
 # 配置库: mysql -h localhost -P 3306 -u data_config -p'1qaz!QAZjinlujie' -D data_config
 # =============================================================================
 
@@ -25,6 +26,13 @@ STOCK_MYSQL_PORT="${STOCK_MYSQL_PORT:-3306}"
 STOCK_MYSQL_USER="${STOCK_MYSQL_USER:-app_user}"
 STOCK_MYSQL_PASSWORD="${STOCK_MYSQL_PASSWORD:-jinlujie}"
 STOCK_MYSQL_DATABASE="${STOCK_MYSQL_DATABASE:-stock_data}"
+
+# --- data_industry 网站库（行业资金流 Web 用户等业务，与 stock_data 分离）---
+INDUSTRY_MYSQL_HOST="${INDUSTRY_MYSQL_HOST:-localhost}"
+INDUSTRY_MYSQL_PORT="${INDUSTRY_MYSQL_PORT:-3306}"
+INDUSTRY_MYSQL_USER="${INDUSTRY_MYSQL_USER:-data_industry}"
+INDUSTRY_MYSQL_PASSWORD="${INDUSTRY_MYSQL_PASSWORD:-1qaz!QAZjinlujie}"
+INDUSTRY_MYSQL_DATABASE="${INDUSTRY_MYSQL_DATABASE:-data_industry}"
 
 # --- 清除系统 HTTP 代理（避免 requests 误读占位符 http_proxy，影响 Tushare/AkShare）---
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY 2>/dev/null || true
@@ -61,6 +69,12 @@ fi
 
 export CONFIG_MYSQL_HOST CONFIG_MYSQL_PORT CONFIG_MYSQL_USER CONFIG_MYSQL_PASSWORD CONFIG_MYSQL_DATABASE
 export STOCK_MYSQL_HOST STOCK_MYSQL_PORT STOCK_MYSQL_USER STOCK_MYSQL_PASSWORD STOCK_MYSQL_DATABASE
+export INDUSTRY_MYSQL_HOST INDUSTRY_MYSQL_PORT INDUSTRY_MYSQL_USER INDUSTRY_MYSQL_PASSWORD INDUSTRY_MYSQL_DATABASE
+export IFF_MYSQL_HOST="${INDUSTRY_MYSQL_HOST}"
+export IFF_MYSQL_PORT="${INDUSTRY_MYSQL_PORT}"
+export IFF_MYSQL_USER="${INDUSTRY_MYSQL_USER}"
+export IFF_MYSQL_PASSWORD="${INDUSTRY_MYSQL_PASSWORD}"
+export IFF_MYSQL_DATABASE="${INDUSTRY_MYSQL_DATABASE}"
 export TUSHARE_HTTP_URL TUSHARE_API_FALLBACK_IP TUSHARE_USE_FALLBACK_IP TUSHARE_PROXY_USE_DOMAIN
 export TUSHARE_TRADE_CAL_START_DATE TUSHARE_TRADE_CAL_END_DATE
 export TUSHARE_HTTP_TIMEOUT TUSHARE_FETCH_RETRIES TUSHARE_FETCH_RETRY_SLEEP
@@ -76,11 +90,23 @@ export DW_FUNC_LOADED=1
 # --- mysql CLI ---
 data_config="mysql -h ${CONFIG_MYSQL_HOST} -P ${CONFIG_MYSQL_PORT} -u ${CONFIG_MYSQL_USER} -p'${CONFIG_MYSQL_PASSWORD}' -D ${CONFIG_MYSQL_DATABASE}"
 data_mysql="mysql -h ${STOCK_MYSQL_HOST} -P ${STOCK_MYSQL_PORT} -u ${STOCK_MYSQL_USER} -p${STOCK_MYSQL_PASSWORD} -D ${STOCK_MYSQL_DATABASE}"
+data_industry="mysql -h ${INDUSTRY_MYSQL_HOST} -P ${INDUSTRY_MYSQL_PORT} -u ${INDUSTRY_MYSQL_USER} -p'${INDUSTRY_MYSQL_PASSWORD}' -D ${INDUSTRY_MYSQL_DATABASE}"
 
 show_dw_env() {
     echo "  配置库: ${CONFIG_MYSQL_USER}@${CONFIG_MYSQL_HOST}:${CONFIG_MYSQL_PORT}/${CONFIG_MYSQL_DATABASE}"
     echo "  业务库: ${STOCK_MYSQL_USER}@${STOCK_MYSQL_HOST}:${STOCK_MYSQL_PORT}/${STOCK_MYSQL_DATABASE}"
-    echo "  CLI: data_config | data_mysql"
+    echo "  网站库: ${INDUSTRY_MYSQL_USER}@${INDUSTRY_MYSQL_HOST}:${INDUSTRY_MYSQL_PORT}/${INDUSTRY_MYSQL_DATABASE}"
+    echo "  CLI: data_config | data_mysql | data_industry"
+}
+
+init_data_industry_schema() {
+    local sql_file="${1:-${DW_ROOT}/mysql_tables/data_industry.sql}"
+    if [[ ! -f "${sql_file}" ]]; then
+        echo "ERROR: 未找到 ${sql_file}" >&2
+        return 1
+    fi
+    echo "初始化 data_industry: ${sql_file}"
+    ${data_industry} < "${sql_file}"
 }
 
 init_data_config_schema() {

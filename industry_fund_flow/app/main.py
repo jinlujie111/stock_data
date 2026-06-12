@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from sqlalchemy.exc import SQLAlchemyError
+
+logger = logging.getLogger(__name__)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -22,7 +26,25 @@ app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
 @app.on_event("startup")
 def _startup() -> None:
-    init_schema()
+    try:
+        init_schema()
+        logger.info("app_user 表已就绪")
+    except SQLAlchemyError as exc:
+        logger.error("初始化数据库失败: %s", exc)
+
+
+@app.exception_handler(SQLAlchemyError)
+async def db_error_handler(_request: Request, exc: SQLAlchemyError):
+    logger.exception("数据库错误")
+    return JSONResponse(status_code=500, content={"detail": f"数据库错误: {exc}"})
+
+
+@app.exception_handler(Exception)
+async def generic_error_handler(_request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.exception("未处理异常")
+    return JSONResponse(status_code=500, content={"detail": str(exc) or "服务器内部错误"})
 
 
 def current_user(iff_token: Annotated[str | None, Cookie(alias=COOKIE_NAME)] = None) -> dict | None:
@@ -99,6 +121,9 @@ def register_submit(
         user = auth_service.register_user(username, password, email or None)
     except auth_service.AuthError as exc:
         raise HTTPException(status_code=400, detail=exc.message) from exc
+    except SQLAlchemyError as exc:
+        logger.exception("注册写库失败")
+        raise HTTPException(status_code=500, detail=f"数据库错误，请检查 MySQL 与 app_user 表: {exc}") from exc
     resp = RedirectResponse(url="/", status_code=303)
     _set_auth_cookie(resp, user)
     return resp

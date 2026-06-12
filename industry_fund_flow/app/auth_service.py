@@ -3,13 +3,12 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.config import JWT_ALGORITHM, JWT_EXPIRE_HOURS, JWT_SECRET
 from app.db import execute, fetch_one
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
 
 
@@ -21,11 +20,11 @@ class AuthError(Exception):
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return pwd_context.verify(password, password_hash)
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
 def create_access_token(user_id: int, username: str) -> str:

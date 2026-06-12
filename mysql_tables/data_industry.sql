@@ -1,4 +1,11 @@
--- 行业资金流网站用户表（data_industry 库；完整建库见 mysql_tables/data_industry.sql）
+-- ============================================================================
+-- data_industry：行业资金流网站等业务数据（与 stock_data 股票库分离）
+-- 首次：root 执行 mysql_tables/data_industry_grants.sql 建库并授权
+-- 建表：source dw-utils/func.sh && init_data_industry_schema
+-- ============================================================================
+
+USE data_industry;
+
 CREATE TABLE IF NOT EXISTS app_user (
     id            BIGINT PRIMARY KEY AUTO_INCREMENT,
     username      VARCHAR(64)  NOT NULL COMMENT '登录名',

@@ -18,8 +18,10 @@ if [[ -f "${REQ}" ]]; then
 fi
 
 export IFF_HOST="${IFF_HOST:-0.0.0.0}"
-# 8080 常被 XXL-JOB 占用，默认改用 8081
-export IFF_PORT="${IFF_PORT:-8081}"
+# 8080 常被 XXL-JOB 占用，默认改用 8082
+export IFF_PORT="${IFF_PORT:-8082}"
+
+echo "MySQL: ${IFF_MYSQL_USER}@${IFF_MYSQL_HOST}:${IFF_MYSQL_PORT}/${IFF_MYSQL_DATABASE}"
 
 if command -v ss >/dev/null 2>&1; then
   if ss -lnt | awk '{print $4}' | grep -qE ":${IFF_PORT}$"; then
