@@ -92,3 +92,18 @@ def get_market_breadth(trade_date: str | None = None) -> dict:
         "metrics": METRICS,
         "data": data,
     }
+
+
+def get_market_breadth_history(days: int = 30) -> dict:
+    """近 N 个交易日涨跌家数序列（按日期升序）。"""
+    days = max(1, min(days, 365))
+    rows = fetch_all_stock(
+        f"""
+        SELECT trade_date, advance_cnt, decline_cnt
+        FROM {TABLE}
+        ORDER BY trade_date DESC
+        LIMIT {days}
+        """
+    )
+    items = [_serialize_row(r) for r in reversed(rows)]
+    return {"days": days, "items": items}

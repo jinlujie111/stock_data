@@ -4,6 +4,10 @@
   const elEmpty = document.getElementById("breadth-empty");
   const elError = document.getElementById("breadth-error");
   const elSummary = document.getElementById("breadth-summary");
+  const elTrendChart = document.getElementById("breadth-trend-chart");
+  const elTrendEmpty = document.getElementById("breadth-trend-empty");
+
+  let trendChart = null;
 
   function fmtValue(val, fmt) {
     if (val === null || val === undefined || val === "") return "—";
@@ -53,6 +57,118 @@
     elSummary.textContent = `交易日期 ${data.trade_date} · 沪深 A 股全市场广度`;
   }
 
+  function renderTrendChart(items) {
+    if (!items || !items.length) {
+      if (trendChart) {
+        trendChart.dispose();
+        trendChart = null;
+      }
+      elTrendChart.style.display = "none";
+      elTrendEmpty.classList.remove("hidden");
+      return;
+    }
+
+    elTrendEmpty.classList.add("hidden");
+    elTrendChart.style.display = "block";
+
+    if (!trendChart) {
+      trendChart = echarts.init(elTrendChart);
+      window.addEventListener("resize", () => trendChart && trendChart.resize());
+    }
+
+    const dates = items.map((r) => r.trade_date);
+    const advance = items.map((r) => r.advance_cnt);
+    const decline = items.map((r) => r.decline_cnt);
+
+    trendChart.setOption({
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#1a2332",
+        borderColor: "#2d3748",
+        textStyle: { color: "#e2e8f0", fontSize: 12 },
+        formatter(params) {
+          const lines = [`${params[0].axisValue}`];
+          params.forEach((p) => {
+            lines.push(`${p.marker}${p.seriesName}：${Number(p.value).toLocaleString("zh-CN")}`);
+          });
+          return lines.join("<br/>");
+        },
+      },
+      legend: {
+        data: ["上涨家数", "下跌家数"],
+        top: 0,
+        right: 0,
+        textStyle: { color: "#94a3b8", fontSize: 12 },
+      },
+      grid: { left: 48, right: 16, top: 36, bottom: 28 },
+      xAxis: {
+        type: "category",
+        data: dates,
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: "#334155" } },
+        axisLabel: { color: "#94a3b8", fontSize: 11 },
+      },
+      yAxis: {
+        type: "value",
+        splitLine: { lineStyle: { color: "#1e293b" } },
+        axisLabel: {
+          color: "#94a3b8",
+          fontSize: 11,
+          formatter: (v) => (v >= 1000 ? v / 1000 + "k" : v),
+        },
+      },
+      series: [
+        {
+          name: "上涨家数",
+          type: "line",
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 5,
+          data: advance,
+          lineStyle: { width: 2, color: "#f87171" },
+          itemStyle: { color: "#f87171" },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(248, 113, 113, 0.25)" },
+                { offset: 1, color: "rgba(248, 113, 113, 0)" },
+              ],
+            },
+          },
+        },
+        {
+          name: "下跌家数",
+          type: "line",
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 5,
+          data: decline,
+          lineStyle: { width: 2, color: "#4ade80" },
+          itemStyle: { color: "#4ade80" },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(74, 222, 128, 0.25)" },
+                { offset: 1, color: "rgba(74, 222, 128, 0)" },
+              ],
+            },
+          },
+        },
+      ],
+    });
+  }
+
   async function loadDates() {
     const res = await apiGet("/api/market-breadth/trade-dates");
     elDate.innerHTML = res.dates
@@ -79,6 +195,11 @@
     renderMetrics(payload);
   }
 
+  async function loadTrend() {
+    const res = await apiGet("/api/market-breadth/history?days=30");
+    renderTrendChart(res.items);
+  }
+
   elDate.addEventListener("change", () => {
     loadBreadth().catch((err) => {
       elError.textContent = err.message;
@@ -86,7 +207,7 @@
     });
   });
 
-  loadDates()
+  Promise.all([loadDates(), loadTrend()])
     .then(() => loadBreadth())
     .catch((err) => {
       elError.textContent = err.message;

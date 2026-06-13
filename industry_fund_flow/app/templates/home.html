@@ -19,6 +19,12 @@
   <div id="breadth-error" class="alert alert-error hidden"></div>
   <div id="breadth-metrics" class="metric-grid"></div>
   <div id="breadth-empty" class="table-empty hidden">该交易日暂无市场广度数据</div>
+
+  <div class="breadth-trend">
+    <h3 class="breadth-trend-title">近30日涨跌家数趋势</h3>
+    <div id="breadth-trend-empty" class="table-empty hidden">暂无趋势数据</div>
+    <div id="breadth-trend-chart"></div>
+  </div>
 </section>
 
 <h2 class="section-title section-title--spaced">板块五维分析</h2>
@@ -32,5 +38,6 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script src="/static/js/home.js"></script>
 {% endblock %}
