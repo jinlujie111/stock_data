@@ -167,6 +167,17 @@ def api_market_breadth_dates(
     return {"latest": latest, "dates": dates}
 
 
+@app.get("/api/market-breadth/history")
+def api_market_breadth_history(
+    days: int = Query(30, ge=1, le=365),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return mb_svc.get_market_breadth_history(days)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询市场广度历史失败: {exc}") from exc
+
+
 @app.get("/api/market-breadth")
 def api_market_breadth(
     trade_date: str | None = Query(None),
