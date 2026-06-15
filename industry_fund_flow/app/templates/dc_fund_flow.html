@@ -1,9 +1,29 @@
 {% extends "app_layout.html" %}
 {% block app_content %}
-<div class="page-head">
-  <div>
-    <h1>{{ dimension.title }}</h1>
-    <p class="muted">{{ dimension.subtitle }}</p>
+<div class="dashboard-top">
+  <div class="dashboard-head">
+    <div>
+      <h1>{{ dimension.title }}</h1>
+      <p class="muted">{{ dimension.subtitle }}</p>
+    </div>
+    <div class="dashboard-badges">
+      <span class="status-badge">行业资金流</span>
+      <span class="status-badge status-badge--success">实时更新</span>
+    </div>
+  </div>
+  <div class="overview-cards">
+    <div class="overview-card">
+      <span>当前交易日</span>
+      <strong id="summary-date">加载中</strong>
+    </div>
+    <div class="overview-card">
+      <span>可选板块</span>
+      <strong id="summary-total">-</strong>
+    </div>
+    <div class="overview-card">
+      <span>当前筛选</span>
+      <strong id="summary-filter">全部板块</strong>
+    </div>
   </div>
 </div>
 
@@ -63,16 +83,23 @@
     <h2 class="section-title">近30日趋势</h2>
     <div class="charts-toolbar">
       <label class="filter-field filter-field--grow">
-        <span>图表板块（可输入模糊匹配，中/英文逗号分隔多个关键词）</span>
-        <input
-          type="text"
-          id="chart-board-input"
-          class="board-search"
-          placeholder="默认：半导体、通信、有色、化工、创新药、机器人"
-          autocomplete="off"
-        />
+        <span>图表板块（可输入名称/代码搜索后点选）</span>
+        <div class="board-picker" id="chart-board-picker">
+          <div class="board-selected" id="chart-board-selected"></div>
+          <input
+            type="text"
+            id="chart-board-search"
+            class="board-search"
+            placeholder="输入板块名称或代码，模糊匹配…"
+            autocomplete="off"
+          />
+          <div class="board-dropdown hidden" id="chart-board-dropdown"></div>
+        </div>
       </label>
-      <button type="button" class="btn btn-primary charts-refresh-btn" id="btn-chart-refresh">刷新图表</button>
+      <div class="charts-toolbar-actions">
+        <button type="button" class="btn btn-primary charts-refresh-btn" id="btn-chart-refresh">刷新图表</button>
+        <button type="button" class="btn btn-ghost" id="btn-reset-chart-boards">恢复默认</button>
+      </div>
     </div>
   </div>
   <div id="chart-error" class="alert alert-error hidden"></div>

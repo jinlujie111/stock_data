@@ -17,14 +17,20 @@
   const elDropdown = document.getElementById("board-dropdown");
   const elSelected = document.getElementById("board-selected");
   const elPicker = document.getElementById("board-picker");
+  const elChartSearch = document.getElementById("chart-board-search");
+  const elChartDropdown = document.getElementById("chart-board-dropdown");
+  const elChartSelected = document.getElementById("chart-board-selected");
+  const elChartPicker = document.getElementById("chart-board-picker");
   const elHead = document.getElementById("table-head");
   const elBody = document.getElementById("table-body");
   const elSummary = document.getElementById("result-summary");
+  const elSummaryDate = document.getElementById("summary-date");
+  const elSummaryTotal = document.getElementById("summary-total");
+  const elSummaryFilter = document.getElementById("summary-filter");
   const elEmpty = document.getElementById("table-empty");
   const elError = document.getElementById("table-error");
   const elHint = document.getElementById("filter-hint");
   const chipGroup = document.getElementById("content-type-chips");
-  const elChartInput = document.getElementById("chart-board-input");
   const elChartError = document.getElementById("chart-error");
 
   let selectedContentTypes = [];
@@ -32,7 +38,9 @@
   let tableRows = [];
   let sortKey = defaultSortKey;
   let sortDir = defaultSortDir;
+  let chartDefaultsApplied = false;
   const selectedBoards = new Map();
+  const chartSelectedBoards = new Map();
   const charts = { yi: null, rate: null, rank: null };
 
   function fmtCell(val, fmt) {
@@ -73,6 +81,17 @@
     return String(v);
   }
 
+  function updateOverviewCards() {
+    if (elSummaryDate) elSummaryDate.textContent = elDate.value || "加载中";
+    if (elSummaryTotal) elSummaryTotal.textContent = allBoards.length ? `${allBoards.length} 个` : "—";
+    if (elSummaryFilter) {
+      const filters = [];
+      if (selectedContentTypes.length) filters.push(selectedContentTypes.join("、"));
+      if (selectedBoards.size) filters.push(`${selectedBoards.size} 个板块`);
+      elSummaryFilter.textContent = filters.length ? filters.join("；") : "全部板块";
+    }
+  }
+
   function sortRows(rows) {
     const col = columns.find((c) => c.key === sortKey);
     const fmt = col ? col.fmt : "text";
@@ -92,6 +111,10 @@
     return Array.from(selectedBoards.keys());
   }
 
+  function chartSelectedBoardCodes() {
+    return Array.from(chartSelectedBoards.keys());
+  }
+
   function getContentTypesParam() {
     return selectedContentTypes.length ? selectedContentTypes.join(",") : "";
   }
@@ -107,12 +130,27 @@
     return tokens.every((t) => text.includes(t));
   }
 
-  function renderSelectedTags() {
-    if (!selectedBoards.size) {
-      elSelected.innerHTML = '<span class="board-placeholder">未选择板块（展示全部）</span>';
+  function resolveBoardByKeyword(keyword) {
+    const kw = keyword.trim();
+    if (!kw) return null;
+    const exact = allBoards.find((b) => b.industry_name === kw || b.industry_code === kw);
+    if (exact) return exact;
+    const matches = allBoards.filter(
+      (b) =>
+        b.industry_name.includes(kw) ||
+        kw.includes(b.industry_name) ||
+        (b.industry_code && b.industry_code.toLowerCase().includes(kw.toLowerCase()))
+    );
+    if (!matches.length) return null;
+    return matches.sort((a, b) => a.industry_name.length - b.industry_name.length)[0];
+  }
+
+  function renderBoardTags(selectedMap, containerEl, emptyText) {
+    if (!selectedMap.size) {
+      containerEl.innerHTML = `<span class="board-placeholder">${emptyText}</span>`;
       return;
     }
-    elSelected.innerHTML = Array.from(selectedBoards.values())
+    containerEl.innerHTML = Array.from(selectedMap.values())
       .map(
         (b) =>
           `<span class="board-tag" data-code="${b.industry_code}">` +
@@ -121,13 +159,25 @@
       .join("");
   }
 
-  function renderDropdown(matches) {
+  function renderSelectedTags() {
+    renderBoardTags(selectedBoards, elSelected, "未选择板块（展示全部）");
+  }
+
+  function renderChartSelectedTags() {
+    renderBoardTags(
+      chartSelectedBoards,
+      elChartSelected,
+      `未选择板块（默认：${chartDefaults.join("、")}）`
+    );
+  }
+
+  function renderDropdown(dropdownEl, matches) {
     if (!matches.length) {
-      elDropdown.innerHTML = '<div class="board-option board-option--empty">无匹配板块</div>';
-      elDropdown.classList.remove("hidden");
+      dropdownEl.innerHTML = '<div class="board-option board-option--empty">无匹配板块</div>';
+      dropdownEl.classList.remove("hidden");
       return;
     }
-    elDropdown.innerHTML = matches
+    dropdownEl.innerHTML = matches
       .slice(0, 50)
       .map(
         (b) =>
@@ -135,35 +185,75 @@
           `${boardLabel(b)}</button>`
       )
       .join("");
-    elDropdown.classList.remove("hidden");
+    dropdownEl.classList.remove("hidden");
   }
 
-  function hideDropdown() {
-    elDropdown.classList.add("hidden");
+  function hideDropdown(dropdownEl) {
+    dropdownEl.classList.add("hidden");
   }
 
-  function onSearchInput() {
+  function onTableSearchInput() {
     const q = elSearch.value;
     if (!q.trim()) {
-      hideDropdown();
+      hideDropdown(elDropdown);
       return;
     }
     const matches = allBoards.filter((b) => !selectedBoards.has(b.industry_code) && matchBoard(b, q));
-    renderDropdown(matches);
+    renderDropdown(elDropdown, matches);
   }
 
-  function addBoard(code) {
+  function onChartSearchInput() {
+    const q = elChartSearch.value;
+    if (!q.trim()) {
+      hideDropdown(elChartDropdown);
+      return;
+    }
+    const matches = allBoards.filter(
+      (b) => !chartSelectedBoards.has(b.industry_code) && matchBoard(b, q)
+    );
+    renderDropdown(elChartDropdown, matches);
+  }
+
+  function addTableBoard(code) {
     const board = allBoards.find((b) => b.industry_code === code);
     if (!board) return;
     selectedBoards.set(code, board);
     renderSelectedTags();
     elSearch.value = "";
-    hideDropdown();
+    hideDropdown(elDropdown);
   }
 
-  function removeBoard(code) {
-    selectedBoards.delete(code);
-    renderSelectedTags();
+  function addChartBoard(code) {
+    const board = allBoards.find((b) => b.industry_code === code);
+    if (!board) return;
+    chartSelectedBoards.set(code, board);
+    renderChartSelectedTags();
+    elChartSearch.value = "";
+    hideDropdown(elChartDropdown);
+  }
+
+  function applyDefaultChartBoards() {
+    chartSelectedBoards.clear();
+    chartDefaults.forEach((name) => {
+      const board = resolveBoardByKeyword(name);
+      if (board) chartSelectedBoards.set(board.industry_code, board);
+    });
+    renderChartSelectedTags();
+  }
+
+  function syncChartBoards() {
+    const keep = new Map();
+    chartSelectedBoards.forEach((b, code) => {
+      const fresh = allBoards.find((x) => x.industry_code === code);
+      if (fresh) keep.set(code, fresh);
+    });
+    chartSelectedBoards.clear();
+    keep.forEach((b, code) => chartSelectedBoards.set(code, b));
+    if (!chartSelectedBoards.size && !chartDefaultsApplied) {
+      applyDefaultChartBoards();
+      chartDefaultsApplied = true;
+    }
+    renderChartSelectedTags();
   }
 
   async function apiGet(path) {
@@ -235,6 +325,7 @@
       elDate.insertAdjacentHTML("afterbegin", `<option value="${data.latest}">${data.latest}</option>`);
     }
     if (data.latest) elDate.value = data.latest;
+    updateOverviewCards();
   }
 
   async function loadBoards() {
@@ -245,15 +336,20 @@
     if (ct) url += `&content_types=${encodeURIComponent(ct)}`;
     const data = await apiGet(url);
     allBoards = data.boards;
-    const keep = new Map();
+
+    const keepTable = new Map();
     selectedBoards.forEach((b, code) => {
-      if (allBoards.some((x) => x.industry_code === code)) keep.set(code, b);
+      if (allBoards.some((x) => x.industry_code === code)) keepTable.set(code, b);
     });
     selectedBoards.clear();
-    keep.forEach((b, code) => selectedBoards.set(code, b));
+    keepTable.forEach((b, code) => selectedBoards.set(code, b));
     renderSelectedTags();
+
+    syncChartBoards();
+
     const sortPart = sortHint ? `；${sortHint}` : "";
     elHint.textContent = `共 ${allBoards.length} 个板块；未选板块表示全部${sortPart}`;
+    updateOverviewCards();
   }
 
   async function loadData() {
@@ -271,19 +367,7 @@
     const boardHint = codes.length ? `，已选 ${codes.length} 个板块` : "，全部板块";
     const typeHint = ct ? `，类型：${ct}` : "，类型：全部";
     elSummary.textContent = `${data.trade_date} · 共 ${data.total} 条${typeHint}${boardHint}`;
-  }
-
-  function splitKeywords(raw) {
-    return raw
-      .split(/[,，]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-
-  function chartBoardKeywords() {
-    const raw = (elChartInput.value || "").trim();
-    if (!raw) return chartDefaults.join(",");
-    return splitKeywords(raw).join(",");
+    updateOverviewCards();
   }
 
   function collectValues(series, valueKey) {
@@ -388,13 +472,16 @@
     clearChartError();
     const td = elDate.value;
     if (!td) return;
-    const keywords = chartBoardKeywords();
-    let url =
-      `/api/dc/fund-flow/trends?trade_date=${encodeURIComponent(td)}&days=30` +
-      `&board_keywords=${encodeURIComponent(keywords)}`;
+    const codes = chartSelectedBoardCodes();
+    let url = `/api/dc/fund-flow/trends?trade_date=${encodeURIComponent(td)}&days=30`;
+    if (codes.length) {
+      url += `&industry_codes=${encodeURIComponent(codes.join(","))}`;
+    } else {
+      url += `&board_keywords=${encodeURIComponent(chartDefaults.join(","))}`;
+    }
     const data = await apiGet(url);
     if (!data.series || !data.series.length) {
-      showChartError("暂无趋势数据，请检查板块关键词或交易日");
+      showChartError("暂无趋势数据，请点选板块或恢复默认后重试");
       return;
     }
     const dates = data.dates;
@@ -444,7 +531,7 @@
   document.getElementById("btn-reset-boards").addEventListener("click", () => {
     selectedBoards.clear();
     elSearch.value = "";
-    hideDropdown();
+    hideDropdown(elDropdown);
     renderSelectedTags();
   });
 
@@ -452,36 +539,64 @@
     loadCharts().catch((err) => showChartError(err.message));
   });
 
+  document.getElementById("btn-reset-chart-boards").addEventListener("click", () => {
+    chartDefaultsApplied = true;
+    applyDefaultChartBoards();
+    loadCharts().catch((err) => showChartError(err.message));
+  });
+
   elDate.addEventListener("change", () => {
+    chartDefaultsApplied = false;
     loadBoards()
       .then(() => loadData())
       .then(() => loadCharts())
       .catch((err) => showError(err.message));
   });
 
-  elSearch.addEventListener("input", onSearchInput);
-  elSearch.addEventListener("focus", onSearchInput);
+  elSearch.addEventListener("input", onTableSearchInput);
+  elSearch.addEventListener("focus", onTableSearchInput);
+
+  elChartSearch.addEventListener("input", onChartSearchInput);
+  elChartSearch.addEventListener("focus", onChartSearchInput);
 
   elDropdown.addEventListener("click", (e) => {
     const btn = e.target.closest(".board-option[data-code]");
     if (!btn) return;
-    addBoard(btn.dataset.code);
+    addTableBoard(btn.dataset.code);
+  });
+
+  elChartDropdown.addEventListener("click", (e) => {
+    const btn = e.target.closest(".board-option[data-code]");
+    if (!btn) return;
+    addChartBoard(btn.dataset.code);
   });
 
   elSelected.addEventListener("click", (e) => {
     const tag = e.target.closest(".board-tag");
     if (!tag) return;
-    if (e.target.tagName === "BUTTON") removeBoard(tag.dataset.code);
+    if (e.target.tagName === "BUTTON") {
+      selectedBoards.delete(tag.dataset.code);
+      renderSelectedTags();
+    }
+  });
+
+  elChartSelected.addEventListener("click", (e) => {
+    const tag = e.target.closest(".board-tag");
+    if (!tag) return;
+    if (e.target.tagName === "BUTTON") {
+      chartSelectedBoards.delete(tag.dataset.code);
+      renderChartSelectedTags();
+    }
   });
 
   document.addEventListener("click", (e) => {
-    if (!elPicker.contains(e.target)) hideDropdown();
+    if (!elPicker.contains(e.target)) hideDropdown(elDropdown);
+    if (!elChartPicker.contains(e.target)) hideDropdown(elChartDropdown);
   });
-
-  elChartInput.placeholder = "默认：" + chartDefaults.join("、");
 
   renderHead();
   renderSelectedTags();
+  renderChartSelectedTags();
   loadTradeDates()
     .then(() => loadBoards())
     .then(() => loadData())
