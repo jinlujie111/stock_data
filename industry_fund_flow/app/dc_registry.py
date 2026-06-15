@@ -4,10 +4,11 @@ from __future__ import annotations
 from typing import TypedDict
 
 
-class ColumnDef(TypedDict):
+class ColumnDef(TypedDict, total=False):
     key: str
     label: str
-    fmt: str  # text | num | pct | int | bool
+    fmt: str
+    sortable: bool
 
 
 class DimensionDef(TypedDict, total=False):
@@ -18,6 +19,8 @@ class DimensionDef(TypedDict, total=False):
     order_by: str
     columns: list[ColumnDef]
     sort_hint: str
+    default_sort_key: str
+    default_sort_dir: str
 
 
 _COMMON: list[ColumnDef] = [
@@ -32,18 +35,20 @@ DC_DIMENSIONS: dict[str, DimensionDef] = {
         "title": "资金强度",
         "subtitle": "东方财富 · 板块主力资金与流入强度",
         "table": "dwm_dc_industry_fund_flow_di",
-        "order_by": "net_amount IS NULL, net_amount ASC",
-        "sort_hint": "默认按主力净流入从小到大排序，未选板块表示全部",
+        "order_by": "dc_rank IS NULL, dc_rank ASC",
+        "sort_hint": "默认按资金流排名从小到大；点击表头可排序",
+        "default_sort_key": "dc_rank",
+        "default_sort_dir": "asc",
         "columns": _COMMON
         + [
-            {"key": "net_amount_wan", "label": "主力净流入(万)", "fmt": "num"},
-            {"key": "net_amount_rate", "label": "主力净流入占比(%)", "fmt": "pct"},
-            {"key": "fund_inflow_strength", "label": "资金流入强度", "fmt": "num"},
-            {"key": "net_inflow_days", "label": "连续净流入天数", "fmt": "int"},
-            {"key": "fund_accel", "label": "资金加速度", "fmt": "num"},
-            {"key": "elg_net_ratio", "label": "超大单占比", "fmt": "pct"},
-            {"key": "pct_change", "label": "涨跌幅(%)", "fmt": "pct"},
-            {"key": "dc_rank", "label": "资金流排名", "fmt": "int"},
+            {"key": "net_amount_wan", "label": "主力净流入(亿)", "fmt": "yi", "sortable": True},
+            {"key": "net_amount_rate", "label": "主力净流入占比", "fmt": "pct2", "sortable": True},
+            {"key": "fund_inflow_strength", "label": "资金流入强度", "fmt": "strength4", "sortable": True},
+            {"key": "net_inflow_days", "label": "连续净流入天数", "fmt": "days", "sortable": True},
+            {"key": "fund_accel", "label": "资金加速度(亿)", "fmt": "yi_accel", "sortable": True},
+            {"key": "elg_net_ratio", "label": "超大单占比", "fmt": "pct2", "sortable": True},
+            {"key": "pct_change", "label": "涨跌幅", "fmt": "pct2", "sortable": True},
+            {"key": "dc_rank", "label": "资金流排名", "fmt": "int", "sortable": True},
         ],
     },
     "trend-strength": {

@@ -17,6 +17,7 @@ from app.dc_service import (
     parse_trade_date,
     query_dimension,
 )
+from app import fund_flow_service as ff_svc
 
 api_router = APIRouter(prefix="/api/dc", tags=["dc-api"])
 page_router = APIRouter(tags=["dc-pages"])
@@ -45,22 +46,25 @@ def dc_list_page(slug: str, request: Request, user: dict = Depends(require_user)
         dim = get_dimension(slug)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="未知维度") from exc
+    template = "dc_fund_flow.html" if slug == "fund-flow" else "dc_list.html"
+    page_cfg = {
+        "slug": dim["slug"],
+        "title": dim["title"],
+        "columns": dim["columns"],
+        "sort_hint": dim.get("sort_hint", ""),
+        "default_sort_key": dim.get("default_sort_key", ""),
+        "default_sort_dir": dim.get("default_sort_dir", "asc"),
+    }
+    if slug == "fund-flow":
+        page_cfg["chart_default_boards"] = ff_svc.DEFAULT_CHART_BOARDS
     return _templates.TemplateResponse(
         request,
-        "dc_list.html",
+        template,
         _ctx(
             user,
             slug,
             dimension=dim,
-            dimension_json=json.dumps(
-                {
-                    "slug": dim["slug"],
-                    "title": dim["title"],
-                    "columns": dim["columns"],
-                    "sort_hint": dim.get("sort_hint", ""),
-                },
-                ensure_ascii=False,
-            ),
+            dimension_json=json.dumps(page_cfg, ensure_ascii=False),
         ),
     )
 
@@ -118,6 +122,24 @@ def api_boards(
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail=f"查询板块失败: {exc}") from exc
     return {"trade_date": td, "boards": boards}
+
+
+@api_router.get("/fund-flow/trends")
+def api_fund_flow_trends(
+    trade_date: str | None = Query(None),
+    industry_codes: str | None = Query(None),
+    board_keywords: str | None = Query(None),
+    days: int = Query(30, ge=1, le=120),
+    _user: dict = Depends(require_user),
+):
+    try:
+        codes = parse_csv_list(industry_codes) or None
+        keywords = ff_svc.parse_board_keywords(board_keywords)
+        return ff_svc.get_fund_flow_trends(trade_date, codes, keywords, days)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询趋势失败: {exc}") from exc
 
 
 @api_router.get("/{slug}")
