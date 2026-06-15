@@ -226,19 +226,69 @@ def list_boards(
     engine: Engine,
     trade_date: date,
     content_types: list[str],
+    min_constituents: int = 3,
 ) -> list[dict[str, Any]]:
+    """从 ods_dc_member_di 枚举板块（与扩散 DWM 一致），避免仅靠资金流 DWM 漏掉行业板块。"""
     placeholders = ", ".join(f":ct{i}" for i in range(len(content_types)))
-    params: dict[str, Any] = {"td": trade_date}
+    params: dict[str, Any] = {
+        "td": trade_date,
+        "min_cnt": min_constituents,
+    }
     for i, ct in enumerate(content_types):
         params[f"ct{i}"] = ct
-    sql = f"""
+
+    sql_member = f"""
+    WITH ff AS (
+        SELECT industry_code, industry_name, content_type
+        FROM dwm_dc_industry_fund_flow_di
+        WHERE trade_date = :td
+        UNION
+        SELECT industry_code, industry_name, content_type
+        FROM ods_industry_fund_flow_di
+        WHERE trade_date = :td
+    ),
+    board_base AS (
+        SELECT
+            m.ts_code AS industry_code,
+            COALESCE(idx.dc_name, ff.industry_name, m.ts_code) AS industry_name,
+            CASE
+                WHEN idx.idx_type = '行业板块' THEN '行业'
+                WHEN idx.idx_type = '概念板块' THEN '概念'
+                WHEN idx.idx_type = '地域板块' THEN '地域'
+                WHEN ff.content_type IN ('行业', '概念', '地域') THEN ff.content_type
+                ELSE NULL
+            END AS content_type,
+            COUNT(DISTINCT m.con_code) AS member_cnt
+        FROM ods_dc_member_di m
+        LEFT JOIN ods_dc_index_di idx
+          ON m.trade_date = idx.trade_date AND m.ts_code = idx.ts_code
+        LEFT JOIN ff ON m.ts_code = ff.industry_code
+        WHERE m.trade_date = :td
+        GROUP BY m.ts_code, idx.dc_name, idx.idx_type, ff.industry_name, ff.content_type
+    )
+    SELECT industry_code, industry_name, content_type
+    FROM board_base
+    WHERE content_type IN ({placeholders})
+      AND member_cnt >= :min_cnt
+    ORDER BY content_type, industry_name
+    """
+    with engine.connect() as conn:
+        rows = conn.execute(text(sql_member), params).mappings().all()
+    if rows:
+        return [dict(r) for r in rows]
+
+    # 兜底：资金流 DWM（历史逻辑）
+    sql_ff = f"""
     SELECT DISTINCT industry_code, industry_name, content_type
     FROM dwm_dc_industry_fund_flow_di
     WHERE trade_date = :td AND content_type IN ({placeholders})
     ORDER BY content_type, industry_name
-  """
+    """
     with engine.connect() as conn:
-        rows = conn.execute(text(sql), params).mappings().all()
+        rows = conn.execute(
+            text(sql_ff),
+            {k: v for k, v in params.items() if k != "min_cnt"},
+        ).mappings().all()
     if rows:
         return [dict(r) for r in rows]
     sql_fb = f"""
@@ -246,9 +296,12 @@ def list_boards(
     FROM ods_industry_fund_flow_di
     WHERE trade_date = :td AND content_type IN ({placeholders})
     ORDER BY content_type, industry_name
-  """
+    """
     with engine.connect() as conn:
-        rows = conn.execute(text(sql_fb), params).mappings().all()
+        rows = conn.execute(
+            text(sql_fb),
+            {k: v for k, v in params.items() if k != "min_cnt"},
+        ).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -257,23 +310,32 @@ def load_members(
     trade_date: date,
     industry_code: str,
 ) -> list[dict[str, str]]:
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                """
-                SELECT con_code, name
-                FROM ods_dc_member_di
-                WHERE trade_date = :td AND ts_code = :ic
-                """
-            ),
-            {"td": trade_date, "ic": industry_code},
-        ).mappings().all()
-    out: list[dict[str, str]] = []
-    seen: set[str] = set()
-    for r in rows:
-        code = normalize_con_code(str(r["con_code"]))
-        if code in seen:
-            continue
-        seen.add(code)
-        out.append({"ts_code": code, "stock_name": r.get("name") or ""})
-    return out
+    codes_to_try = [industry_code]
+    if industry_code.endswith(".DC"):
+        codes_to_try.append(industry_code[:-3])
+    else:
+        codes_to_try.append(f"{industry_code}.DC")
+
+    for board_code in codes_to_try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT con_code, name
+                    FROM ods_dc_member_di
+                    WHERE trade_date = :td AND ts_code = :ic
+                    """
+                ),
+                {"td": trade_date, "ic": board_code},
+            ).mappings().all()
+        if rows:
+            out: list[dict[str, str]] = []
+            seen: set[str] = set()
+            for r in rows:
+                code = normalize_con_code(str(r["con_code"]))
+                if code in seen:
+                    continue
+                seen.add(code)
+                out.append({"ts_code": code, "stock_name": r.get("name") or ""})
+            return out
+    return []

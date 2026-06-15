@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
@@ -126,13 +127,16 @@ def run_batch(
     if not mem_cnt:
         raise RuntimeError(f"ods_dc_member_di 无数据: {trade_date}")
 
-    boards = list_boards(engine, trade_date, content_types)
+    boards = list_boards(
+        engine, trade_date, content_types, min_constituents=cfg.min_constituents,
+    )
     if not boards:
         raise RuntimeError(f"无目标板块: {trade_date} types={content_types}")
 
+    by_type = Counter(b.get("content_type") for b in boards)
     logger.info(
-        "batch start trade_date=%s boards=%d workers=%d types=%s",
-        trade_date, len(boards), workers, content_types,
+        "batch start trade_date=%s boards=%d by_type=%s workers=%d types=%s",
+        trade_date, len(boards), dict(by_type), workers, content_types,
     )
 
     with engine.begin() as conn:
@@ -187,6 +191,7 @@ def run_batch(
         "boards_ok": len(summaries),
         "boards_skipped": skipped,
         "score_rows": len(all_scores),
+        "ok_by_type": dict(Counter(s.get("content_type") for s in summaries)),
     }
     logger.info("batch done %s", stats)
     return stats
