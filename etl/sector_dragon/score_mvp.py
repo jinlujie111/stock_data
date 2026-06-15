@@ -8,7 +8,12 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from etl.sector_dragon.db_util import DragonConfig, list_trading_days, load_members
+from etl.sector_dragon.db_util import (
+    DragonConfig,
+    _board_code_variants,
+    list_trading_days,
+    load_members,
+)
 from etl.sector_dragon.scoring import (
     build_summary_text,
     composite_mvp,
@@ -42,19 +47,20 @@ def _compound_return(conn, codes: list[str], start: date, end: date) -> dict[str
 
 
 def _board_return(conn, industry_code: str, start: date, end: date) -> float | None:
-    row = conn.execute(
-        text(
-            """
-            SELECT EXP(SUM(LN(GREATEST(1 + pct_change / 100, 1e-8)))) - 1 AS ret
-            FROM ods_dc_daily_di
-            WHERE ts_code = :ic AND trade_date BETWEEN :start AND :end
-            """
-        ),
-        {"ic": industry_code, "start": start, "end": end},
-    ).mappings().first()
-    if not row or row["ret"] is None:
-        return None
-    return float(row["ret"])
+    for ic in _board_code_variants(industry_code):
+        row = conn.execute(
+            text(
+                """
+                SELECT EXP(SUM(LN(GREATEST(1 + pct_change / 100, 1e-8)))) - 1 AS ret
+                FROM ods_dc_daily_di
+                WHERE ts_code = :ic AND trade_date BETWEEN :start AND :end
+                """
+            ),
+            {"ic": ic, "start": start, "end": end},
+        ).mappings().first()
+        if row and row["ret"] is not None:
+            return float(row["ret"])
+    return None
 
 
 def score_board_mvp(
@@ -66,10 +72,16 @@ def score_board_mvp(
     industry_code = board["industry_code"]
     industry_name = board.get("industry_name") or industry_code
     content_type = board.get("content_type") or ""
+    member_date = board.get("member_date") or trade_date
+    if isinstance(member_date, str):
+        member_date = date.fromisoformat(member_date[:10])
 
-    members = load_members(engine, trade_date, industry_code)
+    members = load_members(engine, trade_date, industry_code, member_date)
     if len(members) < cfg.min_constituents:
-        logger.debug("skip %s: constituents=%d", industry_code, len(members))
+        logger.debug(
+            "skip %s: constituents=%d member_date=%s",
+            industry_code, len(members), member_date,
+        )
         return [], None
 
     codes = [m["ts_code"] for m in members]
@@ -219,6 +231,7 @@ def score_board_mvp(
                     mv_proxy=mv_map.get(c),
                     report_cnt_30d=inst_map.get(c),
                     board_ret_60d=board_ret,
+                    member_date=str(member_date),
                 ),
             }
         )

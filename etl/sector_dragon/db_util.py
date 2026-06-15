@@ -228,7 +228,11 @@ def list_boards(
     content_types: list[str],
     min_constituents: int = 3,
 ) -> list[dict[str, Any]]:
-    """从 ods_dc_member_di 枚举板块（与扩散 DWM 一致），避免仅靠资金流 DWM 漏掉行业板块。"""
+    """
+    从 ods_dc_member_di 枚举板块。
+    成分股取 trade_date 向前 60 日内「最近且成分数最多」的一日快照，
+    避免当日 dc_member 只同步了部分板块/少量股票导致行业板块被跳过。
+    """
     placeholders = ", ".join(f":ct{i}" for i in range(len(content_types)))
     params: dict[str, Any] = {
         "td": trade_date,
@@ -247,10 +251,40 @@ def list_boards(
         FROM ods_industry_fund_flow_di
         WHERE trade_date = :td
     ),
+    candidate_dates AS (
+        SELECT
+            m.ts_code,
+            m.trade_date,
+            COUNT(DISTINCT m.con_code) AS member_cnt,
+            ROW_NUMBER() OVER (
+                PARTITION BY m.ts_code
+                ORDER BY m.trade_date DESC, COUNT(DISTINCT m.con_code) DESC
+            ) AS rn
+        FROM ods_dc_member_di m
+        WHERE m.trade_date <= :td
+          AND m.trade_date >= DATE_SUB(:td, INTERVAL 60 DAY)
+        GROUP BY m.ts_code, m.trade_date
+    ),
+    best_member AS (
+        SELECT ts_code, trade_date AS member_date, member_cnt
+        FROM candidate_dates
+        WHERE rn = 1 AND member_cnt >= :min_cnt
+    ),
+    idx_latest AS (
+        SELECT ts_code, dc_name, idx_type
+        FROM (
+            SELECT
+                ts_code, dc_name, idx_type,
+                ROW_NUMBER() OVER (PARTITION BY ts_code ORDER BY trade_date DESC) AS rn
+            FROM ods_dc_index_di
+            WHERE trade_date <= :td
+        ) t
+        WHERE rn = 1
+    ),
     board_base AS (
         SELECT
-            m.ts_code AS industry_code,
-            COALESCE(idx.dc_name, ff.industry_name, m.ts_code) AS industry_name,
+            b.ts_code AS industry_code,
+            COALESCE(idx.dc_name, ff.industry_name, b.ts_code) AS industry_name,
             CASE
                 WHEN idx.idx_type = '行业板块' THEN '行业'
                 WHEN idx.idx_type = '概念板块' THEN '概念'
@@ -258,18 +292,15 @@ def list_boards(
                 WHEN ff.content_type IN ('行业', '概念', '地域') THEN ff.content_type
                 ELSE NULL
             END AS content_type,
-            COUNT(DISTINCT m.con_code) AS member_cnt
-        FROM ods_dc_member_di m
-        LEFT JOIN ods_dc_index_di idx
-          ON m.trade_date = idx.trade_date AND m.ts_code = idx.ts_code
-        LEFT JOIN ff ON m.ts_code = ff.industry_code
-        WHERE m.trade_date = :td
-        GROUP BY m.ts_code, idx.dc_name, idx.idx_type, ff.industry_name, ff.content_type
+            b.member_date,
+            b.member_cnt
+        FROM best_member b
+        LEFT JOIN idx_latest idx ON b.ts_code = idx.ts_code
+        LEFT JOIN ff ON b.ts_code = ff.industry_code
     )
-    SELECT industry_code, industry_name, content_type
+    SELECT industry_code, industry_name, content_type, member_date, member_cnt
     FROM board_base
     WHERE content_type IN ({placeholders})
-      AND member_cnt >= :min_cnt
     ORDER BY content_type, industry_name
     """
     with engine.connect() as conn:
@@ -305,18 +336,24 @@ def list_boards(
     return [dict(r) for r in rows]
 
 
+def _board_code_variants(industry_code: str) -> list[str]:
+    codes = [industry_code]
+    if industry_code.endswith(".DC"):
+        codes.append(industry_code[:-3])
+    else:
+        codes.append(f"{industry_code}.DC")
+    return codes
+
+
 def load_members(
     engine: Engine,
     trade_date: date,
     industry_code: str,
+    member_date: date | None = None,
 ) -> list[dict[str, str]]:
-    codes_to_try = [industry_code]
-    if industry_code.endswith(".DC"):
-        codes_to_try.append(industry_code[:-3])
-    else:
-        codes_to_try.append(f"{industry_code}.DC")
-
-    for board_code in codes_to_try:
+    """加载成分股；member_date 为成分快照日（可与 trade_date 不同）。"""
+    query_date = member_date or trade_date
+    for board_code in _board_code_variants(industry_code):
         with engine.connect() as conn:
             rows = conn.execute(
                 text(
@@ -326,7 +363,7 @@ def load_members(
                     WHERE trade_date = :td AND ts_code = :ic
                     """
                 ),
-                {"td": trade_date, "ic": board_code},
+                {"td": query_date, "ic": board_code},
             ).mappings().all()
         if rows:
             out: list[dict[str, str]] = []
