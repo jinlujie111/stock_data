@@ -351,8 +351,8 @@
       ? `更新于 ${fmtSnapshotTime(data.trade_date)}`
       : "";
     if (!hasData) {
-      elBoardTop5Inflow.innerHTML = "";
-      elBoardTop5Outflow.innerHTML = "";
+      elBoardTop5Inflow.innerHTML = '<div class="board-top5-empty-hint">暂无数据</div>';
+      elBoardTop5Outflow.innerHTML = '<div class="board-top5-empty-hint">暂无数据</div>';
       elBoardTop5Empty.classList.remove("hidden");
       return;
     }
@@ -414,7 +414,24 @@
   }
 
   async function loadSnapshots() {
-    await Promise.all([loadBoardTop5(), loadStockTop10()]);
+    const results = await Promise.allSettled([loadBoardTop5(), loadStockTop10()]);
+    results.forEach((r, i) => {
+      if (r.status === "rejected") {
+        const msg = r.reason?.message || String(r.reason);
+        if (i === 0) showBoardTop5Error(msg);
+        else showStockTop10Error(msg);
+      }
+    });
+  }
+
+  function refreshPageData() {
+    clearError();
+    return loadBoards()
+      .then(() => Promise.all([
+        loadData().catch((err) => showError(err.message)),
+        loadSnapshots(),
+        loadCharts().catch((err) => showChartError(err.message)),
+      ]));
   }
 
   function renderHead() {
@@ -646,22 +663,23 @@
       }
     }
     loadBoards()
-      .then(() => loadBoardTop5())
+      .then(() => loadSnapshots())
       .catch((err) => showError(err.message));
   });
 
-  stockFlowTabs.addEventListener("click", (e) => {
+  if (stockFlowTabs) {
+    stockFlowTabs.addEventListener("click", (e) => {
     const btn = e.target.closest(".tab[data-dir]");
     if (!btn) return;
     stockFlowDirection = btn.dataset.dir;
     stockFlowTabs.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
     btn.classList.add("active");
     loadStockTop10().catch((err) => showStockTop10Error(err.message));
-  });
+    });
+  }
 
   document.getElementById("btn-query").addEventListener("click", () => {
-    loadData().catch((err) => showError(err.message));
-    loadSnapshots().catch((err) => showBoardTop5Error(err.message));
+    refreshPageData();
   });
 
   document.getElementById("btn-reset-boards").addEventListener("click", () => {
@@ -683,11 +701,7 @@
 
   elDate.addEventListener("change", () => {
     chartDefaultsApplied = false;
-    loadBoards()
-      .then(() => loadData())
-      .then(() => loadSnapshots())
-      .then(() => loadCharts())
-      .catch((err) => showError(err.message));
+    refreshPageData().catch((err) => showError(err.message));
   });
 
   elSearch.addEventListener("input", onTableSearchInput);
@@ -735,9 +749,6 @@
   renderSelectedTags();
   renderChartSelectedTags();
   loadTradeDates()
-    .then(() => loadBoards())
-    .then(() => loadData())
-    .then(() => loadSnapshots())
-    .then(() => loadCharts())
+    .then(() => refreshPageData())
     .catch((err) => showError(err.message));
 })();
