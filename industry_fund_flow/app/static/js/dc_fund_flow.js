@@ -279,7 +279,61 @@
     return raw;
   }
 
-  function buildChart(canvasId, chartKey, label, series, dates, valueKey, yTitle) {
+  function collectValues(series, valueKey) {
+    return series
+      .flatMap((s) => s.points.map((p) => p[valueKey]))
+      .filter((v) => v !== null && v !== undefined && !Number.isNaN(Number(v)))
+      .map(Number);
+  }
+
+  function yScaleOptions(chartKey, series, valueKey) {
+    const vals = collectValues(series, valueKey);
+    const base = {
+      ticks: {
+        color: "#8b9cb3",
+        maxTicksLimit: 6,
+        font: { size: 11 },
+      },
+      grid: { color: "rgba(45,58,79,0.35)" },
+      border: { display: false },
+    };
+    if (!vals.length) return base;
+
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const span = max - min;
+    const pad = span > 0 ? span * 0.08 : Math.max(Math.abs(max), 1) * 0.08;
+
+    if (chartKey === "rank") {
+      return {
+        ...base,
+        reverse: true,
+        min: Math.max(1, Math.floor(min - pad)),
+        max: Math.ceil(max + pad),
+        ticks: {
+          ...base.ticks,
+          stepSize: Math.max(1, Math.ceil((max - min) / 5)),
+        },
+      };
+    }
+
+    return {
+      ...base,
+      min: min - pad,
+      max: max + pad,
+      ticks: {
+        ...base.ticks,
+        callback: (v) => {
+          const n = Number(v);
+          if (chartKey === "rate") return n.toFixed(1) + "%";
+          if (chartKey === "yi") return n.toFixed(2);
+          return n;
+        },
+      },
+    };
+  }
+
+  function buildChart(canvasId, chartKey, series, dates, valueKey) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === "undefined") return;
     if (charts[chartKey]) {
@@ -307,14 +361,17 @@
         },
         scales: {
           x: {
-            ticks: { color: "#8b9cb3", maxRotation: 45, minRotation: 0 },
-            grid: { color: "rgba(45,58,79,0.5)" },
+            ticks: {
+              color: "#8b9cb3",
+              maxRotation: 45,
+              minRotation: 0,
+              maxTicksLimit: 10,
+              font: { size: 11 },
+            },
+            grid: { color: "rgba(45,58,79,0.35)" },
+            border: { display: false },
           },
-          y: {
-            title: { display: !!yTitle, text: yTitle, color: "#8b9cb3" },
-            ticks: { color: "#8b9cb3" },
-            grid: { color: "rgba(45,58,79,0.5)" },
-          },
+          y: yScaleOptions(chartKey, series, valueKey),
         },
       },
     });
@@ -334,9 +391,9 @@
       return;
     }
     const dates = data.dates;
-    buildChart("chart-net-yi", "yi", "主力净流入(亿)", data.series, dates, "net_amount_yi", "亿");
-    buildChart("chart-net-rate", "rate", "主力净流入占比(%)", data.series, dates, "net_amount_rate", "%");
-    buildChart("chart-rank", "rank", "资金流排名", data.series, dates, "dc_rank", "排名");
+    buildChart("chart-net-yi", "yi", data.series, dates, "net_amount_yi");
+    buildChart("chart-net-rate", "rate", data.series, dates, "net_amount_rate");
+    buildChart("chart-rank", "rank", data.series, dates, "dc_rank");
   }
 
   elHead.addEventListener("click", (e) => {
