@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
-from app import auth_service, routes_dc
+from app import auth_service, routes_dc, routes_dragon
 from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
 from app.deps import current_user, require_user
@@ -26,8 +26,11 @@ app = FastAPI(title=APP_TITLE)
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
 routes_dc.init_dc_routes(_TEMPLATES)
+routes_dragon.init_dragon_routes(_TEMPLATES)
 app.include_router(routes_dc.page_router)
 app.include_router(routes_dc.api_router)
+app.include_router(routes_dragon.page_router)
+app.include_router(routes_dragon.api_router)
 
 
 @app.on_event("startup")

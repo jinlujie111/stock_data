@@ -986,3 +986,20 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.summary-box {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding: 1rem 1.25rem;
+  margin: 0 0 1rem;
+  background: var(--surface-2, #f6f8fa);
+  border-radius: 8px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.data-table tr.row-leader td {
+  font-weight: 600;
+  background: rgba(34, 197, 94, 0.06);
+}

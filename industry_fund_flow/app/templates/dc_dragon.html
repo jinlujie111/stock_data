@@ -1,0 +1,82 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head">
+  <h1>板块龙头</h1>
+  <p class="muted">东财行业 + 概念板块 · MVP 四因子综合评分</p>
+</div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <select id="trade-date"></select>
+    </label>
+    <label class="filter-field filter-field--wide">
+      <span>板块类型</span>
+      <div class="chip-group" id="content-type-chips">
+        {% for ct in content_types %}
+        <button type="button" class="chip{% if ct in ['行业','概念'] %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
+        {% endfor %}
+      </div>
+    </label>
+    <label class="filter-field filter-field--grow">
+      <span>板块搜索</span>
+      <input type="text" id="board-keyword" class="board-search" placeholder="名称或代码…" />
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+    </div>
+  </div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<section class="card">
+  <h2 class="section-title">全市场龙头速览</h2>
+  <p id="leaders-updated" class="muted snapshot-time"></p>
+  <div class="table-wrap">
+    <table class="data-table" id="leaders-table">
+      <thead>
+        <tr>
+          <th>类型</th>
+          <th>板块</th>
+          <th>综合龙头</th>
+          <th>综合分</th>
+          <th>资金龙头</th>
+          <th>趋势龙头</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="leaders-body"></tbody>
+    </table>
+  </div>
+  <div id="leaders-empty" class="table-empty hidden">暂无数据，请先运行 ETL：run_sector_dragon_batch</div>
+</section>
+
+<section class="card hidden" id="detail-card">
+  <div class="page-head">
+    <h2 id="detail-title">板块明细</h2>
+    <button type="button" class="btn btn-ghost" id="btn-close-detail">关闭</button>
+  </div>
+  <pre id="summary-text" class="summary-box"></pre>
+  <div class="table-wrap">
+    <table class="data-table" id="scores-table">
+      <thead>
+        <tr>
+          <th>股票</th>
+          <th>综合分</th>
+          <th>资金分</th>
+          <th>趋势分</th>
+          <th>机构分</th>
+          <th>排名</th>
+        </tr>
+      </thead>
+      <tbody id="scores-body"></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dc_dragon.js?v=20260610"></script>
+{% endblock %}

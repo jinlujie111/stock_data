@@ -232,6 +232,89 @@ CREATE TABLE IF NOT EXISTS ods_dc_hot_di (
     UNIQUE KEY uk_dc_hot (trade_date, market, hot_type, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财App热榜(Tushare dc_hot)';
 
+CREATE TABLE IF NOT EXISTS dwm_sector_stock_dragon_score_di (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date          DATE           NOT NULL COMMENT '交易日期',
+    industry_code       VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name       VARCHAR(128)   NULL COMMENT '板块名称',
+    content_type        VARCHAR(16)    NULL COMMENT '板块类型(行业/概念/地域)',
+    ts_code             VARCHAR(16)    NOT NULL COMMENT '成分股TS代码',
+    stock_name          VARCHAR(64)    NULL COMMENT '股票简称',
+    score_industry      DECIMAL(10, 2) NULL COMMENT '产业分0-100',
+    score_fund          DECIMAL(10, 2) NULL COMMENT '资金分',
+    score_trend         DECIMAL(10, 2) NULL COMMENT '趋势分',
+    score_inst          DECIMAL(10, 2) NULL COMMENT '机构分',
+    score_composite     DECIMAL(10, 2) NULL COMMENT '综合分',
+    rank_industry       INT            NULL COMMENT '产业排名(板块内)',
+    rank_fund           INT            NULL COMMENT '资金排名',
+    rank_trend          INT            NULL COMMENT '趋势排名',
+    rank_inst           INT            NULL COMMENT '机构排名',
+    rank_composite      INT            NULL COMMENT '综合排名',
+    is_industry_leader  TINYINT        NOT NULL DEFAULT 0 COMMENT '产业龙头',
+    is_fund_leader      TINYINT        NOT NULL DEFAULT 0 COMMENT '资金龙头',
+    is_trend_leader     TINYINT        NOT NULL DEFAULT 0 COMMENT '趋势龙头',
+    is_inst_leader      TINYINT        NOT NULL DEFAULT 0 COMMENT '机构龙头',
+    is_composite_leader TINYINT        NOT NULL DEFAULT 0 COMMENT '综合龙头',
+    score_mode          VARCHAR(8)     NOT NULL DEFAULT 'mvp' COMMENT 'mvp/full',
+    industry_as_of      DATE           NULL COMMENT '财报截止日',
+    inst_as_of          DATE           NULL COMMENT '机构数据截止日',
+    detail_json         JSON           NULL COMMENT '子因子明细',
+    created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_sector_dragon_score (trade_date, industry_code, ts_code, score_mode),
+    KEY idx_sector_dragon_board (trade_date, industry_code, score_mode),
+    KEY idx_sector_dragon_composite (trade_date, content_type, score_composite)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块成分股龙头评分(DWM)';
+
+CREATE TABLE IF NOT EXISTS sector_dragon_summary_di (
+    id                      BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date              DATE           NOT NULL COMMENT '交易日期',
+    industry_code           VARCHAR(32)    NOT NULL COMMENT '板块代码',
+    industry_name           VARCHAR(128)   NULL COMMENT '板块名称',
+    content_type            VARCHAR(16)    NULL COMMENT '板块类型',
+    leader_industry_ts      VARCHAR(16)    NULL COMMENT '产业龙头代码',
+    leader_industry_name    VARCHAR(64)    NULL COMMENT '产业龙头名称',
+    leader_fund_ts          VARCHAR(16)    NULL COMMENT '资金龙头代码',
+    leader_fund_name        VARCHAR(64)    NULL COMMENT '资金龙头名称',
+    leader_trend_ts         VARCHAR(16)    NULL COMMENT '趋势龙头代码',
+    leader_trend_name       VARCHAR(64)    NULL COMMENT '趋势龙头名称',
+    leader_inst_ts          VARCHAR(16)    NULL COMMENT '机构龙头代码',
+    leader_inst_name        VARCHAR(64)    NULL COMMENT '机构龙头名称',
+    leader_composite_ts     VARCHAR(16)    NULL COMMENT '综合龙头代码',
+    leader_composite_name   VARCHAR(64)    NULL COMMENT '综合龙头名称',
+    summary_text            TEXT           NULL COMMENT '结论文案',
+    score_mode              VARCHAR(8)     NOT NULL DEFAULT 'mvp',
+    created_at              DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_sector_dragon_summary (trade_date, industry_code, score_mode),
+    KEY idx_sector_dragon_summary_ct (trade_date, content_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头结论摘要';
+
+CREATE TABLE IF NOT EXISTS sector_dragon_config (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    config_key      VARCHAR(64)    NOT NULL COMMENT '__global__或industry_code',
+    score_mode      VARCHAR(8)     NOT NULL DEFAULT 'mvp',
+    content_types   VARCHAR(64)    NOT NULL DEFAULT '行业,概念',
+    w_industry      DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    w_fund          DECIMAL(5, 4)  NOT NULL DEFAULT 0.3500,
+    w_trend         DECIMAL(5, 4)  NOT NULL DEFAULT 0.2500,
+    w_inst          DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    fund_window_days INT           NOT NULL DEFAULT 20,
+    trend_windows   JSON           NULL,
+    mvp_weights     JSON           NULL,
+    rs_cap          DECIMAL(6, 2)  NOT NULL DEFAULT 3.00,
+    rs_cap_score    DECIMAL(6, 2)  NOT NULL DEFAULT 90.00,
+    min_constituents INT           NOT NULL DEFAULT 3,
+    effective_date  DATE           NOT NULL,
+    is_active       TINYINT        NOT NULL DEFAULT 1,
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_sector_dragon_config (config_key, effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头评分参数';
+
+-- 废弃占位表（历史误建为 dc_hot 结构，新环境可手工 DROP）
+-- DROP TABLE IF EXISTS dwm_dc_stock_dragon_score_di;
+
 -- ============================================================================
 -- 同花顺板块数据
 -- ============================================================================

@@ -138,6 +138,7 @@ NAV_ITEMS = [
     {"slug": "market-heat", "label": "市场热度", "href": "/dc/market-heat"},
     {"slug": "prosperity", "label": "产业景气", "href": "/dc/prosperity"},
     {"slug": "diffusion", "label": "扩散效应", "href": "/dc/diffusion"},
+    {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon"},
 ]
 
 CONTENT_TYPES = ["行业", "概念", "地域"]

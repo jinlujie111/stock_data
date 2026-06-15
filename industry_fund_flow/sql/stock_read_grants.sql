@@ -23,4 +23,17 @@ GRANT SELECT ON stock_data.ods_limit_list_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_ths_member_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_ths_member_di TO 'app_user'@'%';
 
+GRANT SELECT ON stock_data.dwm_sector_stock_dragon_score_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_sector_stock_dragon_score_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.sector_dragon_summary_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.sector_dragon_summary_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.sector_dragon_config TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.sector_dragon_config TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_dc_member_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_dc_member_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_report_rc_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_report_rc_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_dc_daily_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_dc_daily_di TO 'app_user'@'%';
+
 FLUSH PRIVILEGES;
