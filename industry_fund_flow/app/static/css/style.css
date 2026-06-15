@@ -727,6 +727,16 @@ body {
   background: rgba(59, 130, 246, 0.08);
 }
 
+.cell-rise {
+  color: #f87171;
+  font-weight: 500;
+}
+
+.cell-fall {
+  color: #4ade80;
+  font-weight: 500;
+}
+
 .table-empty {
   padding: 2rem;
   text-align: center;

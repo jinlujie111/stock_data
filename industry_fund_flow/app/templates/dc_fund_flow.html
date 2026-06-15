@@ -1,30 +1,7 @@
 {% extends "app_layout.html" %}
 {% block app_content %}
-<div class="dashboard-top">
-  <div class="dashboard-head">
-    <div>
-      <h1>{{ dimension.title }}</h1>
-      <p class="muted">{{ dimension.subtitle }}</p>
-    </div>
-    <div class="dashboard-badges">
-      <span class="status-badge">行业资金流</span>
-      <span class="status-badge status-badge--success">实时更新</span>
-    </div>
-  </div>
-  <div class="overview-cards">
-    <div class="overview-card">
-      <span>当前交易日</span>
-      <strong id="summary-date">加载中</strong>
-    </div>
-    <div class="overview-card">
-      <span>可选板块</span>
-      <strong id="summary-total">-</strong>
-    </div>
-    <div class="overview-card">
-      <span>当前筛选</span>
-      <strong id="summary-filter">全部板块</strong>
-    </div>
-  </div>
+<div class="page-head">
+  <h1>{{ dimension.title }}</h1>
 </div>
 
 <div class="card filters-card">
@@ -61,13 +38,9 @@
       <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
     </div>
   </div>
-  <div id="filter-hint" class="filter-hint muted"></div>
 </div>
 
 <div class="card table-card">
-  <div class="table-toolbar">
-    <span id="result-summary" class="muted">加载中…</span>
-  </div>
   <div class="table-wrap">
     <table class="data-table" id="data-table">
       <thead><tr id="table-head"></tr></thead>

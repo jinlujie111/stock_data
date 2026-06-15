@@ -26,12 +26,26 @@
     if (val === null || val === undefined || val === "") return "—";
     if (fmt === "bool") return val === 1 || val === true ? "是" : "否";
     if (fmt === "int") return Number(val).toLocaleString("zh-CN");
-    if (fmt === "pct" || fmt === "num") {
+    if (fmt === "pct" || fmt === "pct2" || fmt === "num") {
       const n = Number(val);
       if (Number.isNaN(n)) return val;
+      if (fmt === "pct2") return n.toFixed(2) + "%";
       return n.toLocaleString("zh-CN", { maximumFractionDigits: 4 });
     }
     return val;
+  }
+
+  function pctChangeClass(col, val) {
+    if (col.key !== "pct_change") return "";
+    const n = Number(val);
+    if (Number.isNaN(n) || n === 0) return "";
+    return n > 0 ? "cell-rise" : "cell-fall";
+  }
+
+  function renderCell(row, col) {
+    const cls = pctChangeClass(col, row[col.key]);
+    const text = fmtCell(row[col.key], col.fmt);
+    return cls ? `<td class="${cls}">${text}</td>` : `<td>${text}</td>`;
   }
 
   function selectedBoardCodes() {
@@ -142,9 +156,7 @@
     elBody.innerHTML = items
       .map(
         (row) =>
-          "<tr>" +
-          columns.map((c) => `<td>${fmtCell(row[c.key], c.fmt)}</td>`).join("") +
-          "</tr>"
+          "<tr>" + columns.map((c) => renderCell(row, c)).join("") + "</tr>"
       )
       .join("");
   }

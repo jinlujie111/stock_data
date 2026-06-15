@@ -2,7 +2,6 @@
   const cfg = window.__DC_PAGE__;
   const slug = cfg.slug;
   const columns = cfg.columns;
-  const sortHint = cfg.sort_hint || "";
   const defaultSortKey = cfg.default_sort_key || "dc_rank";
   const defaultSortDir = cfg.default_sort_dir || "asc";
   const chartDefaults = cfg.chart_default_boards || [];
@@ -23,13 +22,8 @@
   const elChartPicker = document.getElementById("chart-board-picker");
   const elHead = document.getElementById("table-head");
   const elBody = document.getElementById("table-body");
-  const elSummary = document.getElementById("result-summary");
-  const elSummaryDate = document.getElementById("summary-date");
-  const elSummaryTotal = document.getElementById("summary-total");
-  const elSummaryFilter = document.getElementById("summary-filter");
   const elEmpty = document.getElementById("table-empty");
   const elError = document.getElementById("table-error");
-  const elHint = document.getElementById("filter-hint");
   const chipGroup = document.getElementById("content-type-chips");
   const elChartError = document.getElementById("chart-error");
 
@@ -72,6 +66,19 @@
     }
   }
 
+  function pctChangeClass(col, val) {
+    if (col.key !== "pct_change") return "";
+    const n = Number(val);
+    if (Number.isNaN(n) || n === 0) return "";
+    return n > 0 ? "cell-rise" : "cell-fall";
+  }
+
+  function renderCell(row, col) {
+    const cls = pctChangeClass(col, row[col.key]);
+    const text = fmtCell(row[col.key], col.fmt);
+    return cls ? `<td class="${cls}">${text}</td>` : `<td>${text}</td>`;
+  }
+
   function sortValue(row, key, fmt) {
     const v = row[key];
     if (v === null || v === undefined || v === "") return null;
@@ -79,17 +86,6 @@
     if (fmt === "yi_accel") return Number(v) / 1e8;
     if (["pct2", "strength4", "days", "int"].includes(fmt)) return Number(v);
     return String(v);
-  }
-
-  function updateOverviewCards() {
-    if (elSummaryDate) elSummaryDate.textContent = elDate.value || "加载中";
-    if (elSummaryTotal) elSummaryTotal.textContent = allBoards.length ? `${allBoards.length} 个` : "—";
-    if (elSummaryFilter) {
-      const filters = [];
-      if (selectedContentTypes.length) filters.push(selectedContentTypes.join("、"));
-      if (selectedBoards.size) filters.push(`${selectedBoards.size} 个板块`);
-      elSummaryFilter.textContent = filters.length ? filters.join("；") : "全部板块";
-    }
   }
 
   function sortRows(rows) {
@@ -305,9 +301,7 @@
     elBody.innerHTML = items
       .map(
         (row) =>
-          "<tr>" +
-          columns.map((c) => `<td>${fmtCell(row[c.key], c.fmt)}</td>`).join("") +
-          "</tr>"
+          "<tr>" + columns.map((c) => renderCell(row, c)).join("") + "</tr>"
       )
       .join("");
   }
@@ -325,7 +319,6 @@
       elDate.insertAdjacentHTML("afterbegin", `<option value="${data.latest}">${data.latest}</option>`);
     }
     if (data.latest) elDate.value = data.latest;
-    updateOverviewCards();
   }
 
   async function loadBoards() {
@@ -346,15 +339,10 @@
     renderSelectedTags();
 
     syncChartBoards();
-
-    const sortPart = sortHint ? `；${sortHint}` : "";
-    elHint.textContent = `共 ${allBoards.length} 个板块；未选板块表示全部${sortPart}`;
-    updateOverviewCards();
   }
 
   async function loadData() {
     clearError();
-    elSummary.textContent = "查询中…";
     const td = elDate.value;
     const ct = getContentTypesParam();
     const codes = selectedBoardCodes();
@@ -364,10 +352,6 @@
     const data = await apiGet(url);
     tableRows = data.items;
     applySort();
-    const boardHint = codes.length ? `，已选 ${codes.length} 个板块` : "，全部板块";
-    const typeHint = ct ? `，类型：${ct}` : "，类型：全部";
-    elSummary.textContent = `${data.trade_date} · 共 ${data.total} 条${typeHint}${boardHint}`;
-    updateOverviewCards();
   }
 
   function collectValues(series, valueKey) {
