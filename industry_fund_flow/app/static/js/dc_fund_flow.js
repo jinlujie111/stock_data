@@ -26,8 +26,19 @@
   const elError = document.getElementById("table-error");
   const chipGroup = document.getElementById("content-type-chips");
   const elChartError = document.getElementById("chart-error");
+  const elBoardTop5Inflow = document.getElementById("board-top5-inflow");
+  const elBoardTop5Outflow = document.getElementById("board-top5-outflow");
+  const elBoardTop5Empty = document.getElementById("board-top5-empty");
+  const elBoardTop5Error = document.getElementById("board-top5-error");
+  const elBoardTop5Updated = document.getElementById("board-top5-updated");
+  const elStockTop10Body = document.getElementById("stock-top10-body");
+  const elStockTop10Empty = document.getElementById("stock-top10-empty");
+  const elStockTop10Error = document.getElementById("stock-top10-error");
+  const elStockTop10Updated = document.getElementById("stock-top10-updated");
+  const stockFlowTabs = document.getElementById("stock-flow-tabs");
 
   let selectedContentTypes = [];
+  let stockFlowDirection = "in";
   let allBoards = [];
   let tableRows = [];
   let sortKey = defaultSortKey;
@@ -67,10 +78,36 @@
   }
 
   function pctChangeClass(col, val) {
-    if (col.key !== "pct_change") return "";
+    if (col.key !== "pct_change" && col.key !== "pct_chg") return "";
     const n = Number(val);
     if (Number.isNaN(n) || n === 0) return "";
     return n > 0 ? "cell-rise" : "cell-fall";
+  }
+
+  function pctClass(val) {
+    const n = Number(val);
+    if (Number.isNaN(n) || n === 0) return "";
+    return n > 0 ? "cell-rise" : "cell-fall";
+  }
+
+  function fmtPct(val) {
+    const n = Number(val);
+    if (Number.isNaN(n)) return "—";
+    const sign = n > 0 ? "+" : "";
+    return sign + n.toFixed(2) + "%";
+  }
+
+  function fmtYi(val) {
+    const n = Number(val);
+    if (Number.isNaN(n)) return "—";
+    return n.toFixed(2) + "亿";
+  }
+
+  function fmtSnapshotTime(tradeDate) {
+    if (!tradeDate) return "";
+    const parts = tradeDate.split("-");
+    if (parts.length !== 3) return tradeDate;
+    return `${parts[1]}-${parts[2]} 15:05`;
   }
 
   function renderCell(row, col) {
@@ -275,6 +312,109 @@
 
   function clearChartError() {
     elChartError.classList.add("hidden");
+  }
+
+  function showBoardTop5Error(msg) {
+    elBoardTop5Error.textContent = msg;
+    elBoardTop5Error.classList.remove("hidden");
+  }
+
+  function clearBoardTop5Error() {
+    elBoardTop5Error.classList.add("hidden");
+  }
+
+  function showStockTop10Error(msg) {
+    elStockTop10Error.textContent = msg;
+    elStockTop10Error.classList.remove("hidden");
+  }
+
+  function clearStockTop10Error() {
+    elStockTop10Error.classList.add("hidden");
+  }
+
+  function renderBoardTop5Item(item, mode) {
+    const pctCls = pctClass(item.pct_change);
+    const amtCls = mode === "in" ? "cell-rise" : "cell-fall";
+    const amt = item.net_amount_yi_abs != null ? item.net_amount_yi_abs : item.net_amount_yi;
+    return (
+      `<div class="board-top5-item">` +
+      `<span class="board-top5-name" title="${item.industry_name || ""}">${item.industry_name || "—"}</span>` +
+      `<span class="board-top5-pct ${pctCls}">${fmtPct(item.pct_change)}</span>` +
+      `<span class="board-top5-amt ${amtCls}">${fmtYi(amt)}</span>` +
+      `</div>`
+    );
+  }
+
+  function renderBoardTop5(data) {
+    const hasData = (data.inflow && data.inflow.length) || (data.outflow && data.outflow.length);
+    elBoardTop5Updated.textContent = data.trade_date
+      ? `更新于 ${fmtSnapshotTime(data.trade_date)}`
+      : "";
+    if (!hasData) {
+      elBoardTop5Inflow.innerHTML = "";
+      elBoardTop5Outflow.innerHTML = "";
+      elBoardTop5Empty.classList.remove("hidden");
+      return;
+    }
+    elBoardTop5Empty.classList.add("hidden");
+    elBoardTop5Inflow.innerHTML = (data.inflow || []).map((item) => renderBoardTop5Item(item, "in")).join("");
+    elBoardTop5Outflow.innerHTML = (data.outflow || []).map((item) => renderBoardTop5Item(item, "out")).join("");
+  }
+
+  function renderStockTop10(data) {
+    elStockTop10Updated.textContent = data.trade_date
+      ? `更新于 ${fmtSnapshotTime(data.trade_date)}`
+      : "";
+    const items = data.items || [];
+    if (!items.length) {
+      elStockTop10Body.innerHTML = "";
+      elStockTop10Empty.classList.remove("hidden");
+      return;
+    }
+    elStockTop10Empty.classList.add("hidden");
+    const isIn = data.direction !== "out";
+    elStockTop10Body.innerHTML = items
+      .map((row) => {
+        const pctCls = pctClass(row.pct_chg);
+        const netCls = isIn ? "cell-rise" : "cell-fall";
+        const netVal = row.net_mf_yi_abs != null ? row.net_mf_yi_abs : row.net_mf_yi;
+        return (
+          "<tr>" +
+          `<td>${row.stock_name || row.ts_code || "—"}</td>` +
+          `<td class="${netCls}">${fmtYi(netVal)}</td>` +
+          `<td class="${pctCls}">${fmtPct(row.pct_chg)}</td>` +
+          `<td>${fmtYi(row.amount_yi)}</td>` +
+          `<td>${row.amount_ratio != null ? Number(row.amount_ratio).toFixed(2) + "%" : "—"}</td>` +
+          "</tr>"
+        );
+      })
+      .join("");
+  }
+
+  async function loadBoardTop5() {
+    clearBoardTop5Error();
+    const td = elDate.value;
+    if (!td) return;
+    const ct = getContentTypesParam();
+    let url = `/api/dc/fund-flow/board-top5?trade_date=${encodeURIComponent(td)}`;
+    if (ct) url += `&content_types=${encodeURIComponent(ct)}`;
+    const data = await apiGet(url);
+    renderBoardTop5(data);
+  }
+
+  async function loadStockTop10() {
+    clearStockTop10Error();
+    const td = elDate.value;
+    if (!td) return;
+    const url =
+      `/api/dc/fund-flow/stock-top10?trade_date=${encodeURIComponent(td)}` +
+      `&direction=${encodeURIComponent(stockFlowDirection)}`;
+    const data = await apiGet(url);
+    renderStockTop10(data);
+  }
+
+  async function loadSnapshots() {
+    await Promise.all([loadBoardTop5(), loadStockTop10()]);
   }
 
   function renderHead() {
@@ -505,11 +645,23 @@
         chipGroup.querySelector('[data-value=""]').classList.add("active");
       }
     }
-    loadBoards().catch((err) => showError(err.message));
+    loadBoards()
+      .then(() => loadBoardTop5())
+      .catch((err) => showError(err.message));
+  });
+
+  stockFlowTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".tab[data-dir]");
+    if (!btn) return;
+    stockFlowDirection = btn.dataset.dir;
+    stockFlowTabs.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    btn.classList.add("active");
+    loadStockTop10().catch((err) => showStockTop10Error(err.message));
   });
 
   document.getElementById("btn-query").addEventListener("click", () => {
     loadData().catch((err) => showError(err.message));
+    loadSnapshots().catch((err) => showBoardTop5Error(err.message));
   });
 
   document.getElementById("btn-reset-boards").addEventListener("click", () => {
@@ -533,6 +685,7 @@
     chartDefaultsApplied = false;
     loadBoards()
       .then(() => loadData())
+      .then(() => loadSnapshots())
       .then(() => loadCharts())
       .catch((err) => showError(err.message));
   });
@@ -584,6 +737,7 @@
   loadTradeDates()
     .then(() => loadBoards())
     .then(() => loadData())
+    .then(() => loadSnapshots())
     .then(() => loadCharts())
     .catch((err) => showError(err.message));
 })();

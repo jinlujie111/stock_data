@@ -124,6 +124,35 @@ def api_boards(
     return {"trade_date": td, "boards": boards}
 
 
+@api_router.get("/fund-flow/board-top5")
+def api_fund_flow_board_top5(
+    trade_date: str | None = Query(None),
+    content_types: str | None = Query(None),
+    _user: dict = Depends(require_user),
+):
+    try:
+        cts = parse_csv_list(content_types) or None
+        return ff_svc.get_board_flow_top5(trade_date, cts)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询板块资金流向失败: {exc}") from exc
+
+
+@api_router.get("/fund-flow/stock-top10")
+def api_fund_flow_stock_top10(
+    trade_date: str | None = Query(None),
+    direction: str = Query("in", pattern="^(in|out)$"),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return ff_svc.get_stock_flow_top10(trade_date, direction)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询个股资金流向失败: {exc}") from exc
+
+
 @api_router.get("/fund-flow/trends")
 def api_fund_flow_trends(
     trade_date: str | None = Query(None),

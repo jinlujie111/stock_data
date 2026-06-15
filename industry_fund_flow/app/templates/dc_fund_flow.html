@@ -40,6 +40,56 @@
   </div>
 </div>
 
+<section class="card snapshot-card">
+  <div class="snapshot-head">
+    <div>
+      <h2 class="section-title">板块资金流向 <span class="snapshot-rank-hint">前5排名</span></h2>
+      <p id="board-top5-updated" class="muted snapshot-time"></p>
+    </div>
+  </div>
+  <div id="board-top5-error" class="alert alert-error hidden"></div>
+  <div class="board-top5-grid">
+    <div class="board-top5-col">
+      <h3 class="board-top5-col-title board-top5-col-title--in">净流入</h3>
+      <div id="board-top5-inflow" class="board-top5-list"></div>
+    </div>
+    <div class="board-top5-col">
+      <h3 class="board-top5-col-title board-top5-col-title--out">净流出</h3>
+      <div id="board-top5-outflow" class="board-top5-list"></div>
+    </div>
+  </div>
+  <div id="board-top5-empty" class="table-empty hidden">暂无板块资金流向数据</div>
+</section>
+
+<section class="card snapshot-card">
+  <div class="snapshot-head snapshot-head--tabs">
+    <div>
+      <h2 class="section-title">主力资金流向 <span class="snapshot-rank-hint">前10股票</span></h2>
+      <p id="stock-top10-updated" class="muted snapshot-time"></p>
+    </div>
+    <div class="tab-group" id="stock-flow-tabs">
+      <button type="button" class="tab active" data-dir="in">流入</button>
+      <button type="button" class="tab" data-dir="out">流出</button>
+    </div>
+  </div>
+  <div id="stock-top10-error" class="alert alert-error hidden"></div>
+  <div class="table-wrap snapshot-table-wrap">
+    <table class="data-table snapshot-table" id="stock-top10-table">
+      <thead>
+        <tr>
+          <th>品种</th>
+          <th>主力净流入</th>
+          <th>日内涨跌幅</th>
+          <th>成交额</th>
+          <th>成交额占比</th>
+        </tr>
+      </thead>
+      <tbody id="stock-top10-body"></tbody>
+    </table>
+  </div>
+  <div id="stock-top10-empty" class="table-empty hidden">暂无个股资金流向数据</div>
+</section>
+
 <div class="card table-card">
   <div class="table-wrap">
     <table class="data-table" id="data-table">

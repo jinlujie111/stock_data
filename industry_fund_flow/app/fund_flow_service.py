@@ -197,3 +197,161 @@ def parse_board_keywords(raw: str | None) -> list[str] | None:
     if not raw:
         return None
     return [p.strip() for p in re.split(r"[,，]", raw) if p.strip()]
+
+
+def _resolve_trade_date(trade_date: str | None) -> str | None:
+    td = parse_trade_date(trade_date) if trade_date else None
+    if not td:
+        row = fetch_one_stock(f"SELECT MAX(trade_date) AS d FROM {TABLE}")
+        td = _serialize(row["d"]) if row and row.get("d") else None
+    return td
+
+
+def _content_type_clause(content_types: list[str] | None) -> tuple[str, dict]:
+    if not content_types:
+        return "", {}
+    params = {f"ct{i}": ct for i, ct in enumerate(content_types)}
+    placeholders = ", ".join(f":ct{i}" for i in range(len(content_types)))
+    return f" AND content_type IN ({placeholders})", params
+
+
+def _board_flow_row(row: dict) -> dict:
+    item = _serialize_row(row)
+    net = item.get("net_amount")
+    yi = round(float(net) / 1e8, 2) if net is not None else None
+    return {
+        "industry_code": item.get("industry_code"),
+        "industry_name": item.get("industry_name"),
+        "content_type": item.get("content_type"),
+        "pct_change": item.get("pct_change"),
+        "net_amount_yi": yi,
+        "net_amount_yi_abs": round(abs(yi), 2) if yi is not None else None,
+    }
+
+
+def get_board_flow_top5(
+    trade_date: str | None = None,
+    content_types: list[str] | None = None,
+) -> dict:
+    td = _resolve_trade_date(trade_date)
+    if not td:
+        return {"trade_date": None, "inflow": [], "outflow": []}
+
+    ct_sql, ct_params = _content_type_clause(content_types)
+    base_params = {"trade_date": td, **ct_params}
+
+    inflow_rows = fetch_all_stock(
+        f"""
+        SELECT industry_code, industry_name, content_type, pct_change, net_amount
+        FROM {TABLE}
+        WHERE trade_date = :trade_date
+          AND net_amount IS NOT NULL
+          {ct_sql}
+        ORDER BY net_amount DESC
+        LIMIT 5
+        """,
+        base_params,
+    )
+    outflow_rows = fetch_all_stock(
+        f"""
+        SELECT industry_code, industry_name, content_type, pct_change, net_amount
+        FROM {TABLE}
+        WHERE trade_date = :trade_date
+          AND net_amount IS NOT NULL
+          {ct_sql}
+        ORDER BY net_amount ASC
+        LIMIT 5
+        """,
+        base_params,
+    )
+    return {
+        "trade_date": td,
+        "inflow": [_board_flow_row(r) for r in inflow_rows],
+        "outflow": [_board_flow_row(r) for r in outflow_rows],
+    }
+
+
+def _stock_flow_row(row: dict) -> dict:
+    item = _serialize_row(row)
+    net_wan = item.get("net_mf_amount")
+    amount_qian = item.get("amount")
+    total_qian = item.get("total_amount")
+    net_yi = round(float(net_wan) / 10000, 2) if net_wan is not None else None
+    amount_yi = round(float(amount_qian) / 100000, 2) if amount_qian is not None else None
+    ratio = None
+    if amount_qian is not None and total_qian:
+        ratio = round(float(amount_qian) / float(total_qian) * 100, 2)
+    return {
+        "ts_code": item.get("ts_code"),
+        "stock_name": item.get("stock_name") or item.get("ts_code"),
+        "net_mf_yi": net_yi,
+        "net_mf_yi_abs": round(abs(net_yi), 2) if net_yi is not None else None,
+        "pct_chg": item.get("pct_chg"),
+        "amount_yi": amount_yi,
+        "amount_ratio": ratio,
+    }
+
+
+def get_stock_flow_top10(
+    trade_date: str | None = None,
+    direction: str = "in",
+) -> dict:
+    td = _resolve_trade_date(trade_date)
+    if not td:
+        return {"trade_date": None, "direction": direction, "items": []}
+
+    direction = (direction or "in").strip().lower()
+    if direction not in ("in", "out"):
+        raise ValueError("direction 应为 in 或 out")
+    order = "DESC" if direction == "in" else "ASC"
+
+    rows = fetch_all_stock(
+        f"""
+        SELECT
+            f.ts_code,
+            COALESCE(dcn.name, tmn.name, f.ts_code) AS stock_name,
+            f.net_mf_amount,
+            d.pct_chg,
+            d.amount,
+            mkt.total_amount
+        FROM ods_stock_fund_flow_di f
+        INNER JOIN ods_stock_detail_di d
+            ON f.trade_date = d.trade_date AND f.ts_code = d.ts_code
+        CROSS JOIN (
+            SELECT SUM(amount) AS total_amount
+            FROM ods_stock_detail_di
+            WHERE trade_date = :trade_date
+              AND (
+                ts_code LIKE '%.SH'
+                OR ts_code LIKE '%.SZ'
+                OR ts_code LIKE '%.BJ'
+              )
+        ) mkt
+        LEFT JOIN (
+            SELECT con_code, MAX(name) AS name
+            FROM ods_dc_member_di
+            WHERE trade_date = :trade_date
+            GROUP BY con_code
+        ) dcn ON dcn.con_code = f.ts_code
+        LEFT JOIN (
+            SELECT con_code, MAX(name) AS name
+            FROM ods_ths_member_di
+            GROUP BY con_code
+        ) tmn ON tmn.con_code = f.ts_code
+        WHERE f.trade_date = :trade_date
+          AND f.net_mf_amount IS NOT NULL
+          AND (
+            f.ts_code LIKE '%.SH'
+            OR f.ts_code LIKE '%.SZ'
+            OR f.ts_code LIKE '%.BJ'
+          )
+        ORDER BY f.net_mf_amount {order}
+        LIMIT 10
+        """,
+        {"trade_date": td},
+    )
+    return {
+        "trade_date": td,
+        "direction": direction,
+        "items": [_stock_flow_row(r) for r in rows],
+    }
