@@ -273,10 +273,17 @@
     elSummary.textContent = `${data.trade_date} · 共 ${data.total} 条${typeHint}${boardHint}`;
   }
 
+  function splitKeywords(raw) {
+    return raw
+      .split(/[,，]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   function chartBoardKeywords() {
     const raw = (elChartInput.value || "").trim();
     if (!raw) return chartDefaults.join(",");
-    return raw;
+    return splitKeywords(raw).join(",");
   }
 
   function collectValues(series, valueKey) {

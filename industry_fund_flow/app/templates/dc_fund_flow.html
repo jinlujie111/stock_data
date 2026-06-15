@@ -61,17 +61,19 @@
 <section class="card charts-card">
   <div class="charts-head">
     <h2 class="section-title">近30日趋势</h2>
-    <label class="filter-field filter-field--grow">
-      <span>图表板块（可输入模糊匹配，逗号分隔多个关键词）</span>
-      <input
-        type="text"
-        id="chart-board-input"
-        class="board-search"
-        placeholder="默认：半导体、通信、有色、化工、创新药、机器人"
-        autocomplete="off"
-      />
-    </label>
-    <button type="button" class="btn btn-primary" id="btn-chart-refresh">刷新图表</button>
+    <div class="charts-toolbar">
+      <label class="filter-field filter-field--grow">
+        <span>图表板块（可输入模糊匹配，中/英文逗号分隔多个关键词）</span>
+        <input
+          type="text"
+          id="chart-board-input"
+          class="board-search"
+          placeholder="默认：半导体、通信、有色、化工、创新药、机器人"
+          autocomplete="off"
+        />
+      </label>
+      <button type="button" class="btn btn-primary charts-refresh-btn" id="btn-chart-refresh">刷新图表</button>
+    </div>
   </div>
   <div id="chart-error" class="alert alert-error hidden"></div>
   <div class="chart-grid">

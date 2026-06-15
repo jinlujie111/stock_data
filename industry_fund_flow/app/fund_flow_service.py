@@ -1,6 +1,7 @@
 """资金强度：近30日趋势与板块解析。"""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -195,4 +196,4 @@ def get_fund_flow_trends(
 def parse_board_keywords(raw: str | None) -> list[str] | None:
     if not raw:
         return None
-    return [p.strip() for p in raw.split(",") if p.strip()]
+    return [p.strip() for p in re.split(r"[,，]", raw) if p.strip()]
