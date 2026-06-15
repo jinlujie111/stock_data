@@ -200,7 +200,7 @@ INSERT INTO db_sync_task (
     1, '东财板块日线日快照(Tushare dc_daily, 行业+概念+地域；单次最多2000行/类型，需约6000积分)'
 );
 
--- Tushare dc_member → ods_dc_member_di（按日 snapshot，东财板块成分）
+-- Tushare dc_member → ods_dc_member_di（按日 snapshot，按板块循环拉全量成分）
 INSERT INTO db_sync_task (
     proxy_source, source_table, target_database, target_table, target_table_describe,
     sync_mode, fetch_config, transform_config, status, remark
@@ -208,8 +208,9 @@ INSERT INTO db_sync_task (
     'tushare', 'dc_member', 'stock_data', 'ods_dc_member_di', '东财板块成分', 'snapshot',
     JSON_OBJECT(
         'token_type', 'tushare',
-        'params', JSON_OBJECT('trade_date', '$trade_date'),
-        'inject_date_range', FALSE
+        'board_table', 'ods_industry_fund_flow_di',
+        'content_types', JSON_ARRAY('行业', '概念', '地域'),
+        'sleep_seconds', 0.2
     ),
     JSON_OBJECT(
         'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
@@ -217,7 +218,7 @@ INSERT INTO db_sync_task (
         'dropna', JSON_ARRAY('trade_date', 'ts_code', 'con_code'),
         'keep_columns', JSON_ARRAY('trade_date', 'ts_code', 'con_code', 'name')
     ),
-    1, '东财板块成分日快照(Tushare dc_member, trade_date全市场；单次最多5000行，需约6000积分)'
+    1, '东财板块成分日快照：按 moneyflow_ind_dc 板块列表循环 dc_member(ts_code)，避免单次5000行截断'
 );
 
 -- Tushare index_classify → ods_industry_classify（full，字段与接口一致）

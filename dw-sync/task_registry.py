@@ -299,6 +299,222 @@ def sync_fina_indicator_vip(
     )
 
 
+@register("tushare", "dc_index")
+def sync_dc_index(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """dc_index 按 idx_type 分三次拉取；全空时标失败并提示排查。"""
+    from sync_writer import write_dataframe
+
+    td = trade_date or date.today()
+    df = fetch_task_dataframe(task, trade_date)
+    out = apply_transform(df, task)
+    write_td = write_trade_date_for_sync_mode(task, trade_date)
+
+    logger.info(
+        "dc_index id=%s 原始=%s 映射后=%s",
+        task["id"],
+        len(df),
+        len(out),
+    )
+
+    if out.empty:
+        td_str = td.strftime("%Y%m%d")
+        msg = (
+            f"dc_index 在 {td_str} 返回 0 行。"
+            "请核对：① Tushare 积分≥6000；② 代理 API 是否正常；"
+            f"③ 对比同日 moneyflow_ind_dc："
+            f"run_data_sync {td_str} --source-table moneyflow_ind_dc；"
+            "④ 换邻近交易日试跑。"
+        )
+        logger.error(msg)
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message=msg,
+        )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    transform_cfg = get_transform_config(task)
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="snapshot",
+        trade_date=write_td,
+        snapshot_delete_column=transform_cfg.get("snapshot_delete_column") or "trade_date",
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
+@register("tushare", "dc_member")
+def sync_dc_member(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """
+    dc_member 单次最多 5000 行，按板块 ts_code 循环拉取全量成分。
+    板块列表来自当日 ods_industry_fund_flow_di（东财 moneyflow_ind_dc）。
+    """
+    from mysql_config import get_target_engine
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.2)
+    td = trade_date or date.today()
+    td_str = td.strftime("%Y%m%d")
+    board_table = str(fetch_cfg.get("board_table") or "ods_industry_fund_flow_di")
+    board_database = str(fetch_cfg.get("board_database") or task["target_database"])
+    content_types = fetch_cfg.get("content_types") or ["行业", "概念", "地域"]
+
+    engine = get_target_engine(board_database)
+    placeholders = ", ".join(f":ct{i}" for i in range(len(content_types)))
+    params: dict[str, Any] = {"td": td}
+    for i, ct in enumerate(content_types):
+        params[f"ct{i}"] = ct
+
+    with engine.connect() as conn:
+        codes = [
+            row[0]
+            for row in conn.execute(
+                text(
+                    f"""
+                    SELECT DISTINCT industry_code
+                    FROM `{board_table}`
+                    WHERE trade_date = :td
+                      AND content_type IN ({placeholders})
+                    ORDER BY industry_code
+                    """
+                ),
+                params,
+            ).fetchall()
+        ]
+        if not codes:
+            fallback_td = conn.execute(
+                text(
+                    f"""
+                    SELECT MAX(trade_date) FROM `{board_table}`
+                    WHERE trade_date <= :td
+                      AND content_type IN ({placeholders})
+                    """
+                ),
+                params,
+            ).scalar()
+            if fallback_td:
+                params["td"] = fallback_td
+                logger.warning(
+                    "dc_member %s 无板块列表，回退到 %s", td_str, fallback_td
+                )
+                codes = [
+                    row[0]
+                    for row in conn.execute(
+                        text(
+                            f"""
+                            SELECT DISTINCT industry_code
+                            FROM `{board_table}`
+                            WHERE trade_date = :td
+                              AND content_type IN ({placeholders})
+                            ORDER BY industry_code
+                            """
+                        ),
+                        params,
+                    ).fetchall()
+                ]
+
+    if not codes:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message=(
+                f"{board_database}.{board_table} 在 {td_str} 无板块代码，"
+                "请先同步 moneyflow_ind_dc"
+            ),
+        )
+
+    frames: list[pd.DataFrame] = []
+    for i, ts_code in enumerate(codes):
+        logger.info("dc_member 进度 %s/%s ts_code=%s", i + 1, len(codes), ts_code)
+        try:
+            part = fetch_tushare(
+                "dc_member",
+                token_type=token_type,
+                trade_date=td_str,
+                ts_code=ts_code,
+            )
+        except Exception as exc:
+            logger.warning("dc_member ts_code=%s 失败: %s", ts_code, exc)
+            continue
+        if not part.empty:
+            frames.append(part)
+        if sleep_s > 0 and i + 1 < len(codes):
+            time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+
+    logger.info(
+        "dc_member id=%s 板块=%s 原始=%s 映射后=%s",
+        task["id"],
+        len(codes),
+        len(df),
+        len(out),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if out.empty:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message=f"dc_member {td_str} 全部板块返回空，请检查 Tushare 积分与代理",
+        )
+
+    transform_cfg = get_transform_config(task)
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="snapshot",
+        trade_date=td,
+        snapshot_delete_column=transform_cfg.get("snapshot_delete_column") or "trade_date",
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 @register("tushare", "ths_member")
 def sync_ths_member(
     task: TaskDict, trade_date: date | None, dry_run: bool
