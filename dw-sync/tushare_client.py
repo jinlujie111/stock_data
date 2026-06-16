@@ -162,9 +162,9 @@ def _configure_proxy_url(api_url: str) -> str:
 def get_http_timeout() -> int:
     """Tushare HTTP 读超时（秒）；历史补数接口较慢时可通过环境变量加大。"""
     try:
-        return max(10, int(os.getenv("TUSHARE_HTTP_TIMEOUT", "30")))
+        return max(10, int(os.getenv("TUSHARE_HTTP_TIMEOUT", "15")))
     except ValueError:
-        return 30
+        return 15
 
 
 def _apply_proxy_to_pro(pro: Any, api_url: str | None, token_type: str) -> None:

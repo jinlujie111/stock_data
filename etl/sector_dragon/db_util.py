@@ -10,6 +10,8 @@ from sqlalchemy.engine import Engine
 
 from mysql_config import get_engine
 
+EXCLUDED_BOARD_NAMES = {"B股", "B 股"}
+
 
 @dataclass
 class DragonConfig:
@@ -303,10 +305,14 @@ def list_boards(
     WHERE content_type IN ({placeholders})
     ORDER BY content_type, industry_name
     """
+    def _is_excluded_board(row: dict[str, Any]) -> bool:
+        name = str(row.get("industry_name") or "").strip()
+        return name in EXCLUDED_BOARD_NAMES
+
     with engine.connect() as conn:
         rows = conn.execute(text(sql_member), params).mappings().all()
     if rows:
-        return [dict(r) for r in rows]
+        return [dict(r) for r in rows if not _is_excluded_board(dict(r))]
 
     # 兜底：资金流 DWM（历史逻辑）
     sql_ff = f"""
@@ -321,7 +327,7 @@ def list_boards(
             {k: v for k, v in params.items() if k != "min_cnt"},
         ).mappings().all()
     if rows:
-        return [dict(r) for r in rows]
+        return [dict(r) for r in rows if not _is_excluded_board(dict(r))]
     sql_fb = f"""
     SELECT DISTINCT industry_code, industry_name, content_type
     FROM ods_industry_fund_flow_di
@@ -333,7 +339,7 @@ def list_boards(
             text(sql_fb),
             {k: v for k, v in params.items() if k != "min_cnt"},
         ).mappings().all()
-    return [dict(r) for r in rows]
+    return [dict(r) for r in rows if not _is_excluded_board(dict(r))]
 
 
 def _board_code_variants(industry_code: str) -> list[str]:
