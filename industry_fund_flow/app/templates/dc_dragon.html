@@ -20,11 +20,22 @@
       </div>
     </label>
     <label class="filter-field filter-field--grow">
-      <span>板块搜索</span>
-      <input type="text" id="board-keyword" class="board-search" placeholder="名称或代码…" />
+      <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
+      <div class="board-picker" id="board-picker">
+        <div class="board-selected" id="board-selected"></div>
+        <input
+          type="text"
+          id="board-search"
+          class="board-search"
+          placeholder="输入板块名称或代码，模糊匹配…"
+          autocomplete="off"
+        />
+        <div class="board-dropdown hidden" id="board-dropdown"></div>
+      </div>
     </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
     </div>
   </div>
 </div>
@@ -41,7 +52,7 @@
           <th>类型</th>
           <th>板块</th>
           <th>综合龙头</th>
-          <th>综合分</th>
+          <th class="sortable-th" data-sort="composite">综合分</th>
           <th>资金龙头</th>
           <th>趋势龙头</th>
           <th>操作</th>
@@ -64,10 +75,11 @@
       <thead>
         <tr>
           <th>股票</th>
+          <th>股票代码</th>
           <th>综合分</th>
-          <th>资金分</th>
-          <th>趋势分</th>
-          <th>机构分</th>
+          <th class="sortable-th" data-sort="fund">资金分</th>
+          <th class="sortable-th" data-sort="trend">趋势分</th>
+          <th class="sortable-th" data-sort="inst">机构分</th>
           <th>排名</th>
         </tr>
       </thead>

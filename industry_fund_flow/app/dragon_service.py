@@ -114,6 +114,7 @@ def list_boards(
 def get_leaders(
     trade_date: str | None = None,
     content_types: list[str] | None = None,
+    industry_codes: list[str] | None = None,
     top: int = 50,
     sort: str = "composite",
     keyword: str | None = None,
@@ -128,7 +129,12 @@ def get_leaders(
         "trend": "s.score_trend",
     }.get(sort, "s.score_composite")
     kw_sql = ""
+    code_sql = ""
     params: dict[str, Any] = {"td": td, **ct_params}
+    if industry_codes:
+        placeholders = ", ".join(f":ic{i}" for i in range(len(industry_codes)))
+        code_sql = f" AND m.industry_code IN ({placeholders})"
+        params.update({f"ic{i}": c for i, c in enumerate(industry_codes)})
     if keyword and keyword.strip():
         kw_sql = " AND (m.industry_name LIKE :kw OR m.industry_code LIKE :kw)"
         params["kw"] = f"%{keyword.strip()}%"
@@ -145,7 +151,7 @@ def get_leaders(
          AND s.industry_code = m.industry_code
          AND s.ts_code = m.leader_composite_ts
          AND s.score_mode = m.score_mode
-        WHERE m.trade_date = :td {ct_sql} {kw_sql}
+        WHERE m.trade_date = :td {ct_sql} {code_sql} {kw_sql}
         ORDER BY {order_col} IS NULL, {order_col} DESC, m.industry_name
         LIMIT {top}
         """,
@@ -158,6 +164,9 @@ def get_board_scores(
     industry_code: str,
     trade_date: str | None = None,
     mode: str = "mvp",
+    top: int = 10,
+    sort: str = "composite",
+    order: str = "desc",
 ) -> dict:
     td = _resolve_trade_date(trade_date)
     header = fetch_one_stock(
@@ -171,6 +180,14 @@ def get_board_scores(
     )
     if not header:
         raise ValueError(f"板块 {industry_code} 在 {td} 无评分数据")
+    top = max(1, min(top, 200))
+    sort_col = {
+        "composite": "score_composite",
+        "fund": "score_fund",
+        "trend": "score_trend",
+        "inst": "score_inst",
+    }.get(sort, "score_composite")
+    order_sql = "ASC" if str(order).lower() == "asc" else "DESC"
     rows = fetch_all_stock(
         f"""
         SELECT ts_code, stock_name,
@@ -180,7 +197,8 @@ def get_board_scores(
                detail_json
         FROM {SCORE_TABLE}
         WHERE trade_date = :td AND industry_code = :ic AND score_mode = :mode
-        ORDER BY rank_composite IS NULL, rank_composite ASC, score_composite DESC
+        ORDER BY {sort_col} IS NULL, {sort_col} {order_sql}, rank_composite ASC
+        LIMIT {top}
         """,
         {"td": td, "ic": industry_code, "mode": mode},
     )

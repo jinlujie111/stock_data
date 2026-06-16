@@ -74,10 +74,13 @@ def api_dragon_scores(
     industry_code: str,
     trade_date: str | None = Query(None),
     mode: str = Query("mvp"),
+    top: int = Query(10, ge=1, le=200),
+    sort: str = Query("composite", pattern="^(composite|fund|trend|inst)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     _user: dict = Depends(require_user),
 ):
     try:
-        return dragon_svc.get_board_scores(industry_code, trade_date, mode)
+        return dragon_svc.get_board_scores(industry_code, trade_date, mode, top, sort, order)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
@@ -102,7 +105,8 @@ def api_dragon_summary(
 def api_dragon_leaders(
     trade_date: str | None = Query(None),
     content_types: str | None = Query(None),
-    top: int = Query(50, ge=1, le=200),
+    industry_codes: str | None = Query(None),
+    top: int = Query(10, ge=1, le=200),
     sort: str = Query("composite"),
     keyword: str | None = Query(None),
     _user: dict = Depends(require_user),
@@ -111,6 +115,7 @@ def api_dragon_leaders(
         items = dragon_svc.get_leaders(
             trade_date,
             dragon_svc.parse_content_types_param(content_types),
+            dragon_svc.parse_content_types_param(industry_codes),
             top,
             sort,
             keyword,

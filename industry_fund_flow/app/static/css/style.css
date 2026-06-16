@@ -994,9 +994,10 @@ body {
   line-height: 1.6;
   padding: 1rem 1.25rem;
   margin: 0 0 1rem;
-  background: var(--surface-2, #f6f8fa);
+  color: var(--text);
+  background: rgba(15, 20, 25, 0.82);
   border-radius: 8px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .data-table tr.row-leader td {
