@@ -503,6 +503,7 @@ body {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(18px);
+  overflow: visible;
 }
 
 .filters {

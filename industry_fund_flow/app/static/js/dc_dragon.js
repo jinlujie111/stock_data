@@ -5,6 +5,7 @@
   const elBoardDropdown = document.getElementById("board-dropdown");
   const elBoardSelected = document.getElementById("board-selected");
   const elBoardPicker = document.getElementById("board-picker");
+  const elFilterHint = document.getElementById("filter-hint");
   const elLeadersBody = document.getElementById("leaders-body");
   const elLeadersEmpty = document.getElementById("leaders-empty");
   const elLeadersUpdated = document.getElementById("leaders-updated");
@@ -24,12 +25,20 @@
   let currentIndustryCode = "";
   let detailSort = "composite";
   let detailOrder = "desc";
+  let boardSearchTimer = null;
 
   function fmtNum(v) {
     if (v === null || v === undefined || v === "") return "—";
     const n = Number(v);
     if (Number.isNaN(n)) return v;
     return n.toFixed(1);
+  }
+
+  async function apiGet(path) {
+    const res = await fetch(path, { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "请求失败");
+    return data;
   }
 
   function showError(msg) {
@@ -74,6 +83,12 @@
       .join("");
   }
 
+  function updateFilterHint() {
+    if (!elFilterHint) return;
+    const typeHint = getContentTypesParam().replace(",", "、");
+    elFilterHint.textContent = `共 ${allBoards.length} 个板块可选；输入名称或代码模糊匹配后点选；未选板块表示全部（类型：${typeHint}）`;
+  }
+
   function hideDropdown() {
     elBoardDropdown.classList.add("hidden");
   }
@@ -95,14 +110,42 @@
     elBoardDropdown.classList.remove("hidden");
   }
 
+  async function fetchBoards(keyword) {
+    const td = elDate.value;
+    if (!td) return [];
+    const params = new URLSearchParams({
+      trade_date: td,
+      content_types: getContentTypesParam(),
+    });
+    const kw = (keyword || "").trim();
+    if (kw) params.set("keyword", kw);
+    const data = await apiGet(`/api/v1/dragon/boards?${params}`);
+    return data.items || [];
+  }
+
   function onBoardSearchInput() {
     const q = elBoardSearch.value;
     if (!q.trim()) {
       hideDropdown();
       return;
     }
-    const matches = allBoards.filter((b) => !selectedBoards.has(b.industry_code) && matchBoard(b, q));
-    renderDropdown(matches);
+    clearTimeout(boardSearchTimer);
+    boardSearchTimer = setTimeout(async () => {
+      try {
+        const remote = await fetchBoards(q);
+        const pool = remote.length ? remote : allBoards;
+        const matches = pool.filter(
+          (b) => !selectedBoards.has(b.industry_code) && matchBoard(b, q)
+        );
+        renderDropdown(matches);
+      } catch (e) {
+        const matches = allBoards.filter(
+          (b) => !selectedBoards.has(b.industry_code) && matchBoard(b, q)
+        );
+        renderDropdown(matches);
+        if (!matches.length) showError(e.message || String(e));
+      }
+    }, 200);
   }
 
   function addBoard(code) {
@@ -112,19 +155,11 @@
     renderSelectedTags();
     elBoardSearch.value = "";
     hideDropdown();
+    refresh();
   }
 
   async function loadBoardOptions() {
-    const td = elDate.value;
-    if (!td) return;
-    const params = new URLSearchParams({
-      trade_date: td,
-      content_types: getContentTypesParam(),
-    });
-    const res = await fetch(`/api/v1/dragon/boards?${params}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "加载板块失败");
-    allBoards = data.items || [];
+    allBoards = await fetchBoards("");
     const keep = new Map();
     selectedBoards.forEach((b, code) => {
       if (allBoards.some((x) => x.industry_code === code)) keep.set(code, b);
@@ -132,6 +167,7 @@
     selectedBoards.clear();
     keep.forEach((b, code) => selectedBoards.set(code, b));
     renderSelectedTags();
+    updateFilterHint();
   }
 
   function bindChips() {
@@ -151,15 +187,15 @@
             if (["行业", "概念"].includes(c.dataset.value)) c.classList.add("active");
           });
         }
-        loadBoardOptions().catch((e) => showError(e.message || String(e)));
+        loadBoardOptions()
+          .then(() => refresh())
+          .catch((e) => showError(e.message || String(e)));
       });
     });
   }
 
   async function loadTradeDates() {
-    const res = await fetch("/api/v1/dragon/trade-dates");
-    if (!res.ok) throw new Error("加载交易日失败");
-    const data = await res.json();
+    const data = await apiGet("/api/v1/dragon/trade-dates");
     elDate.innerHTML = "";
     (data.dates || []).forEach((d) => {
       const opt = document.createElement("option");
@@ -180,9 +216,7 @@
     });
     const boardCodes = selectedBoardCodes();
     if (boardCodes.length) params.set("industry_codes", boardCodes.join(","));
-    const res = await fetch(`/api/v1/dragon/leaders?${params}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "加载龙头榜失败");
+    const data = await apiGet(`/api/v1/dragon/leaders?${params}`);
     elLeadersUpdated.textContent = `数据日期：${data.trade_date || td}`;
     const items = data.items || [];
     if (!items.length) {
@@ -223,17 +257,13 @@
     clearError();
     currentIndustryCode = industryCode;
     const td = elDate.value;
-    const [sumRes, scoreRes] = await Promise.all([
-      fetch(`/api/v1/dragon/boards/${encodeURIComponent(industryCode)}/summary?trade_date=${td}`),
-      fetch(
+    const [summary, scores] = await Promise.all([
+      apiGet(`/api/v1/dragon/boards/${encodeURIComponent(industryCode)}/summary?trade_date=${td}`),
+      apiGet(
         `/api/v1/dragon/boards/${encodeURIComponent(industryCode)}/scores?trade_date=${td}` +
           `&top=10&sort=${encodeURIComponent(detailSort)}&order=${encodeURIComponent(detailOrder)}`
       ),
     ]);
-    const summary = await sumRes.json();
-    const scores = await scoreRes.json();
-    if (!sumRes.ok) throw new Error(summary.detail || "加载摘要失败");
-    if (!scoreRes.ok) throw new Error(scores.detail || "加载评分明细失败");
     elDetailTitle.textContent = `${summary.industry_name || industryCode} · 成分股评分`;
     elSummary.textContent = summary.summary_text || "";
     const items = scores.items || [];
@@ -271,13 +301,25 @@
     elBoardSearch.value = "";
     hideDropdown();
     renderSelectedTags();
+    refresh();
   });
   elBoardSearch.addEventListener("input", onBoardSearchInput);
   elBoardSearch.addEventListener("focus", onBoardSearchInput);
-  elBoardDropdown.addEventListener("click", (e) => {
+  elBoardDropdown.addEventListener("click", async (e) => {
     const btn = e.target.closest(".board-option[data-code]");
     if (!btn) return;
-    addBoard(btn.dataset.code);
+    const code = btn.dataset.code;
+    if (!allBoards.some((b) => b.industry_code === code)) {
+      try {
+        const found = await fetchBoards(code);
+        const board = found.find((b) => b.industry_code === code);
+        if (board) allBoards.push(board);
+      } catch (err) {
+        showError(err.message || String(err));
+        return;
+      }
+    }
+    addBoard(code);
   });
   elBoardSelected.addEventListener("click", (e) => {
     const tag = e.target.closest(".board-tag");
@@ -285,6 +327,7 @@
     if (e.target.tagName === "BUTTON") {
       selectedBoards.delete(tag.dataset.code);
       renderSelectedTags();
+      refresh();
     }
   });
   detailSortableHeaders.forEach((th) => {
@@ -301,6 +344,11 @@
         openDetail(currentIndustryCode).catch((e) => showError(e.message || String(e)));
       }
     });
+  });
+  elDate.addEventListener("change", () => {
+    loadBoardOptions()
+      .then(() => refresh())
+      .catch((e) => showError(e.message || String(e)));
   });
   document.addEventListener("click", (e) => {
     if (!elBoardPicker.contains(e.target)) hideDropdown();
