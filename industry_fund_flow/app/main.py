@@ -27,10 +27,10 @@ app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
 routes_dc.init_dc_routes(_TEMPLATES)
 routes_dragon.init_dragon_routes(_TEMPLATES)
-app.include_router(routes_dc.page_router)
-app.include_router(routes_dc.api_router)
 app.include_router(routes_dragon.page_router)
 app.include_router(routes_dragon.api_router)
+app.include_router(routes_dc.page_router)
+app.include_router(routes_dc.api_router)
 
 
 @app.on_event("startup")

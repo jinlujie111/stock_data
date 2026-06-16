@@ -11,6 +11,7 @@ from sqlalchemy.engine import Engine
 from mysql_config import get_engine
 
 EXCLUDED_BOARD_NAMES = {"B股", "B 股"}
+EXCLUDED_BOARD_CODES = {"BK0636.DC", "BK0636"}
 
 
 @dataclass
@@ -306,6 +307,9 @@ def list_boards(
     ORDER BY content_type, industry_name
     """
     def _is_excluded_board(row: dict[str, Any]) -> bool:
+        code = str(row.get("industry_code") or "").strip().upper()
+        if code in EXCLUDED_BOARD_CODES:
+            return True
         name = str(row.get("industry_name") or "").strip()
         return name in EXCLUDED_BOARD_NAMES
 
