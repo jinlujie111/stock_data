@@ -432,7 +432,40 @@ INSERT INTO db_sync_task (
             'bz_sales', 'bz_profit', 'bz_cost', 'curr_type', 'update_flag'
         )
     ),
-    1, '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2个报告期全市场，full=按季period回溯(需约5000积分)'
+    1, '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2季全市场(单次约1万行上限，需配合 fina_mainbz 按股补全)'
+);
+
+-- Tushare fina_mainbz → ods_fina_mainbz_di（按股循环，补 VIP 截断缺失；missing_only 默认 true）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'fina_mainbz', 'stock_data', 'ods_fina_mainbz_di', '主营业务构成(按股补全)', 'incremental', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'stock_table', 'ods_stock_company_di',
+        'stock_database', 'stock_data',
+        'missing_only', TRUE,
+        'snapshot_periods', 2,
+        'params', JSON_OBJECT(
+            'type', 'P',
+            'fields', 'ts_code,end_date,bz_item,bz_code,bz_sales,bz_profit,bz_cost,curr_type,update_flag'
+        ),
+        'sleep_seconds', 0.35,
+        'batch_log_every', 200,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('end_date', '%Y%m%d'),
+        'constants', JSON_OBJECT('bz_type', 'P'),
+        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'bz_type', 'bz_item'),
+        'dropna', JSON_ARRAY('ts_code', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'end_date', 'bz_type', 'bz_item', 'bz_code',
+            'bz_sales', 'bz_profit', 'bz_cost', 'curr_type', 'update_flag'
+        )
+    ),
+    1, '主营业务构成按股补全(Tushare fina_mainbz)；补近2季无记录股票，约2000积分'
 );
 
 -- Tushare report_rc → ods_report_rc_di（按日 snapshot，卖方盈利预测）

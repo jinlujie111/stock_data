@@ -404,6 +404,177 @@ def sync_fina_mainbz_vip(
     )
 
 
+def _delete_ts_codes(database: str, table: str, codes: list[str], *, bz_type: str | None = None) -> None:
+    if not codes:
+        return
+    from mysql_config import get_target_engine
+
+    engine = get_target_engine(database)
+    chunk = 400
+    for i in range(0, len(codes), chunk):
+        part = codes[i : i + chunk]
+        placeholders = ", ".join(f":c{j}" for j in range(len(part)))
+        params: dict[str, Any] = {f"c{j}": c for j, c in enumerate(part)}
+        sql = f"DELETE FROM `{table}` WHERE ts_code IN ({placeholders})"
+        if bz_type:
+            sql += " AND bz_type = :bz_type"
+            params["bz_type"] = bz_type
+        with engine.begin() as conn:
+            conn.execute(text(sql), params)
+
+
+def _load_mainbz_stock_codes(task: TaskDict, trade_date: date | None) -> list[str]:
+    fetch_cfg = get_fetch_config(task)
+    stock_db = str(fetch_cfg.get("stock_database") or task["target_database"])
+    stock_table = str(fetch_cfg.get("stock_table") or "ods_stock_company_di")
+    td = trade_date or date.today()
+    missing_only = bool(fetch_cfg.get("missing_only", True))
+    snap_n = int(fetch_cfg.get("snapshot_periods") or 2)
+    periods = _snapshot_quarter_periods(td, count=snap_n)
+    max_stocks = fetch_cfg.get("max_stocks")
+
+    from mysql_config import get_target_engine
+
+    engine = get_target_engine(stock_db)
+    if missing_only and periods:
+        from datetime import datetime
+
+        placeholders = ", ".join(f":p{i}" for i in range(len(periods)))
+        params: dict[str, Any] = {
+            f"p{i}": datetime.strptime(p, "%Y%m%d").date() for i, p in enumerate(periods)
+        }
+        sql = f"""
+            SELECT c.ts_code
+            FROM `{stock_table}` c
+            WHERE NOT EXISTS (
+                SELECT 1 FROM `{task['target_table']}` m
+                WHERE m.ts_code = c.ts_code
+                  AND m.end_date IN ({placeholders})
+            )
+            ORDER BY c.ts_code
+        """
+        with engine.connect() as conn:
+            codes = [row[0] for row in conn.execute(text(sql), params).fetchall()]
+    else:
+        with engine.connect() as conn:
+            codes = [row[0] for row in conn.execute(text(f"SELECT ts_code FROM `{stock_table}` ORDER BY ts_code")).fetchall()]
+
+    if max_stocks is not None:
+        codes = codes[: int(max_stocks)]
+    return codes
+
+
+@register("tushare", "fina_mainbz")
+def sync_fina_mainbz(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """
+    fina_mainbz 按个股循环拉主营业务构成（补 fina_mainbz_vip 单次约 10000 行上限导致的缺失）。
+    默认 missing_only：仅补近 N 个报告期在 ods_fina_mainbz_di 中无记录的股票。
+    """
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.35)
+    log_every = int(fetch_cfg.get("batch_log_every") or 200)
+    bz_type = str((fetch_cfg.get("params") or {}).get("type") or "P")
+    fields = (fetch_cfg.get("params") or {}).get("fields")
+    sync_mode = (task.get("sync_mode") or "incremental").lower()
+
+    codes = _load_mainbz_stock_codes(task, trade_date)
+    if not codes:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=True,
+            message="无待补全股票（missing_only 已覆盖近季报告期）",
+        )
+
+    logger.info("fina_mainbz 待拉取 %s 只股票 type=%s", len(codes), bz_type)
+    frames: list[pd.DataFrame] = []
+    ok_cnt = 0
+    for i, ts_code in enumerate(codes, start=1):
+        try:
+            kwargs: dict[str, Any] = {"ts_code": ts_code, "type": bz_type}
+            if fields:
+                kwargs["fields"] = fields
+            part = fetch_tushare("fina_mainbz", token_type=token_type, **kwargs)
+        except Exception as exc:
+            logger.warning("fina_mainbz ts_code=%s 失败: %s", ts_code, exc)
+            continue
+        if not part.empty:
+            frames.append(part)
+            ok_cnt += 1
+        if log_every > 0 and i % log_every == 0:
+            logger.info("fina_mainbz 进度 %s/%s ok=%s", i, len(codes), ok_cnt)
+        if sleep_s > 0 and i < len(codes):
+            time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+    refreshed = sorted(out["ts_code"].dropna().unique().tolist()) if not out.empty and "ts_code" in out.columns else []
+
+    logger.info(
+        "fina_mainbz id=%s 股票=%s 成功=%s 原始行=%s 映射后=%s",
+        task["id"],
+        len(codes),
+        ok_cnt,
+        len(df),
+        len(out),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if out.empty:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message=f"fina_mainbz 未拉到数据（待补 {len(codes)} 只）",
+        )
+
+    if sync_mode == "full":
+        from mysql_config import get_target_engine
+
+        engine = get_target_engine(task["target_database"])
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE `{task['target_table']}`"))
+    else:
+        _delete_ts_codes(
+            task["target_database"],
+            task["target_table"],
+            refreshed,
+            bz_type=bz_type if "bz_type" in out.columns else None,
+        )
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="append",
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+        message=f"补全 {len(refreshed)} 只股票",
+    )
+
+
 @register("tushare", "fina_indicator_vip")
 def sync_fina_indicator_vip(
     task: TaskDict, trade_date: date | None, dry_run: bool
