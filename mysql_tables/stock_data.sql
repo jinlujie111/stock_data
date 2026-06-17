@@ -115,6 +115,44 @@ CREATE TABLE IF NOT EXISTS ods_fina_indicator (
     UNIQUE KEY uk_fina_indicator (ts_code, end_date, ann_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司财务指标(Tushare fina_indicator_vip)';
 
+CREATE TABLE IF NOT EXISTS ods_stock_company_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code         VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    exchange        VARCHAR(8)     NULL COMMENT '交易所 SSE/SZSE/BSE',
+    chairman        VARCHAR(64)    NULL COMMENT '法人代表/董事长',
+    manager         VARCHAR(64)    NULL COMMENT '总经理',
+    secretary       VARCHAR(64)    NULL COMMENT '董秘',
+    reg_capital     DECIMAL(20, 4) NULL COMMENT '注册资本(万元)',
+    setup_date      DATE           NULL COMMENT '成立日期',
+    province        VARCHAR(32)    NULL COMMENT '省份',
+    city            VARCHAR(32)    NULL COMMENT '城市',
+    introduction    TEXT           NULL COMMENT '公司简介',
+    website         VARCHAR(256)   NULL COMMENT '公司网站',
+    employees       INT            NULL COMMENT '员工人数',
+    main_business   TEXT           NULL COMMENT '主营业务',
+    business_scope  TEXT           NULL COMMENT '经营范围',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_stock_company (ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上市公司基本信息(Tushare stock_company)';
+
+CREATE TABLE IF NOT EXISTS ods_fina_mainbz_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    end_date    DATE           NOT NULL COMMENT '报告期',
+    bz_type     CHAR(1)        NOT NULL DEFAULT 'P' COMMENT 'P产品 D地区 I行业',
+    bz_item     VARCHAR(256)   NULL COMMENT '主营业务项目',
+    bz_code     VARCHAR(16)    NULL COMMENT '主营业务来源类型代码',
+    bz_sales    DECIMAL(24, 4) NULL COMMENT '主营业务收入(元)',
+    bz_profit   DECIMAL(24, 4) NULL COMMENT '主营业务利润(元)',
+    bz_cost     DECIMAL(24, 4) NULL COMMENT '主营业务成本(元)',
+    curr_type   VARCHAR(8)     NULL COMMENT '货币代码',
+    update_flag VARCHAR(8)     NULL COMMENT '是否更新',
+    created_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_fina_mainbz (ts_code, end_date, bz_type, bz_item(128))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主营业务构成(Tushare fina_mainbz_vip,按产品)';
+
 -- ============================================================================
 -- 股票的预测信息
 -- ============================================================================

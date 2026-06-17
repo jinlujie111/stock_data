@@ -210,6 +210,200 @@ def _delete_by_date_column(
         )
 
 
+def _snapshot_quarter_periods(trade_date: date, *, count: int = 2) -> list[str]:
+    """不晚于 trade_date 的最近 count 个季报报告期末日（YYYYMMDD）。"""
+    all_periods = _quarter_period_ends("20180101", trade_date)
+    if not all_periods:
+        return []
+    n = max(1, count)
+    return all_periods[-n:]
+
+
+def _delete_by_date_values(
+    database: str, table: str, column: str, values: list[date]
+) -> None:
+    if not values:
+        return
+    from mysql_config import get_target_engine
+
+    engine = get_target_engine(database)
+    placeholders = ", ".join(f":v{i}" for i in range(len(values)))
+    params = {f"v{i}": v for i, v in enumerate(values)}
+    with engine.begin() as conn:
+        conn.execute(
+            text(f"DELETE FROM `{table}` WHERE `{column}` IN ({placeholders})"),
+            params,
+        )
+
+
+@register("tushare", "stock_company")
+def sync_stock_company(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """stock_company 按交易所全量拉取；full 模式 TRUNCATE 后写入。"""
+    from sync_writer import write_dataframe
+
+    df = fetch_task_dataframe(task, trade_date)
+    out = apply_transform(df, task)
+    sync_mode = (task.get("sync_mode") or "full").lower()
+
+    logger.info(
+        "stock_company id=%s 原始=%s 映射后=%s mode=%s",
+        task["id"],
+        len(df),
+        len(out),
+        sync_mode,
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if out.empty:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message="stock_company 返回 0 行，请检查 Tushare 积分与代理 API",
+        )
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode=sync_mode,
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
+@register("tushare", "fina_mainbz_vip")
+def sync_fina_mainbz_vip(
+    task: TaskDict, trade_date: date | None, dry_run: bool
+) -> SyncResult:
+    """fina_mainbz_vip 全市场按报告期拉取；snapshot 默认近 2 季 type=P，full 季末回溯。"""
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sync_mode = (task.get("sync_mode") or "snapshot").lower()
+    td = trade_date or date.today()
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.5)
+    bz_type = str((fetch_cfg.get("params") or {}).get("type") or "P")
+    fields = (fetch_cfg.get("params") or {}).get("fields")
+    frames: list[pd.DataFrame] = []
+
+    if sync_mode == "full":
+        from_yyyymmdd = str(fetch_cfg.get("full_start") or "20180101")
+        periods = _quarter_period_ends(from_yyyymmdd, td)
+        for i, period in enumerate(periods):
+            logger.info("fina_mainbz_vip 进度 %s/%s period=%s type=%s", i + 1, len(periods), period, bz_type)
+            try:
+                kwargs: dict[str, Any] = {"period": period, "type": bz_type}
+                if fields:
+                    kwargs["fields"] = fields
+                part = fetch_tushare("fina_mainbz_vip", token_type=token_type, **kwargs)
+            except Exception as exc:
+                logger.warning("fina_mainbz_vip period=%s 失败: %s", period, exc)
+                continue
+            if not part.empty:
+                frames.append(part)
+            if sleep_s > 0:
+                time.sleep(sleep_s)
+    else:
+        snap_n = int(fetch_cfg.get("snapshot_periods") or 2)
+        periods = _snapshot_quarter_periods(td, count=snap_n)
+        for i, period in enumerate(periods):
+            logger.info(
+                "fina_mainbz_vip snapshot %s/%s period=%s type=%s",
+                i + 1,
+                len(periods),
+                period,
+                bz_type,
+            )
+            try:
+                kwargs = {"period": period, "type": bz_type}
+                if fields:
+                    kwargs["fields"] = fields
+                part = fetch_tushare("fina_mainbz_vip", token_type=token_type, **kwargs)
+            except Exception as exc:
+                logger.warning("fina_mainbz_vip period=%s 失败: %s", period, exc)
+                continue
+            if not part.empty:
+                frames.append(part)
+            if sleep_s > 0 and i + 1 < len(periods):
+                time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+
+    logger.info(
+        "fina_mainbz_vip id=%s 原始=%s 映射后=%s mode=%s periods=%s",
+        task["id"],
+        len(df),
+        len(out),
+        sync_mode,
+        len(frames),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if sync_mode == "full" and not out.empty:
+        from mysql_config import get_target_engine
+
+        engine = get_target_engine(task["target_database"])
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE `{task['target_table']}`"))
+    elif sync_mode == "snapshot" and not out.empty and "end_date" in out.columns:
+        end_dates: list[date] = []
+        for raw in out["end_date"].dropna().unique():
+            if isinstance(raw, date):
+                end_dates.append(raw)
+            else:
+                end_dates.append(pd.Timestamp(raw).date())
+        _delete_by_date_values(
+            task["target_database"],
+            task["target_table"],
+            "end_date",
+            sorted(set(end_dates)),
+        )
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="append",
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 @register("tushare", "fina_indicator_vip")
 def sync_fina_indicator_vip(
     task: TaskDict, trade_date: date | None, dry_run: bool
