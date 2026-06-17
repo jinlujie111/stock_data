@@ -61,7 +61,7 @@ ON DUPLICATE KEY UPDATE
     is_industry_leader=VALUES(is_industry_leader), is_fund_leader=VALUES(is_fund_leader),
     is_trend_leader=VALUES(is_trend_leader), is_inst_leader=VALUES(is_inst_leader),
     is_composite_leader=VALUES(is_composite_leader),
-    inst_as_of=VALUES(inst_as_of), detail_json=VALUES(detail_json),
+    industry_as_of=VALUES(industry_as_of), inst_as_of=VALUES(inst_as_of), detail_json=VALUES(detail_json),
     updated_at=CURRENT_TIMESTAMP
 """
 

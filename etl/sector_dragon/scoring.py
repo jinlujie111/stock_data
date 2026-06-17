@@ -34,6 +34,15 @@ def rs_to_score(
     return round(cap_score * (rs_clamped / cap), 2)
 
 
+def composite_weighted(*parts: tuple[float, float | None]) -> float | None:
+    """按权重合成；缺失子项自动降权（权重和重归一）。"""
+    valid = [(w, s) for w, s in parts if s is not None]
+    if not valid:
+        return None
+    w_sum = sum(w for w, _ in valid)
+    return round(sum(w * s for w, s in valid) / w_sum, 2)
+
+
 def composite_mvp(
     score_fund: float | None,
     score_rs: float | None,
@@ -45,19 +54,12 @@ def composite_mvp(
     w_amount: float = 0.2,
     w_mv: float = 0.1,
 ) -> float | None:
-    parts: list[tuple[float, float]] = []
-    for w, s in (
+    return composite_weighted(
         (w_fund, score_fund),
         (w_rs, score_rs),
         (w_amount, score_amount),
         (w_mv, score_mv),
-    ):
-        if s is not None:
-            parts.append((w, s))
-    if not parts:
-        return None
-    w_sum = sum(w for w, _ in parts)
-    return round(sum(w * s for w, s in parts) / w_sum, 2)
+    )
 
 
 def rank_desc(scores: dict[str, float | None]) -> dict[str, int | None]:

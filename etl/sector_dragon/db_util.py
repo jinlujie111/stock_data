@@ -28,6 +28,11 @@ class DragonConfig:
     w_rs: float = 0.3
     w_amount: float = 0.2
     w_mv: float = 0.1
+    w_np_yoy: float = 0.35
+    w_q_yoy: float = 0.25
+    w_roe: float = 0.25
+    w_upgrade: float = 0.075
+    w_forecast_rev: float = 0.075
 
 
 def parse_trade_date(s: str) -> date:
@@ -192,6 +197,13 @@ def load_config(engine: Engine, content_types: list[str]) -> DragonConfig:
         cfg.w_rs = float(mw.get("rs", cfg.w_rs))
         cfg.w_amount = float(mw.get("amount_share", cfg.w_amount))
         cfg.w_mv = float(mw.get("mv", cfg.w_mv))
+        iw = mw.get("industry")
+        if isinstance(iw, dict):
+            cfg.w_np_yoy = float(iw.get("np_yoy", cfg.w_np_yoy))
+            cfg.w_q_yoy = float(iw.get("q_yoy", cfg.w_q_yoy))
+            cfg.w_roe = float(iw.get("roe", cfg.w_roe))
+            cfg.w_upgrade = float(iw.get("upgrade", cfg.w_upgrade))
+            cfg.w_forecast_rev = float(iw.get("forecast_rev", cfg.w_forecast_rev))
     return cfg
 
 
