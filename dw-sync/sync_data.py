@@ -73,7 +73,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="跳过交易日校验（非交易日也执行同步）",
+        help="跳过交易日校验；手动执行时亦跳过 monthly 调度限制",
     )
     return parser.parse_args(argv)
 
@@ -84,17 +84,23 @@ def run_sync(
     task_id: int | None = None,
     source_table: str | None = None,
     dry_run: bool = False,
+    force_schedule: bool = False,
 ) -> list[SyncResult]:
     tasks = load_sync_tasks(task_id=task_id, source_table=source_table)
     if not tasks:
         logger.warning("未找到符合条件的 db_sync_task（status=1）")
         return []
 
+    manual_run = task_id is not None or bool(source_table) or force_schedule
     results: list[SyncResult] = []
     failed = 0
     for task in tasks:
-        # monthly 任务：仅在每月 1 号执行
-        if task.get("schedule_type") == "monthly" and date.today().day != 1:
+        # monthly 任务：日批仅在每月 1 号；手动指定任务或 --force 时不跳过
+        if (
+            task.get("schedule_type") == "monthly"
+            and date.today().day != 1
+            and not manual_run
+        ):
             logger.info(
                 "跳过 id=%s %s: schedule_type=monthly 且今天不是 1 号",
                 task["id"],
@@ -177,6 +183,7 @@ def main(argv: list[str] | None = None) -> None:
         task_id=args.task_id,
         source_table=args.source_table,
         dry_run=args.dry_run,
+        force_schedule=args.force,
     )
 
 
