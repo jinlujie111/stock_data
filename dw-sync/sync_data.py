@@ -6,6 +6,9 @@
 用法（须通过 sync_runner.sh，以加载 dw-utils/func.sh 环境变量）：
   bash dw-sync/sync_runner.sh [YYYYMMDD] [--task-id ID] [--source-table NAME] [--dry-run]
 
+  区间补数（按 ods_trading_day 逐日执行）：
+  bash dw-sync/sync_runner.sh 20250101 --end-date 20260615 --source-table daily_basic --force
+
 示例：
   bash dw-sync/sync_runner.sh                    # 跑全部 status=1 任务
   bash dw-sync/sync_runner.sh 20260525 --source-table tool_trade_date_hist_sina
@@ -28,7 +31,7 @@ for _p in (_DW_UTILS, _DW_SYNC):
 
 from mysql_config import load_sync_tasks  # noqa: E402
 from task_registry import SyncResult, run_task  # noqa: E402
-from trade_data_flag import get_trade_day_flag  # noqa: E402
+from trade_data_flag import get_trade_day_flag, get_trading_dates  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,6 +77,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--force",
         action="store_true",
         help="跳过交易日校验；手动执行时亦跳过 monthly 调度限制",
+    )
+    parser.add_argument(
+        "--end-date",
+        default=None,
+        help="区间补数结束日 YYYYMMDD（含）；与 trade_date 组成 [start,end] 内全部交易日",
     )
     return parser.parse_args(argv)
 
@@ -174,7 +182,47 @@ def should_skip_sync(trade_date: date, *, force: bool) -> bool:
 def main(argv: list[str] | None = None) -> None:
     ensure_dw_loaded()
     args = parse_args(argv)
-    td = parse_trade_date(args.trade_date)
+    start = parse_trade_date(args.trade_date)
+    end = parse_trade_date(args.end_date) if args.end_date else start
+    if end < start:
+        start, end = end, start
+
+    if args.end_date:
+        dates = get_trading_dates(start, end)
+        if not dates:
+            logger.error(
+                "区间 %s ~ %s 在 ods_trading_day 无交易日，请先同步交易日历",
+                start,
+                end,
+            )
+            raise SystemExit(1)
+        logger.info(
+            "区间补数: %s ~ %s 共 %s 个交易日 source_table=%s",
+            dates[0],
+            dates[-1],
+            len(dates),
+            args.source_table or "*",
+        )
+        failed_days: list[date] = []
+        for i, td in enumerate(dates, start=1):
+            logger.info("—— 补数进度 %s/%s: %s ——", i, len(dates), td)
+            try:
+                run_sync(
+                    td,
+                    task_id=args.task_id,
+                    source_table=args.source_table,
+                    dry_run=args.dry_run,
+                    force_schedule=args.force,
+                )
+            except SystemExit:
+                failed_days.append(td)
+        if failed_days:
+            logger.error("区间补数失败 %s 天: %s", len(failed_days), failed_days[:10])
+            raise SystemExit(1)
+        logger.info("区间补数完成: %s 个交易日", len(dates))
+        return
+
+    td = start
     if should_skip_sync(td, force=args.force):
         return
     logger.info("业务日期: %s dry_run=%s", td, args.dry_run)

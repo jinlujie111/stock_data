@@ -55,6 +55,26 @@ def is_trading_day(check_date: date | None = None) -> bool:
     return get_trade_day_flag(check_date) == 1
 
 
+def get_trading_dates(start: date, end: date) -> list[date]:
+    """返回 [start, end] 内 ods_trading_day 的交易日列表（升序）。"""
+    if end < start:
+        start, end = end, start
+    engine = get_engine()
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT trade_date
+                FROM ods_trading_day
+                WHERE trade_date >= :s AND trade_date <= :e
+                ORDER BY trade_date
+                """
+            ),
+            {"s": start, "e": end},
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="交易日标识：1=ods_trading_day 中存在，0=不存在"

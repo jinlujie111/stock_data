@@ -700,3 +700,44 @@ CREATE TABLE IF NOT EXISTS dim_industry_etf_map (
     KEY idx_dim_industry_etf_industry (industry_code, is_active),
     KEY idx_dim_industry_etf_index (index_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业-ETF映射维表';
+
+-- -----------------------------------------------------------------------------
+-- 需求4 AI核心池：东财热度赛道维表（dim_industry_track + dim_industry_track_stock）
+-- 赛道来源：dwm_dc_industry_market_heat_di 按成交额占比等取 TopN 东财板块
+-- 成分来源：ods_dc_member_di 对应板块当日成分
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dim_industry_track (
+    industry_id       VARCHAR(32)  NOT NULL COMMENT '赛道ID(=东财板块代码)',
+    industry_name     VARCHAR(128) NOT NULL COMMENT '赛道名称',
+    as_of_date        DATE         NOT NULL COMMENT '快照交易日',
+    content_type      VARCHAR(16)  NULL COMMENT '概念/行业/地域',
+    dc_board_code     VARCHAR(32)  NOT NULL COMMENT '东财板块代码 BKxxxx.DC',
+    heat_rank         INT          NULL COMMENT '同类型内成交额占比排名(东财热度)',
+    heat_sort         INT          NOT NULL COMMENT '入选赛道总排序1..N',
+    amount_ratio      DECIMAL(20, 8) NULL COMMENT '板块成交额占全A比',
+    dc_hot_rank       INT          NULL COMMENT '成分股东财人气榜最佳排名',
+    dc_hot_rank_soar  INT          NULL COMMENT '成分股东财飙升榜最佳排名',
+    pct_change        DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
+    status            TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用 0历史批次',
+    source            VARCHAR(32)  NOT NULL DEFAULT 'dc_market_heat' COMMENT 'dc_market_heat|manual',
+    remark            VARCHAR(512) NULL,
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (industry_id, as_of_date),
+    KEY idx_track_asof_sort (as_of_date, status, heat_sort),
+    KEY idx_track_board (dc_board_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池-东财热度赛道维表';
+
+CREATE TABLE IF NOT EXISTS dim_industry_track_stock (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    industry_id   VARCHAR(32)  NOT NULL COMMENT '关联 dim_industry_track.industry_id',
+    as_of_date    DATE         NOT NULL COMMENT '快照交易日',
+    ts_code       VARCHAR(16)  NOT NULL COMMENT '成分股TS代码',
+    stock_name    VARCHAR(64)  NULL COMMENT '成分股简称',
+    source        VARCHAR(32)  NOT NULL DEFAULT 'dc_member' COMMENT 'dc_member|manual',
+    is_active     TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效 0历史批次',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_track_stock (industry_id, as_of_date, ts_code),
+    KEY idx_track_stock_asof (as_of_date, industry_id, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池-东财板块成分候选股';

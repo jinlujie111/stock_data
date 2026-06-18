@@ -152,6 +152,20 @@ run_data_sync() {
     bash "${runner}" "$@"
 }
 
+# 按交易日区间逐日调用 run_data_sync（等价于 sync_data.py --end-date）
+run_data_sync_range() {
+    local start end runner
+    if [[ $# -lt 2 ]]; then
+        echo "用法: run_data_sync_range START_YYYYMMDD END_YYYYMMDD [--source-table NAME] [--force] ..." >&2
+        return 1
+    fi
+    start="$(get_date "$1")"
+    end="$(get_date "$2" "$1")"
+    shift 2
+    runner="${DW_ROOT}/dw-sync/sync_runner.sh"
+    bash "${runner}" "${start}" --end-date "${end}" "$@"
+}
+
 run_dwm_market_breadth() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_market_breadth_di.sh"
     if [[ ! -f "${runner}" ]]; then
@@ -338,6 +352,15 @@ run_dwd_market_breadth() {
 
 run_dim_industry_etf_map() {
     local runner="${DW_ROOT}/dw-dim/pro_dim_industry_etf_map.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
+run_dim_industry_track() {
+    local runner="${DW_ROOT}/dw-dim/pro_dim_industry_track.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1

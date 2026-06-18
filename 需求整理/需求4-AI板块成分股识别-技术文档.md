@@ -52,7 +52,7 @@ flowchart TB
     JOB --> etl
 ```
 
-**与需求2 的差异**：需求2 对东财**全板块**做规则因子评分；本需求对 **dim 精选赛道** 调用 **LLM** 做语义归属，候选股可来自人工维护或东财板块弱关联初筛。
+**与需求2 的差异**：需求2 对东财**全板块**做规则因子评分；本需求对 **东财热度 TopN 赛道**（`dim_industry_track`）调用 **LLM** 做语义归属；候选股来自 **东财板块成分**（`dim_industry_track_stock` ← `ods_dc_member_di`），不以东财成分为最终核心池，仅作 AI 分析输入范围。
 
 ---
 
@@ -69,38 +69,64 @@ flowchart TB
 
 ## 3. 核心表设计
 
-### 3.1 DIM：`dim_industry_track`
+### 3.1 DIM：`dim_industry_track`（东财热度 TopN 赛道）
+
+**数据来源**：`dwm_dc_industry_market_heat_di`（东财板块市场热度 DWM，基于 `ods_dc_daily` / `ods_dc_member` / `ods_dc_hot` 聚合）。
+
+**筛选规则**（默认 Top **50**，`AI_CORE_TRACK_TOP_N` 可配）：
+
+| 步骤 | 说明 |
+|------|------|
+| 范围 | `content_type IN ('概念','行业')`（`AI_CORE_TRACK_CONTENT_TYPES` 可配） |
+| 主排序 | `amount_ratio` 降序（板块成交额占全 A 比，东财热度核心指标） |
+| 次排序 | `dc_hot_rank` 升序（成分股东财 App **人气榜**最佳排名，越小越热） |
+| 再次 | `pct_change` 降序 |
+| 过滤 | `constituent_cnt >= 3`（`AI_CORE_TRACK_MIN_CONST`） |
+
+**刷新**：`run_dim_industry_track YYYYMMDD`（`dw-dim/pro_dim_industry_track.sh`），前置 `run_dwm_dc_industry_market_heat`。
 
 ```sql
 CREATE TABLE IF NOT EXISTS dim_industry_track (
-    industry_id       VARCHAR(32)  NOT NULL COMMENT '赛道ID',
+    industry_id       VARCHAR(32)  NOT NULL COMMENT '赛道ID=东财板块代码 BKxxxx.DC',
     industry_name     VARCHAR(128) NOT NULL COMMENT '赛道名称',
-    parent_industry_id VARCHAR(32) NULL COMMENT '上级赛道',
-    level             TINYINT      NOT NULL DEFAULT 1 COMMENT '1=一级 2=二级',
-    status            TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
-    dc_board_code     VARCHAR(32)  NULL COMMENT '关联东财板块BK代码(可选)',
-    sort_order        INT          NOT NULL DEFAULT 0,
+    as_of_date        DATE         NOT NULL COMMENT '快照交易日',
+    content_type      VARCHAR(16)  NULL COMMENT '概念/行业/地域',
+    dc_board_code     VARCHAR(32)  NOT NULL COMMENT '东财板块代码',
+    heat_rank         INT          NULL COMMENT '同类型内成交额占比排名',
+    heat_sort         INT          NOT NULL COMMENT '入选赛道总排序1..N',
+    amount_ratio      DECIMAL(20, 8) NULL COMMENT '成交额占全A比',
+    dc_hot_rank       INT          NULL COMMENT '成分股东财人气榜最佳排名',
+    dc_hot_rank_soar  INT          NULL COMMENT '成分股东财飙升榜最佳排名',
+    pct_change        DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
+    status            TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用 0历史批次',
+    source            VARCHAR(32)  NOT NULL DEFAULT 'dc_market_heat',
     remark            VARCHAR(512) NULL,
     created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (industry_id),
-    UNIQUE KEY uk_track_name (industry_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池-赛道维表';
+    PRIMARY KEY (industry_id, as_of_date),
+    KEY idx_track_asof_sort (as_of_date, status, heat_sort)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池-东财热度赛道维表';
 ```
 
-### 3.2 DIM：`dim_industry_track_stock`（候选池）
+> `source='manual'` 行由运营人工维护，日批**不覆盖**，仅将历史 `dc_market_heat` 批次 `status=0`。
+
+### 3.2 DIM：`dim_industry_track_stock`（东财板块成分）
+
+**数据来源**：`ods_dc_member_di`，按 `dim_industry_track.dc_board_code` + `as_of_date` 关联，取当日东财板块**全量成分股**。
 
 ```sql
 CREATE TABLE IF NOT EXISTS dim_industry_track_stock (
     id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-    industry_id   VARCHAR(32)  NOT NULL,
-    ts_code       VARCHAR(16)  NOT NULL,
+    industry_id   VARCHAR(32)  NOT NULL COMMENT '关联 dim_industry_track.industry_id',
+    as_of_date    DATE         NOT NULL COMMENT '快照交易日',
+    ts_code       VARCHAR(16)  NOT NULL COMMENT '成分股TS代码',
     stock_name    VARCHAR(64)  NULL,
-    source        VARCHAR(32)  NOT NULL DEFAULT 'manual' COMMENT 'manual|dc_member|history_core',
+    source        VARCHAR(32)  NOT NULL DEFAULT 'dc_member' COMMENT 'dc_member|manual',
     is_active     TINYINT      NOT NULL DEFAULT 1,
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_track_stock (industry_id, ts_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='赛道候选股(分析输入范围)';
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_track_stock (industry_id, as_of_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池-东财板块成分候选股';
 ```
 
 ### 3.3 配置：`ai_core_pool_config`
@@ -324,8 +350,10 @@ n_date=$(date +%Y%m%d)
 [[ "$(trade_day_flag "${n_date}")" == "1" ]] || exit 0
 
 run_data_sync "${n_date}"
+run_dwm_dc_industry_market_heat "${n_date}"   # 东财板块热度（dim 依赖）
+run_dim_industry_track "${n_date}"            # 需求4：TopN 赛道 + 东财成分
 # … 其他 DWM（可选）…
-run_ai_core_pool_batch "${n_date}"    # 本需求：建议在 ODS 同步之后
+run_ai_core_pool_batch "${n_date}"    # 本需求：建议在 DIM 刷新之后
 ```
 
 | 模式 | 说明 |
