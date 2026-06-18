@@ -18,6 +18,8 @@ GRANT SELECT ON stock_data.ods_stock_fund_flow_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_stock_fund_flow_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_stock_detail_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_stock_detail_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_daily_basic_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_daily_basic_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_limit_list_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_limit_list_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_ths_member_di TO 'app_user'@'localhost';

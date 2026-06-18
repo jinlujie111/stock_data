@@ -302,6 +302,33 @@ INSERT INTO db_sync_task (
     1, 'A股日线行情日快照(Tushare daily)'
 );
 
+-- Tushare daily_basic → ods_daily_basic_di（按日 snapshot，市盈率/市值/换手率等）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'daily_basic', 'stock_data', 'ods_daily_basic_di', 'A股每日指标', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'trade_date', 'close',
+            'turnover_rate', 'turnover_rate_f', 'volume_ratio',
+            'pe', 'pe_ttm', 'pb', 'ps', 'ps_ttm',
+            'dv_ratio', 'dv_ttm',
+            'total_share', 'float_share', 'free_share',
+            'total_mv', 'circ_mv'
+        )
+    ),
+    1, 'A股每日指标日快照(Tushare daily_basic；含总市值/流通市值/换手率，供需求4 V1权重等)'
+);
+
 -- Tushare limit_list_d → ods_limit_list_di（按日 snapshot，含涨停U/跌停D/炸板Z）
 INSERT INTO db_sync_task (
     proxy_source, source_table, target_database, target_table, target_table_describe,

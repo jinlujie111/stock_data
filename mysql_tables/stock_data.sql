@@ -58,6 +58,29 @@ CREATE TABLE IF NOT EXISTS ods_stock_detail_di (
     UNIQUE KEY uk_stock_detail (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股日线行情(Tushare daily)';
 
+CREATE TABLE IF NOT EXISTS ods_daily_basic_di (
+    id                BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code           VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    trade_date        DATE           NOT NULL COMMENT '交易日期',
+    close             DECIMAL(20, 6) NULL COMMENT '收盘价',
+    turnover_rate     DECIMAL(20, 6) NULL COMMENT '换手率(%)',
+    turnover_rate_f   DECIMAL(20, 6) NULL COMMENT '换手率(自由流通股)(%)',
+    volume_ratio      DECIMAL(20, 6) NULL COMMENT '量比',
+    pe                DECIMAL(20, 6) NULL COMMENT '市盈率(总市值/净利润)',
+    pe_ttm            DECIMAL(20, 6) NULL COMMENT '市盈率(TTM)',
+    pb                DECIMAL(20, 6) NULL COMMENT '市净率',
+    ps                DECIMAL(20, 6) NULL COMMENT '市销率',
+    ps_ttm            DECIMAL(20, 6) NULL COMMENT '市销率(TTM)',
+    dv_ratio          DECIMAL(20, 6) NULL COMMENT '股息率(%)',
+    dv_ttm            DECIMAL(20, 6) NULL COMMENT '股息率(TTM)(%)',
+    total_share       DECIMAL(20, 4) NULL COMMENT '总股本(万股)',
+    float_share       DECIMAL(20, 4) NULL COMMENT '流通股本(万股)',
+    free_share        DECIMAL(20, 4) NULL COMMENT '自由流通股本(万股)',
+    total_mv          DECIMAL(20, 4) NULL COMMENT '总市值(万元)',
+    circ_mv           DECIMAL(20, 4) NULL COMMENT '流通市值(万元)',
+    UNIQUE KEY uk_daily_basic (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股每日指标(Tushare daily_basic)';
+
 
 CREATE TABLE IF NOT EXISTS ods_limit_list_di (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
