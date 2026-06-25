@@ -5,8 +5,8 @@
 # 东财板块主线监控表（需求1 §4.4 每日输出物）
 #
 # 字段：排名、行业、主线得分(默认5日均)、资金连续流入、RS5d、涨停数、业绩增速、等级、阶段
-# 阶段规则（简化 v1，可配置化后续迭代）：
-#   机构化：暂缺 ETF 行业汇总 → 不判定
+# 阶段规则（v1.1）：
+#   机构化：映射 ETF 近5交易日份额净增 + 主线分>=70 + 连续净流入>=3天 + RS5d>0
 #   板块爆发：rs_5d>0 且 涨停扩散率>=同类型P80 且 连续净流入>=2天
 #   资金试探：fund_accel>0 且 连续净流入>=1天
 #   否则：观察
@@ -116,7 +116,46 @@ load_dc_mainline_monitor() {
         score_diffusion,
         is_top20
     )
-    WITH enriched AS (
+    WITH etf_share_series AS (
+        SELECT
+            es.ts_code,
+            es.trade_date,
+            es.total_share,
+            LAG(es.total_share, 5) OVER (
+                PARTITION BY es.ts_code ORDER BY es.trade_date
+            ) AS share_lag5
+        FROM ods_etf_share_size_di es
+        WHERE es.trade_date <= '${v_date}'
+    ),
+    etf_latest AS (
+        SELECT
+            ts_code,
+            total_share - share_lag5 AS share_chg_5d
+        FROM etf_share_series
+        WHERE trade_date = '${v_date}'
+    ),
+    etf_by_sw_name AS (
+        SELECT
+            dim.industry_name,
+            MAX(CASE WHEN IFNULL(el.share_chg_5d, 0) > 0 THEN 1 ELSE 0 END) AS has_etf_inflow
+        FROM dim_industry_etf_map dim
+        JOIN etf_latest el ON dim.etf_code = el.ts_code
+        WHERE dim.is_active = 1
+        GROUP BY dim.industry_name
+    ),
+    dc_etf_match AS (
+        SELECT
+            s.industry_code,
+            MAX(IFNULL(ei.has_etf_inflow, 0)) AS has_etf_inflow
+        FROM dws_dc_industry_mainline_score_di s
+        LEFT JOIN etf_by_sw_name ei
+          ON s.industry_name = ei.industry_name
+          OR s.industry_name LIKE CONCAT('%', ei.industry_name, '%')
+          OR ei.industry_name LIKE CONCAT('%', s.industry_name, '%')
+        WHERE s.trade_date = '${v_date}'
+        GROUP BY s.industry_code
+    ),
+    enriched AS (
         SELECT
             s.trade_date,
             s.content_type,
@@ -142,6 +181,7 @@ load_dc_mainline_monitor() {
             df.up_ratio,
             f.fund_accel,
             f.net_inflow_days,
+            IFNULL(em.has_etf_inflow, 0) AS has_etf_inflow,
             100 * PERCENT_RANK() OVER (
                 PARTITION BY s.trade_date, s.content_type
                 ORDER BY COALESCE(h.limit_up_ratio, df.limit_up_ratio)
@@ -153,12 +193,18 @@ load_dc_mainline_monitor() {
           ON s.trade_date = h.trade_date AND s.industry_code = h.industry_code
         LEFT JOIN dwm_dc_industry_diffusion_di df
           ON s.trade_date = df.trade_date AND s.industry_code = df.industry_code
+        LEFT JOIN dc_etf_match em ON s.industry_code = em.industry_code
         WHERE s.trade_date = '${v_date}'
     ),
     staged AS (
         SELECT
             e.*,
             CASE
+                WHEN IFNULL(e.has_etf_inflow, 0) = 1
+                 AND IFNULL(e.main_score, 0) >= 70
+                 AND IFNULL(e.net_inflow_days, 0) >= 3
+                 AND IFNULL(e.rs_5d, 0) > 0
+                THEN '机构化'
                 WHEN e.rs_5d > 0
                  AND e.lur_pctile >= 80
                  AND IFNULL(e.net_inflow_days, 0) >= 2

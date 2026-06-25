@@ -1,0 +1,151 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<style>
+  .level-super { color: #fbbf24; font-weight: 600; }
+  .level-main { color: #60a5fa; font-weight: 600; }
+  .level-rotate { color: #a78bfa; }
+  .level-follow { color: var(--muted); }
+  .stage-tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+  }
+  .stage-tag.stage-burst { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
+  .stage-tag.stage-inst { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.4); }
+  .stage-tag.stage-probe { background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.35); }
+  .score-bar {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 80px;
+    background: rgba(255,255,255,0.06);
+  }
+  .score-bar span { height: 100%; }
+  .dim-fund { background: #3b82f6; }
+  .dim-trend { background: #22c55e; }
+  .dim-heat { background: #f59e0b; }
+  .dim-pros { background: #a855f7; }
+  .dim-diff { background: #ec4899; }
+  #history-card { margin-top: 1.25rem; }
+  #history-chart { min-height: 200px; margin-top: 0.75rem; }
+  .history-svg { width: 100%; height: 220px; }
+</style>
+
+<div class="page-head">
+  <h1>主线板块</h1>
+  <p class="muted">东方财富 · 五维加权得分、等级与三阶段监控榜（默认 5 日均分排序）</p>
+</div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <select id="trade-date"></select>
+    </label>
+    <label class="filter-field">
+      <span>均分窗口</span>
+      <select id="ma-window">
+        <option value="5" selected>5 日</option>
+        <option value="3">3 日</option>
+        <option value="10">10 日</option>
+      </select>
+    </label>
+    <label class="filter-field filter-field--wide">
+      <span>板块类型</span>
+      <div class="chip-group" id="content-type-chips">
+        {% for ct in content_types %}
+        <button type="button" class="chip{% if ct in ['行业','概念'] %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
+        {% endfor %}
+      </div>
+    </label>
+    <label class="filter-field filter-field--wide">
+      <span>等级筛选</span>
+      <div class="chip-group" id="level-chips">
+        <button type="button" class="chip active" data-value="">全部</button>
+        <button type="button" class="chip" data-value="超级主线">超级主线</button>
+        <button type="button" class="chip" data-value="主线">主线</button>
+        <button type="button" class="chip" data-value="轮动热点">轮动热点</button>
+        <button type="button" class="chip" data-value="跟风">跟风</button>
+      </div>
+    </label>
+    <label class="filter-field">
+      <span>TopN</span>
+      <select id="top-n">
+        <option value="20" selected>20</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+    </label>
+    <label class="filter-field filter-field--check">
+      <input type="checkbox" id="top20-only" checked />
+      <span>仅监控 Top20</span>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+    </div>
+  </div>
+  <div id="filter-hint" class="filter-hint muted"></div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<section class="card">
+  <h2 class="section-title">主线监控榜</h2>
+  <p id="rank-updated" class="muted snapshot-time"></p>
+  <div class="table-wrap">
+    <table class="data-table" id="rank-table">
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>类型</th>
+          <th>板块</th>
+          <th>展示分</th>
+          <th>当日总分</th>
+          <th>等级</th>
+          <th>阶段</th>
+          <th>资金连续</th>
+          <th>RS(5日)</th>
+          <th>涨停</th>
+          <th>五维</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="rank-body"></tbody>
+    </table>
+  </div>
+  <div id="rank-empty" class="table-empty hidden">暂无数据，请先运行 ETL：run_dws_dc_industry_mainline_monitor</div>
+</section>
+
+<section class="card hidden" id="history-card">
+  <div class="page-head">
+    <h2 id="history-title">历史得分</h2>
+    <button type="button" class="btn btn-ghost" id="btn-close-history">关闭</button>
+  </div>
+  <div id="history-chart"></div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>总分</th>
+          <th>MA3</th>
+          <th>MA5</th>
+          <th>MA10</th>
+          <th>等级</th>
+          <th>阶段</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dc_mainline.js?v=20260616"></script>
+{% endblock %}

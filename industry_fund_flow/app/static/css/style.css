@@ -487,6 +487,11 @@ body {
   transform: translateY(-2px);
 }
 
+.dash-card--featured {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: linear-gradient(145deg, rgba(59, 130, 246, 0.12), var(--surface));
+}
+
 .dash-card-title {
   font-weight: 600;
   margin-bottom: 0.375rem;

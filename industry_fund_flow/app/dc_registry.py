@@ -133,6 +133,7 @@ DC_DIMENSIONS: dict[str, DimensionDef] = {
 }
 
 NAV_ITEMS = [
+    {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline"},
     {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow"},
     {"slug": "trend-strength", "label": "趋势强度", "href": "/dc/trend-strength"},
     {"slug": "market-heat", "label": "市场热度", "href": "/dc/market-heat"},

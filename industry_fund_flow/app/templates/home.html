@@ -2,7 +2,7 @@
 {% block app_content %}
 <div class="page-head">
   <h1>欢迎，{{ user.username }}</h1>
-  <p class="muted">市场广度与东方财富五维板块数据一览。</p>
+  <p class="muted">市场广度与东方财富主线板块、五维明细一览。</p>
 </div>
 
 <section class="card breadth-card">
@@ -27,13 +27,19 @@
   </div>
 </section>
 
-<h2 class="section-title section-title--spaced">板块五维分析</h2>
+<h2 class="section-title section-title--spaced">业务入口</h2>
 <div class="dash-grid">
+  <a href="/dc/mainline" class="dash-card dash-card--featured">
+    <div class="dash-card-title">主线板块</div>
+    <div class="dash-card-desc">五维加权得分 · 等级 · 三阶段监控榜</div>
+  </a>
   {% for item in nav_items %}
+  {% if item.slug != 'mainline' %}
   <a href="{{ item.href }}" class="dash-card">
     <div class="dash-card-title">{{ item.label }}</div>
     <div class="dash-card-desc">查看东财板块明细列表</div>
   </a>
+  {% endif %}
   {% endfor %}
 </div>
 {% endblock %}

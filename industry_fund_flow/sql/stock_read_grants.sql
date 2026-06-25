@@ -14,6 +14,11 @@ GRANT SELECT ON stock_data.dwm_dc_industry_diffusion_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.dwm_market_breadth_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.dwm_market_breadth_di TO 'app_user'@'%';
 
+GRANT SELECT ON stock_data.dws_dc_industry_mainline_score_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dws_dc_industry_mainline_score_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dws_dc_industry_mainline_monitor_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dws_dc_industry_mainline_monitor_di TO 'app_user'@'%';
+
 GRANT SELECT ON stock_data.ods_stock_fund_flow_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_stock_fund_flow_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_stock_detail_di TO 'app_user'@'localhost';
