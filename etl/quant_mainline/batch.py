@@ -659,22 +659,30 @@ def run_batch(trade_date: date, content_types: tuple[str, ...] | None = None) ->
             }
         )
 
-    # TopN：在配置的板块类型（默认行业+概念）内按 rank_score 全市场排序取 Top3
-    top_types = set(cfg.content_types)
-    rank_rows = [r for r in mainline_rows if r.get("content_type") in top_types]
-    rank_rows.sort(key=lambda x: (x.get("rank_score") or 0), reverse=True)
+    # 各 content_type 内分别排名取 TopN（行业 Top10 + 概念 Top10）
+    top_types = list(cfg.content_types)
     top_n = cfg.top_n
-    for i, r in enumerate(rank_rows):
-        r["rank_no"] = i + 1
-        if i < top_n:
-            r["is_top3"] = 1
-    rank_lookup = {r["industry_code"]: r["rank_no"] for r in rank_rows}
-    top_lookup = {r["industry_code"]: r["is_top3"] for r in rank_rows}
+    rank_lookup: dict[str, int] = {}
+    top_lookup: dict[str, int] = {}
+    for ct in top_types:
+        type_rows = [r for r in mainline_rows if r.get("content_type") == ct]
+        type_rows.sort(key=lambda x: (x.get("rank_score") or 0), reverse=True)
+        for i, r in enumerate(type_rows):
+            code = str(r["industry_code"])
+            rank_no = i + 1
+            is_top = 1 if i < top_n else 0
+            r["rank_no"] = rank_no
+            r["is_top3"] = is_top
+            rank_lookup[code] = rank_no
+            top_lookup[code] = is_top
     for r in mainline_rows:
         code = r["industry_code"]
         if code in rank_lookup:
             r["rank_no"] = rank_lookup[code]
             r["is_top3"] = top_lookup.get(code, 0)
+        else:
+            r["rank_no"] = None
+            r["is_top3"] = 0
 
     with engine.begin() as conn:
         conn.execute(

@@ -52,8 +52,28 @@ def api_qm_trade_dates(
 @api_router.get("/top")
 def api_qm_top(
     trade_date: str | None = Query(None),
-    content_types: str | None = Query(None),
-    top: int = Query(3, ge=1, le=50),
+    content_types: str | None = Query(None, description="单一类型：行业 或 概念"),
+    top: int = Query(10, ge=1, le=50),
+    top_only: bool = Query(True),
+    ma_window: int = Query(5, ge=3, le=10),
+    _user: dict = Depends(require_user),
+):
+    try:
+        if ma_window not in (3, 5, 10):
+            raise ValueError("ma_window 仅支持 3、5、10")
+        ctypes = parse_csv_list(content_types) or ["行业"]
+        return qm_svc.get_top(trade_date, ctypes, top, top_only, ma_window)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询 Top 失败: {exc}") from exc
+
+
+@api_router.get("/top-groups")
+def api_qm_top_groups(
+    trade_date: str | None = Query(None),
+    content_types: str | None = Query(None, description="行业,概念 或子集"),
+    top: int = Query(10, ge=1, le=50),
     top_only: bool = Query(True),
     ma_window: int = Query(5, ge=3, le=10),
     _user: dict = Depends(require_user),
@@ -62,11 +82,11 @@ def api_qm_top(
         if ma_window not in (3, 5, 10):
             raise ValueError("ma_window 仅支持 3、5、10")
         ctypes = parse_csv_list(content_types) or None
-        return qm_svc.get_top(trade_date, ctypes, top, top_only, ma_window)
+        return qm_svc.get_top_groups(trade_date, ctypes, top, top_only, ma_window)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=500, detail=f"查询 Top 失败: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"查询 Top 分组失败: {exc}") from exc
 
 
 @api_router.get("/signals")

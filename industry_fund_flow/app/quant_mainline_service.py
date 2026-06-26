@@ -12,6 +12,47 @@ MAINLINE_TABLE = "dws_dc_industry_quant_mainline_di"
 SIGNAL_TABLE = "dws_dc_industry_quant_mainline_signal_di"
 CONFIG_TABLE = "quant_mainline_config"
 DEFAULT_CONTENT_TYPES = ("行业", "概念")
+TOP_BOARD_TYPES = ("行业", "概念")
+DEFAULT_TOP_N = 10
+
+
+def _row_to_top_item(row: dict, ma_col: str) -> dict:
+    item = _serialize_row(row)
+    display = item.get(ma_col) if item.get(ma_col) is not None else item.get("main_score")
+    item["display_score"] = display
+    item["is_topn"] = bool(item.get("is_top3"))
+    return item
+
+
+def _fetch_top_rows(
+    td: str,
+    content_type: str,
+    *,
+    top: int,
+    top_only: bool,
+    ma_col: str,
+) -> list[dict]:
+    top_filter = " AND m.is_top3 = 1" if top_only else ""
+    sql = f"""
+    SELECT
+        m.trade_date, m.content_type, m.industry_code, m.industry_name,
+        m.score_f, m.score_t, m.score_e, m.score_l, m.score_p,
+        m.main_score, m.main_score_ma3, m.main_score_ma5, m.main_score_ma10,
+        m.rank_no, m.rank_score, m.is_top3,
+        m.amount_ratio, m.rs_ratio, m.limit_up_ratio,
+        m.leader_code, m.leader_name, m.leader_pct_chg,
+        s.signal_status, s.signal_start, s.signal_exit, s.signal_reason
+    FROM {MAINLINE_TABLE} m
+    LEFT JOIN {SIGNAL_TABLE} s
+        ON s.trade_date = m.trade_date AND s.industry_code = m.industry_code
+    WHERE m.trade_date = :td
+      AND m.content_type = :ct
+    {top_filter}
+    ORDER BY m.rank_no ASC, m.{ma_col} DESC, m.main_score DESC
+    LIMIT {top}
+    """
+    rows = fetch_all_stock(sql, {"td": td, "ct": content_type})
+    return [_row_to_top_item(r, ma_col) for r in rows]
 
 
 def _serialize(value: Any) -> Any:
@@ -72,44 +113,53 @@ def _content_type_filter(content_types: list[str] | None) -> tuple[str, dict]:
 def get_top(
     trade_date: str | None = None,
     content_types: list[str] | None = None,
-    top: int = 3,
+    top: int = DEFAULT_TOP_N,
     top_only: bool = True,
     ma_window: int = 5,
 ) -> dict[str, Any]:
     td = _resolve_trade_date(trade_date)
     top = max(1, min(top, 50))
-    ct_sql, ct_params = _content_type_filter(content_types)
+    ctypes = content_types or list(DEFAULT_CONTENT_TYPES)
+    if len(ctypes) != 1:
+        raise ValueError("get_top 请指定单一 content_types，或使用 get_top_groups")
     ma_col = {3: "main_score_ma3", 5: "main_score_ma5", 10: "main_score_ma10"}.get(
         ma_window, "main_score_ma5"
     )
-    top_filter = " AND m.is_top3 = 1" if top_only else ""
-    sql = f"""
-    SELECT
-        m.trade_date, m.content_type, m.industry_code, m.industry_name,
-        m.score_f, m.score_t, m.score_e, m.score_l, m.score_p,
-        m.main_score, m.main_score_ma3, m.main_score_ma5, m.main_score_ma10,
-        m.rank_no, m.rank_score, m.is_top3,
-        m.amount_ratio, m.rs_ratio, m.limit_up_ratio,
-        m.leader_code, m.leader_name, m.leader_pct_chg,
-        s.signal_status, s.signal_start, s.signal_exit, s.signal_reason
-    FROM {MAINLINE_TABLE} m
-    LEFT JOIN {SIGNAL_TABLE} s
-        ON s.trade_date = m.trade_date AND s.industry_code = m.industry_code
-    WHERE m.trade_date = :td
-    {ct_sql}
-    {top_filter}
-    ORDER BY m.rank_no ASC, m.{ma_col} DESC, m.main_score DESC
-    LIMIT {top}
-    """
-    params: dict[str, Any] = {"td": td, **ct_params}
-    rows = fetch_all_stock(sql, params)
-    items = []
-    for r in rows:
-        item = _serialize_row(r)
-        display = item.get(ma_col) if item.get(ma_col) is not None else item.get("main_score")
-        item["display_score"] = display
-        items.append(item)
-    return {"trade_date": td, "ma_window": ma_window, "top": top, "items": items}
+    items = _fetch_top_rows(td, ctypes[0], top=top, top_only=top_only, ma_col=ma_col)
+    return {
+        "trade_date": td,
+        "ma_window": ma_window,
+        "top": top,
+        "content_type": ctypes[0],
+        "items": items,
+    }
+
+
+def get_top_groups(
+    trade_date: str | None = None,
+    content_types: list[str] | None = None,
+    top: int = DEFAULT_TOP_N,
+    top_only: bool = True,
+    ma_window: int = 5,
+) -> dict[str, Any]:
+    td = _resolve_trade_date(trade_date)
+    top = max(1, min(top, 50))
+    ctypes = content_types or list(TOP_BOARD_TYPES)
+    ma_col = {3: "main_score_ma3", 5: "main_score_ma5", 10: "main_score_ma10"}.get(
+        ma_window, "main_score_ma5"
+    )
+    groups: list[dict[str, Any]] = []
+    for ct in TOP_BOARD_TYPES:
+        if ct not in ctypes:
+            continue
+        groups.append(
+            {
+                "content_type": ct,
+                "top": top,
+                "items": _fetch_top_rows(td, ct, top=top, top_only=top_only, ma_col=ma_col),
+            }
+        )
+    return {"trade_date": td, "ma_window": ma_window, "top": top, "groups": groups}
 
 
 def get_signals(

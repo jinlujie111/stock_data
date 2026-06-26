@@ -32,12 +32,12 @@ def percentile_scores(
     if n == 0:
         return scores
     if n == 1:
-        scores[pairs[0][0]] = 100.0 if higher_is_better else 0.0
+        scores[pairs[0][0]] = 100.0
         return scores
 
     sorted_pairs = sorted(pairs, key=lambda x: x[1], reverse=higher_is_better)
     for rank, (idx, _) in enumerate(sorted_pairs):
-        pct = rank / (n - 1) * 100.0
+        pct = (1.0 - rank / (n - 1)) * 100.0
         scores[idx] = round(pct, 2)
     return scores
 

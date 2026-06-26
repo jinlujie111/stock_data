@@ -59,7 +59,7 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 
 | 表 | 说明 |
 |----|------|
-| `dws_dc_industry_quant_mainline_di` | FTELP 五主因子、MainScore、Top3、MA3/5/10 |
+| `dws_dc_industry_quant_mainline_di` | FTELP 五主因子、MainScore、**行业/概念分别 Top10**、MA3/5/10 |
 | `dws_dc_industry_quant_mainline_signal_di` | 启动 / 退潮 / 观察 + 原因 JSON |
 | `quant_mainline_config` | 权重与信号阈值（默认 `content_types=行业,概念`） |
 

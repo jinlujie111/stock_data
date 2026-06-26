@@ -31,11 +31,16 @@
   #history-card { margin-top: 1.25rem; }
   #history-chart { min-height: 200px; margin-top: 0.75rem; }
   .history-svg { width: 100%; height: 220px; }
+  .top-sections { display: flex; flex-direction: column; gap: 1.25rem; }
+  @media (min-width: 1100px) {
+    .top-sections--split { flex-direction: row; align-items: flex-start; }
+    .top-sections--split .top-section-card { flex: 1; min-width: 0; }
+  }
 </style>
 
 <div class="page-head">
   <h1>量化主线</h1>
-  <p class="muted">东方财富 · 行业+概念 · FTELP 五主因子 · Top3 主线 + 启动/退潮信号</p>
+  <p class="muted">东方财富 · 行业 Top10 + 概念 Top10 · FTELP 五主因子 · 启动/退潮信号</p>
 </div>
 
 <div class="card filters-card">
@@ -51,6 +56,14 @@
         <option value="3">3 日</option>
         <option value="10">10 日</option>
       </select>
+    </label>
+    <label class="filter-field filter-field--wide">
+      <span>板块类型</span>
+      <div class="chip-group" id="content-type-chips">
+        <button type="button" class="chip active" data-value="">全部</button>
+        <button type="button" class="chip" data-value="行业">行业</button>
+        <button type="button" class="chip" data-value="概念">概念</button>
+      </div>
     </label>
     <label class="filter-field">
       <span>信号筛选</span>
@@ -70,29 +83,53 @@
 
 <div id="page-error" class="alert alert-error hidden"></div>
 
-<section class="card">
-  <h2 class="section-title">Top3 主线（行业+概念）</h2>
-  <p id="top-updated" class="muted snapshot-time"></p>
-  <div class="table-wrap">
-    <table class="data-table" id="top-table">
-      <thead>
-        <tr>
-          <th>排名</th>
-          <th>类型</th>
-          <th>板块</th>
-          <th>展示分</th>
-          <th>MainScore</th>
-          <th>信号</th>
-          <th>龙头</th>
-          <th>FTELP</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="top-body"></tbody>
-    </table>
-  </div>
-  <div id="top-empty" class="table-empty hidden">暂无数据，请先运行 ETL：run_dws_dc_industry_quant_mainline</div>
-</section>
+<div class="top-sections top-sections--split" id="top-sections">
+  <section class="card top-section-card" id="top-industry-section">
+    <h2 class="section-title">行业 Top10</h2>
+    <p id="top-industry-updated" class="muted snapshot-time"></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th>板块</th>
+            <th>展示分</th>
+            <th>MainScore</th>
+            <th>信号</th>
+            <th>龙头</th>
+            <th>FTELP</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="top-industry-body"></tbody>
+      </table>
+    </div>
+    <div id="top-industry-empty" class="table-empty hidden">暂无行业 Top10 数据</div>
+  </section>
+
+  <section class="card top-section-card" id="top-concept-section">
+    <h2 class="section-title">概念 Top10</h2>
+    <p id="top-concept-updated" class="muted snapshot-time"></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th>板块</th>
+            <th>展示分</th>
+            <th>MainScore</th>
+            <th>信号</th>
+            <th>龙头</th>
+            <th>FTELP</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="top-concept-body"></tbody>
+      </table>
+    </div>
+    <div id="top-concept-empty" class="table-empty hidden">暂无概念 Top10 数据</div>
+  </section>
+</div>
 
 <section class="card">
   <h2 class="section-title">板块信号列表</h2>
@@ -100,6 +137,7 @@
     <table class="data-table" id="signal-table">
       <thead>
         <tr>
+          <th>类型</th>
           <th>板块</th>
           <th>状态</th>
           <th>启动</th>
@@ -130,7 +168,7 @@
           <th>MA5</th>
           <th>MA10</th>
           <th>信号</th>
-          <th>Top3</th>
+          <th>Top10</th>
         </tr>
       </thead>
       <tbody id="history-body"></tbody>
@@ -140,5 +178,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/dc_quant_mainline.js?v=20260616"></script>
+<script src="/static/js/dc_quant_mainline.js?v=20260617"></script>
 {% endblock %}

@@ -28,7 +28,7 @@ DEFAULT_SIGNAL_THRESHOLDS: dict[str, Any] = {
 class QuantMainlineConfig:
     config_key: str = "__global__"
     content_types: tuple[str, ...] = ("行业", "概念")
-    top_n: int = 3
+    top_n: int = 10
     w_f: float = 0.2
     w_t: float = 0.2
     w_e: float = 0.2
@@ -91,7 +91,7 @@ def ensure_schema(engine: Engine) -> None:
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         config_key VARCHAR(64) NOT NULL DEFAULT '__global__' COMMENT '全局或板块代码',
         content_types VARCHAR(64) NOT NULL DEFAULT '行业,概念' COMMENT '评分板块类型,逗号分隔',
-        top_n INT NOT NULL DEFAULT 3 COMMENT '主线TopN',
+        top_n INT NOT NULL DEFAULT 10 COMMENT '各板块类型内TopN(行业/概念分别排名)',
         w_f DECIMAL(5,4) NOT NULL DEFAULT 0.2000,
         w_t DECIMAL(5,4) NOT NULL DEFAULT 0.2000,
         w_e DECIMAL(5,4) NOT NULL DEFAULT 0.2000,
@@ -128,7 +128,7 @@ def ensure_schema(engine: Engine) -> None:
         main_score_ma10 DECIMAL(10,2) NULL,
         rank_no INT NULL,
         rank_score DECIMAL(10,2) NULL COMMENT '排序用分(默认MA5)',
-        is_top3 TINYINT NOT NULL DEFAULT 0,
+        is_top3 TINYINT NOT NULL DEFAULT 0 COMMENT '是否类型内TopN(历史字段名)',
         amount_ratio DECIMAL(20,8) NULL,
         rs_ratio DECIMAL(10,4) NULL,
         limit_up_ratio DECIMAL(20,6) NULL,
@@ -182,7 +182,7 @@ def ensure_schema(engine: Engine) -> None:
                         f_weights, t_weights, e_weights, l_weights, p_weights,
                         signal_thresholds, ma_window_rank, effective_date, is_active
                     ) VALUES (
-                        '__global__', '行业,概念', 3,
+                        '__global__', '行业,概念', 10,
                         0.2, 0.2, 0.2, 0.2, 0.2,
                         :f_w, :t_w, :e_w, :l_w, :p_w,
                         :sig, 5, CURDATE(), 1
@@ -226,7 +226,7 @@ def load_config(engine: Engine, trade_date: date) -> QuantMainlineConfig:
     return QuantMainlineConfig(
         config_key=str(row["config_key"]),
         content_types=ctypes or ("行业", "概念"),
-        top_n=int(row.get("top_n") or 3),
+        top_n=int(row.get("top_n") or 10),
         w_f=float(row.get("w_f") or 0.2),
         w_t=float(row.get("w_t") or 0.2),
         w_e=float(row.get("w_e") or 0.2),

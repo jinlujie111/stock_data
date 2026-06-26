@@ -2,9 +2,15 @@
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elSignalStatus = document.getElementById("signal-status");
-  const elTopBody = document.getElementById("top-body");
-  const elTopEmpty = document.getElementById("top-empty");
-  const elTopUpdated = document.getElementById("top-updated");
+  const typeChips = document.getElementById("content-type-chips");
+  const elIndustrySection = document.getElementById("top-industry-section");
+  const elConceptSection = document.getElementById("top-concept-section");
+  const elIndustryBody = document.getElementById("top-industry-body");
+  const elConceptBody = document.getElementById("top-concept-body");
+  const elIndustryEmpty = document.getElementById("top-industry-empty");
+  const elConceptEmpty = document.getElementById("top-concept-empty");
+  const elIndustryUpdated = document.getElementById("top-industry-updated");
+  const elConceptUpdated = document.getElementById("top-concept-updated");
   const elSignalBody = document.getElementById("signal-body");
   const elPageError = document.getElementById("page-error");
   const elFilterHint = document.getElementById("filter-hint");
@@ -14,6 +20,8 @@
   const elHistoryChart = document.getElementById("history-chart");
   const btnQuery = document.getElementById("btn-query");
   const btnCloseHistory = document.getElementById("btn-close-history");
+
+  let selectedType = "";
 
   function fmtNum(v, d) {
     if (v === null || v === undefined || v === "") return "—";
@@ -61,20 +69,11 @@
     return `<div class="ftelp-bar" title="F/T/E/L/P">${spans}</div>`;
   }
 
-  function renderTop(data) {
-    elTopUpdated.textContent = `交易日 ${data.trade_date} · ${data.ma_window} 日均分 · Top${data.top}`;
-    if (!data.items.length) {
-      elTopBody.innerHTML = "";
-      elTopEmpty.classList.remove("hidden");
-      return;
-    }
-    elTopEmpty.classList.add("hidden");
-    elTopBody.innerHTML = data.items
-      .map(
-        (row) => `
+  function topRowHtml(row) {
+    const inTop = row.is_topn || row.is_top3;
+    return `
       <tr>
-        <td>${row.rank_no ?? "—"} ${row.is_top3 ? '<span class="top-badge">TOP</span>' : ""}</td>
-        <td>${row.content_type || "—"}</td>
+        <td>${row.rank_no ?? "—"} ${inTop ? '<span class="top-badge">TOP</span>' : ""}</td>
         <td>${row.industry_name || "—"}<br><span class="muted">${row.industry_code || ""}</span></td>
         <td><strong>${fmtNum(row.display_score)}</strong></td>
         <td>${fmtNum(row.main_score)}</td>
@@ -82,12 +81,46 @@
         <td>${row.leader_name || "—"}<br><span class="muted">${row.leader_code || ""} ${row.leader_pct_chg != null ? fmtNum(row.leader_pct_chg, 2) + "%" : ""}</span></td>
         <td>${ftelpBar(row)}</td>
         <td><button type="button" class="btn btn-ghost btn-sm btn-history" data-code="${row.industry_code}" data-name="${row.industry_name || ""}">历史</button></td>
-      </tr>`
-      )
-      .join("");
-    elTopBody.querySelectorAll(".btn-history").forEach((btn) => {
+      </tr>`;
+  }
+
+  function bindHistoryButtons(container) {
+    container.querySelectorAll(".btn-history").forEach((btn) => {
       btn.addEventListener("click", () => loadHistory(btn.dataset.code, btn.dataset.name));
     });
+  }
+
+  function renderTopGroup(contentType, items, meta) {
+    const isIndustry = contentType === "行业";
+    const body = isIndustry ? elIndustryBody : elConceptBody;
+    const empty = isIndustry ? elIndustryEmpty : elConceptEmpty;
+    const updated = isIndustry ? elIndustryUpdated : elConceptUpdated;
+    updated.textContent = `交易日 ${meta.trade_date} · ${meta.ma_window} 日均分 · ${contentType} Top${meta.top}`;
+    if (!items.length) {
+      body.innerHTML = "";
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+    body.innerHTML = items.map(topRowHtml).join("");
+    bindHistoryButtons(body);
+  }
+
+  function applyTypeVisibility() {
+    const showIndustry = !selectedType || selectedType === "行业";
+    const showConcept = !selectedType || selectedType === "概念";
+    elIndustrySection.classList.toggle("hidden", !showIndustry);
+    elConceptSection.classList.toggle("hidden", !showConcept);
+  }
+
+  function renderTopGroups(data) {
+    const meta = { trade_date: data.trade_date, ma_window: data.ma_window, top: data.top };
+    const groups = data.groups || [];
+    const industry = groups.find((g) => g.content_type === "行业");
+    const concept = groups.find((g) => g.content_type === "概念");
+    renderTopGroup("行业", industry ? industry.items : [], meta);
+    renderTopGroup("概念", concept ? concept.items : [], meta);
+    applyTypeVisibility();
   }
 
   function renderSignals(data) {
@@ -95,6 +128,7 @@
       .map(
         (row) => `
       <tr>
+        <td>${row.content_type || "—"}</td>
         <td>${row.industry_name || "—"}<br><span class="muted">${row.industry_code || ""}</span></td>
         <td class="${signalClass(row.signal_status)}">${row.signal_status || "—"}</td>
         <td>${row.signal_start ? "是" : "—"}</td>
@@ -171,17 +205,38 @@
     if (data.latest && !elDate.value) elDate.value = data.latest;
   }
 
+  function selectedContentTypesParam() {
+    if (selectedType === "行业" || selectedType === "概念") return selectedType;
+    return "行业,概念";
+  }
+
+  if (typeChips) {
+    typeChips.addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip");
+      if (!btn) return;
+      typeChips.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+      btn.classList.add("active");
+      selectedType = btn.dataset.value || "";
+      queryAll();
+    });
+  }
+
   async function queryAll() {
     clearError();
     elFilterHint.textContent = "查询中…";
     try {
       const td = elDate.value ? elDate.value.replace(/-/g, "") : "";
       const ma = elMa.value;
+      const ctypes = selectedContentTypesParam();
       const topData = await apiGet(
-        `/api/v1/quant-mainline/top?trade_date=${td}&ma_window=${ma}&top=3&top_only=true&content_types=行业,概念`
+        `/api/v1/quant-mainline/top-groups?trade_date=${td}&ma_window=${ma}&top=10&top_only=true&content_types=${encodeURIComponent(ctypes)}`
       );
-      renderTop(topData);
-      const sigParams = new URLSearchParams({ trade_date: td, content_types: "行业,概念", limit: "100" });
+      renderTopGroups(topData);
+      const sigParams = new URLSearchParams({
+        trade_date: td,
+        content_types: ctypes,
+        limit: "200",
+      });
       if (elSignalStatus.value) sigParams.set("status", elSignalStatus.value);
       const sigData = await apiGet(`/api/v1/quant-mainline/signals?${sigParams}`);
       renderSignals(sigData);
