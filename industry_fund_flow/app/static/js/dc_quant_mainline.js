@@ -21,7 +21,7 @@
   const btnQuery = document.getElementById("btn-query");
   const btnCloseHistory = document.getElementById("btn-close-history");
 
-  let selectedType = "";
+  let selectedType = "行业";
 
   function fmtNum(v, d) {
     if (v === null || v === undefined || v === "") return "—";
@@ -107,8 +107,8 @@
   }
 
   function applyTypeVisibility() {
-    const showIndustry = !selectedType || selectedType === "行业";
-    const showConcept = !selectedType || selectedType === "概念";
+    const showIndustry = selectedType === "行业";
+    const showConcept = selectedType === "概念";
     elIndustrySection.classList.toggle("hidden", !showIndustry);
     elConceptSection.classList.toggle("hidden", !showConcept);
   }
@@ -206,17 +206,16 @@
   }
 
   function selectedContentTypesParam() {
-    if (selectedType === "行业" || selectedType === "概念") return selectedType;
-    return "行业,概念";
+    return selectedType === "概念" ? "概念" : "行业";
   }
 
   if (typeChips) {
     typeChips.addEventListener("click", (e) => {
       const btn = e.target.closest(".chip");
-      if (!btn) return;
+      if (!btn || !btn.dataset.value) return;
       typeChips.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
       btn.classList.add("active");
-      selectedType = btn.dataset.value || "";
+      selectedType = btn.dataset.value;
       queryAll();
     });
   }
@@ -251,6 +250,7 @@
   btnCloseHistory.addEventListener("click", () => elHistoryCard.classList.add("hidden"));
 
   (async function init() {
+    applyTypeVisibility();
     try {
       await loadTradeDates();
       await queryAll();
