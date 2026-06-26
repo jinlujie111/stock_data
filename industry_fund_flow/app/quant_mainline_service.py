@@ -1,12 +1,16 @@
 """东财量化主线 FTELP（需求3）查询服务。"""
 from __future__ import annotations
 
-from datetime import date, datetime
-from decimal import Decimal
 from typing import Any
 
 from app.db import fetch_all_stock, fetch_one_stock
-from app.dc_service import parse_csv_list, parse_trade_date
+from app.dc_query_util import (
+    list_trade_dates_from_table,
+    latest_trade_date_from_table,
+    resolve_trade_date,
+    serialize_row,
+)
+from app.dc_service import parse_csv_list
 
 MAINLINE_TABLE = "dws_dc_industry_quant_mainline_di"
 SIGNAL_TABLE = "dws_dc_industry_quant_mainline_signal_di"
@@ -17,7 +21,7 @@ DEFAULT_TOP_N = 10
 
 
 def _row_to_top_item(row: dict, ma_col: str) -> dict:
-    item = _serialize_row(row)
+    item = serialize_row(row, keep_detail_json_str=True)
     display = item.get(ma_col) if item.get(ma_col) is not None else item.get("main_score")
     item["display_score"] = display
     item["is_topn"] = bool(item.get("is_top3"))
@@ -55,50 +59,20 @@ def _fetch_top_rows(
     return [_row_to_top_item(r, ma_col) for r in rows]
 
 
-def _serialize(value: Any) -> Any:
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()[:10]
-    if isinstance(value, Decimal):
-        return float(value)
-    return value
-
-
-def _serialize_row(row: dict) -> dict:
-    out: dict[str, Any] = {}
-    for k, v in row.items():
-        if k == "detail_json" and isinstance(v, str):
-            out[k] = v
-            continue
-        out[k] = _serialize(v)
-    return out
-
-
 def latest_trade_date() -> str | None:
-    row = fetch_one_stock(f"SELECT MAX(trade_date) AS d FROM {MAINLINE_TABLE}")
-    return _serialize(row["d"]) if row and row.get("d") else None
+    return latest_trade_date_from_table(MAINLINE_TABLE)
 
 
 def list_trade_dates(limit: int = 60) -> list[str]:
-    limit = max(1, min(limit, 365))
-    rows = fetch_all_stock(
-        f"""
-        SELECT DISTINCT trade_date AS d
-        FROM {MAINLINE_TABLE}
-        ORDER BY trade_date DESC
-        LIMIT {limit}
-        """
-    )
-    return [_serialize(r["d"]) for r in rows]
+    return list_trade_dates_from_table(MAINLINE_TABLE, limit)
 
 
 def _resolve_trade_date(trade_date: str | None) -> str:
-    td = parse_trade_date(trade_date) if trade_date else None
-    if td:
-        return td
-    latest = latest_trade_date()
-    if not latest:
-        raise ValueError("暂无量化主线数据，请先运行 run_dws_dc_industry_quant_mainline")
-    return latest
+    return resolve_trade_date(
+        trade_date,
+        table=MAINLINE_TABLE,
+        empty_msg="暂无量化主线数据，请先运行 run_dws_dc_industry_quant_mainline",
+    )
 
 
 def _content_type_filter(content_types: list[str] | None) -> tuple[str, dict]:
@@ -195,7 +169,7 @@ def get_signals(
     rows = fetch_all_stock(sql, params)
     return {
         "trade_date": td,
-        "items": [_serialize_row(r) for r in rows],
+        "items": [serialize_row(r, keep_detail_json_str=True) for r in rows],
     }
 
 
@@ -225,7 +199,7 @@ def get_history(
     LIMIT {days}
     """
     rows = fetch_all_stock(sql, {"code": code, "td": td})
-    items = [_serialize_row(r) for r in rows]
+    items = [serialize_row(r, keep_detail_json_str=True) for r in rows]
     name = items[0].get("industry_name") if items else None
     return {
         "industry_code": code,
@@ -247,4 +221,4 @@ def get_config() -> dict[str, Any]:
     )
     if not row:
         return {"config_key": "__global__", "message": "无配置，使用 ETL 内置默认"}
-    return _serialize_row(row)
+    return serialize_row(row, keep_detail_json_str=True)

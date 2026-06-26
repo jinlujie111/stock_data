@@ -1,4 +1,5 @@
 (function () {
+  const { fmtNum, fmtPct, apiGet, renderHistoryChart } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elTop = document.getElementById("top-n");
@@ -19,27 +20,6 @@
 
   let selectedTypes = ["行业", "概念"];
   let selectedLevels = [];
-
-  function fmtNum(v, d) {
-    if (v === null || v === undefined || v === "") return "—";
-    const n = Number(v);
-    if (Number.isNaN(n)) return v;
-    return n.toFixed(d === undefined ? 1 : d);
-  }
-
-  function fmtPct(v) {
-    if (v === null || v === undefined || v === "") return "—";
-    const n = Number(v);
-    if (Number.isNaN(n)) return v;
-    return (n * (Math.abs(n) <= 1 ? 100 : 1)).toFixed(2) + "%";
-  }
-
-  async function apiGet(path) {
-    const res = await fetch(path, { credentials: "same-origin" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || "请求失败");
-    return data;
-  }
 
   function showError(msg) {
     elPageError.textContent = msg;
@@ -172,29 +152,12 @@
     });
   }
 
-  function renderHistoryChart(items) {
-    if (!items.length) {
-      elHistoryChart.innerHTML = '<div class="table-empty">暂无历史数据</div>';
-      return;
-    }
-    const w = 640;
-    const h = 200;
-    const pad = { l: 40, r: 12, t: 12, b: 28 };
-    const scores = items.map((x) => Number(x.total_score_ma5 ?? x.total_score ?? 0));
-    const minY = Math.min(...scores) - 5;
-    const maxY = Math.max(...scores) + 5;
-    const span = maxY - minY || 1;
-    const innerW = w - pad.l - pad.r;
-    const innerH = h - pad.t - pad.b;
-    const pts = items.map((x, i) => {
-      const y = pad.t + innerH - ((Number(x.total_score_ma5 ?? x.total_score ?? 0) - minY) / span) * innerH;
-      const px = pad.l + (i / Math.max(1, items.length - 1)) * innerW;
-      return `${px},${y}`;
+  function renderHistoryChartLocal(items) {
+    renderHistoryChart(elHistoryChart, items, {
+      scoreKey: "total_score_ma5",
+      fallbackKey: "total_score",
+      stroke: "#3b82f6",
     });
-    elHistoryChart.innerHTML = `
-      <svg class="history-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <polyline fill="none" stroke="#3b82f6" stroke-width="2" points="${pts.join(" ")}"/>
-      </svg>`;
   }
 
   async function loadHistory(code, name) {
@@ -204,7 +167,7 @@
       const q = td ? `?industry_code=${encodeURIComponent(code)}&trade_date=${td}&days=60` : `?industry_code=${encodeURIComponent(code)}&days=60`;
       const data = await apiGet(`/api/v1/mainline/history${q}`);
       elHistoryTitle.textContent = `${name || data.industry_name || code} · 近60日得分`;
-      renderHistoryChart(data.items);
+      renderHistoryChartLocal(data.items);
       elHistoryBody.innerHTML = data.items
         .slice()
         .reverse()

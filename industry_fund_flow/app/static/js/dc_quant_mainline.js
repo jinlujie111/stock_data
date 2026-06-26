@@ -1,4 +1,5 @@
 (function () {
+  const { fmtNum, apiGet, renderHistoryChart } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elSignalStatus = document.getElementById("signal-status");
@@ -22,20 +23,6 @@
   const btnCloseHistory = document.getElementById("btn-close-history");
 
   let selectedType = "行业";
-
-  function fmtNum(v, d) {
-    if (v === null || v === undefined || v === "") return "—";
-    const n = Number(v);
-    if (Number.isNaN(n)) return v;
-    return n.toFixed(d === undefined ? 1 : d);
-  }
-
-  async function apiGet(path) {
-    const res = await fetch(path, { credentials: "same-origin" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || "请求失败");
-    return data;
-  }
 
   function showError(msg) {
     elPageError.textContent = msg;
@@ -141,29 +128,12 @@
       .join("");
   }
 
-  function renderHistoryChart(items) {
-    if (!items.length) {
-      elHistoryChart.innerHTML = '<div class="table-empty">暂无历史数据</div>';
-      return;
-    }
-    const w = 640;
-    const h = 200;
-    const pad = { l: 40, r: 12, t: 12, b: 28 };
-    const scores = items.map((x) => Number(x.main_score_ma5 ?? x.main_score ?? 0));
-    const minY = Math.min(...scores) - 5;
-    const maxY = Math.max(...scores) + 5;
-    const span = maxY - minY || 1;
-    const innerW = w - pad.l - pad.r;
-    const innerH = h - pad.t - pad.b;
-    const pts = items.map((x, i) => {
-      const y = pad.t + innerH - ((Number(x.main_score_ma5 ?? x.main_score ?? 0) - minY) / span) * innerH;
-      const px = pad.l + (i / Math.max(1, items.length - 1)) * innerW;
-      return `${px},${y}`;
+  function renderHistoryChartLocal(items) {
+    renderHistoryChart(elHistoryChart, items, {
+      scoreKey: "main_score_ma5",
+      fallbackKey: "main_score",
+      stroke: "#22c55e",
     });
-    elHistoryChart.innerHTML = `
-      <svg class="history-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-        <polyline fill="none" stroke="#22c55e" stroke-width="2" points="${pts.join(" ")}"/>
-      </svg>`;
   }
 
   async function loadHistory(code, name) {
@@ -173,7 +143,7 @@
       const q = td ? `?industry_code=${encodeURIComponent(code)}&trade_date=${td}&days=60` : `?industry_code=${encodeURIComponent(code)}&days=60`;
       const data = await apiGet(`/api/v1/quant-mainline/history${q}`);
       elHistoryTitle.textContent = `${name || data.industry_name || code} · FTELP 近60日`;
-      renderHistoryChart(data.items);
+      renderHistoryChartLocal(data.items);
       elHistoryBody.innerHTML = data.items
         .slice()
         .reverse()
@@ -247,6 +217,9 @@
   }
 
   btnQuery.addEventListener("click", queryAll);
+  if (elSignalStatus) {
+    elSignalStatus.addEventListener("change", queryAll);
+  }
   btnCloseHistory.addEventListener("click", () => elHistoryCard.classList.add("hidden"));
 
   (async function init() {

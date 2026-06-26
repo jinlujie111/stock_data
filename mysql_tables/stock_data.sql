@@ -724,6 +724,155 @@ CREATE TABLE IF NOT EXISTS dwm_dc_industry_trend_strength_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块趋势强度(DWM,来源ods_dc_daily_di+ods_index_daily_di)';
 
 -- -----------------------------------------------------------------------------
+-- DWM：东财板块市场热度 / 扩散 / 景气（ETL: dw-dwm/pro_dwm_dc_industry_*_di.sh）
+-- THS/SW 同结构表由对应 dw-dwm 脚本 CREATE IF NOT EXISTS，字段口径对齐东财
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwm_dc_industry_market_heat_di (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date          DATE           NOT NULL COMMENT '交易日期',
+    content_type        VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code       VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name       VARCHAR(128)   NULL COMMENT '板块名称',
+    constituent_cnt     INT            NOT NULL DEFAULT 0 COMMENT '成分股数',
+    board_amount        DECIMAL(20, 4) NULL COMMENT '板块成交额(元)',
+    market_total_amount DECIMAL(20, 4) NULL COMMENT '全A成交额(元)',
+    amount_ratio        DECIMAL(20, 8) NULL COMMENT '成交额占比=board_amount/market_total',
+    limit_up_cnt        INT            NOT NULL DEFAULT 0 COMMENT '涨停家数',
+    limit_up_ratio      DECIMAL(20, 6) NULL COMMENT '涨停扩散率=limit_up_cnt/constituent_cnt',
+    limit_up_20cm_cnt   INT            NOT NULL DEFAULT 0 COMMENT '20cm涨停家数(创/科)',
+    up_cnt              INT            NOT NULL DEFAULT 0 COMMENT '上涨家数',
+    up_ratio            DECIMAL(20, 6) NULL COMMENT '上涨家数占比',
+    turnover_rate       DECIMAL(20, 6) NULL COMMENT '板块换手率(%)',
+    pct_change          DECIMAL(20, 6) NULL COMMENT '板块涨跌幅(%)',
+    dc_hot_rank         INT            NULL COMMENT '东财人气榜成分最佳排名(仅保留不参与计算)',
+    dc_hot_rank_soar    INT            NULL COMMENT '东财飙升榜成分最佳排名(仅保留不参与计算)',
+    heat_rank           INT            NULL COMMENT '成交额占比排名(同类型内,不含热榜)',
+    created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_dc_industry_market_heat (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块市场热度(DWM,热榜字段仅透传)';
+
+CREATE TABLE IF NOT EXISTS dwm_dc_industry_diffusion_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    constituent_cnt       INT            NOT NULL DEFAULT 0 COMMENT '成分股数',
+    up_cnt                INT            NOT NULL DEFAULT 0 COMMENT '上涨家数',
+    down_cnt              INT            NOT NULL DEFAULT 0 COMMENT '下跌家数',
+    flat_cnt              INT            NOT NULL DEFAULT 0 COMMENT '平盘家数',
+    up_ratio              DECIMAL(20, 6) NULL COMMENT '上涨家数占比',
+    down_ratio            DECIMAL(20, 6) NULL COMMENT '下跌家数占比',
+    flat_ratio            DECIMAL(20, 6) NULL COMMENT '平盘家数占比',
+    limit_up_cnt          INT            NOT NULL DEFAULT 0 COMMENT '涨停家数(U)',
+    limit_up_ratio        DECIMAL(20, 6) NULL COMMENT '涨停扩散率',
+    limit_down_cnt        INT            NOT NULL DEFAULT 0 COMMENT '跌停家数(D)',
+    limit_up_20cm_cnt     INT            NOT NULL DEFAULT 0 COMMENT '20cm涨停家数',
+    limit_up_20cm_ratio   DECIMAL(20, 6) NULL COMMENT '20cm涨停占比',
+    blast_cnt             INT            NOT NULL DEFAULT 0 COMMENT '炸板家数(Z)',
+    touch_limit_cnt       INT            NOT NULL DEFAULT 0 COMMENT '触板家数(U+Z)',
+    blast_ratio           DECIMAL(20, 6) NULL COMMENT '炸板率=blast/touch',
+    board_success_ratio   DECIMAL(20, 6) NULL COMMENT '封板成功率=1-blast_ratio',
+    yesterday_limit_cnt   INT            NOT NULL DEFAULT 0 COMMENT '昨日涨停成分股数',
+    continue_limit_cnt    INT            NOT NULL DEFAULT 0 COMMENT '昨日涨停今日续板数',
+    continue_limit_ratio  DECIMAL(20, 6) NULL COMMENT '晋级率=continue/yesterday_limit',
+    max_limit_times       INT            NULL COMMENT '板块内最高连板数',
+    market_advance_ratio  DECIMAL(20, 6) NULL COMMENT '全市场上涨占比(参考)',
+    up_vs_market          DECIMAL(20, 6) NULL COMMENT '上涨占比/全市场上涨占比',
+    diffusion_rank        INT            NULL COMMENT '上涨占比排名(同类型内)',
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_dc_industry_diffusion (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块扩散效应(DWM)';
+
+CREATE TABLE IF NOT EXISTS dwm_dc_industry_prosperity_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期(快照日)',
+    content_type          VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    constituent_cnt       INT            NOT NULL DEFAULT 0 COMMENT '成分股数',
+    fina_coverage_cnt     INT            NOT NULL DEFAULT 0 COMMENT '有最新财报指标的成分股数',
+    earnings_yoy          DECIMAL(20, 6) NULL COMMENT '归母净利润同比增速均值(%)',
+    earnings_q_yoy        DECIMAL(20, 6) NULL COMMENT '单季度净利润同比增速均值(%)',
+    roe_avg               DECIMAL(20, 6) NULL COMMENT 'ROE均值(%)',
+    forecast_np_avg       DECIMAL(20, 4) NULL COMMENT '近30日研报预测净利润均值(万元)',
+    forecast_rev_pct      DECIMAL(20, 6) NULL COMMENT '预测净利润30日环比变化率(%)',
+    upgrade_ratio         DECIMAL(20, 6) NULL COMMENT '近30日研报上调评级占比',
+    report_cnt_30d        INT            NOT NULL DEFAULT 0 COMMENT '近30日研报条数',
+    report_cnt_mom        DECIMAL(20, 6) NULL COMMENT '研报条数环比(相对前30日,%)',
+    policy_score          DECIMAL(10, 4) NOT NULL DEFAULT 0 COMMENT '政策热度(占位,0-1或0-100)',
+    prosperity_rank       INT            NULL COMMENT 'earnings_yoy降序排名(同类型内)',
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_dc_industry_prosperity (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块产业景气(DWM,成分股财务+卖方预测聚合)';
+
+-- -----------------------------------------------------------------------------
+-- DWS：东财板块主线五维评分与监控（需求1，ETL: dw-dws/pro_dws_dc_industry_mainline_*_di.sh）
+-- THS/SW 对应表：dws_ths_industry_mainline_* / dws_sw_industry_mainline_*（结构同东财，见各 shell）
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dws_dc_industry_mainline_score_di (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date          DATE           NOT NULL COMMENT '交易日期',
+    content_type        VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code       VARCHAR(32)    NOT NULL COMMENT '板块代码(东财)',
+    industry_name       VARCHAR(128)   NULL COMMENT '板块名称',
+    score_fund          DECIMAL(10, 2) NULL COMMENT '资金强度得分0-100',
+    score_trend         DECIMAL(10, 2) NULL COMMENT '趋势强度得分0-100',
+    score_heat          DECIMAL(10, 2) NULL COMMENT '市场热度得分0-100',
+    score_prosperity    DECIMAL(10, 2) NULL COMMENT '产业景气得分0-100',
+    score_diffusion     DECIMAL(10, 2) NULL COMMENT '扩散效应得分0-100',
+    total_score         DECIMAL(10, 2) NULL COMMENT '五维加权总分',
+    total_score_ma3     DECIMAL(10, 2) NULL COMMENT '总分3日均(按入库序)',
+    total_score_ma5     DECIMAL(10, 2) NULL COMMENT '总分5日均',
+    total_score_ma10    DECIMAL(10, 2) NULL COMMENT '总分10日均',
+    mainline_level      VARCHAR(16)    NULL COMMENT '超级主线/主线/轮动热点/跟风',
+    rank_no             INT            NULL COMMENT '总分排名(同类型内)',
+    fund_cont_days      INT            NULL COMMENT '连续净流入天数',
+    rs_5d               DECIMAL(20, 6) NULL COMMENT '5日相对强度',
+    limit_up_cnt        INT            NULL COMMENT '涨停家数',
+    profit_yoy          DECIMAL(20, 6) NULL COMMENT '业绩增速代理(%)',
+    detail_json         JSON           NULL COMMENT '子因子原始值快照',
+    created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dws_dc_mainline_score (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块主线五维评分(DWS)';
+
+CREATE TABLE IF NOT EXISTS dws_dc_industry_mainline_monitor_di (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date          DATE           NOT NULL COMMENT '交易日期',
+    content_type        VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code       VARCHAR(32)    NOT NULL COMMENT '板块代码',
+    industry_name       VARCHAR(128)   NULL COMMENT '板块名称',
+    rank_no             INT            NULL COMMENT '排名(同类型按展示分)',
+    main_score          DECIMAL(10, 2) NULL COMMENT '主线得分(默认5日均,无则当日总分)',
+    total_score         DECIMAL(10, 2) NULL COMMENT '当日五维总分',
+    total_score_ma3     DECIMAL(10, 2) NULL,
+    total_score_ma5     DECIMAL(10, 2) NULL,
+    total_score_ma10    DECIMAL(10, 2) NULL,
+    mainline_level      VARCHAR(16)    NULL COMMENT '超级主线/主线/轮动热点/跟风',
+    mainline_stage      VARCHAR(16)    NULL COMMENT '资金试探/板块爆发/机构化/观察',
+    fund_cont_days      INT            NULL COMMENT '资金连续净流入天数',
+    rs_5d               DECIMAL(20, 6) NULL COMMENT '5日相对强度(%)',
+    limit_up_cnt        INT            NULL COMMENT '涨停家数',
+    profit_yoy          DECIMAL(20, 6) NULL COMMENT '业绩增速代理(%)',
+    amount_ratio        DECIMAL(20, 8) NULL COMMENT '成交额占比',
+    limit_up_ratio      DECIMAL(20, 6) NULL COMMENT '涨停扩散率',
+    up_ratio            DECIMAL(20, 6) NULL COMMENT '上涨家数占比',
+    score_fund          DECIMAL(10, 2) NULL COMMENT '资金维度分',
+    score_trend         DECIMAL(10, 2) NULL COMMENT '趋势维度分',
+    score_heat          DECIMAL(10, 2) NULL COMMENT '热度维度分',
+    score_prosperity    DECIMAL(10, 2) NULL COMMENT '景气维度分',
+    score_diffusion     DECIMAL(10, 2) NULL COMMENT '扩散维度分',
+    is_top20            TINYINT        NOT NULL DEFAULT 0 COMMENT '是否同类型监控Top20',
+    created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dws_dc_mainline_monitor (trade_date, industry_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块主线监控表(DWS)';
+
+-- -----------------------------------------------------------------------------
 -- DWM：同花顺板块趋势强度（ETL: dw-dwm/pro_dwm_ths_industry_trend_strength_di.sh）
 -- 口径与 dwm_dc_industry_trend_strength_di 对齐；板块范围 I/N/R
 -- -----------------------------------------------------------------------------

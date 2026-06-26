@@ -53,8 +53,11 @@ def get_stock_engine() -> Engine:
     return _stock_engine
 
 
+_REPO_ROOT = _ROOT.parent
+
+
 def init_schema() -> None:
-    sql_file = _ROOT / "sql" / "app_user.sql"
+    sql_file = _REPO_ROOT / "mysql_tables" / "data_industry.sql"
     ddl = sql_file.read_text(encoding="utf-8")
     with get_engine().begin() as conn:
         for stmt in ddl.split(";"):

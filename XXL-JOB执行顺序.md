@@ -2,7 +2,8 @@
 
 > 维护日期：2026-06-18  
 > 项目路径（服务器）：`/root/stock_data`  
-> 执行前统一：`cd /root/stock_data && source dw-utils/func.sh`
+> 执行前统一：`cd /root/stock_data && source dw-utils/func.sh`  
+> **表结构真相源**：[`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql)（ETL 脚本内 `CREATE IF NOT EXISTS` 与之对齐）
 
 **XXL-JOB 建议**
 
@@ -14,9 +15,70 @@
 
 **相关文档**
 
-- [调度执行流程.md](调度执行流程.md) — ODS / DWM / DWS 手工命令
 - [需求1-主线板块确认-需求文档.md](需求整理/需求1-主线板块确认-需求文档.md) — 主线榜业务与验收
 - [需求4-AI板块成分股识别-技术文档.md](需求整理/需求4-AI板块成分股识别-技术文档.md)
+
+---
+
+## 〇、ODS 同步分层（`run_data_sync`）
+
+| 层级 | 位置 | 职责 |
+|------|------|------|
+| 任务定义 | `db_sync_task`（配置库） | 数据源、`target_table`、`sync_mode`、`status` |
+| 触发 | crontab / XXL-JOB | 每日调用 `run_data_sync` |
+| 执行 | `dw-sync/sync_runner.sh` → `sync_data.py` | 读配置 → 拉数 → 写 `stock_data` |
+
+```mermaid
+sequenceDiagram
+    participant CRON as crontab/XXL-JOB
+    participant SH as sync_runner.sh
+    participant PY as sync_data.py
+    participant CFG as db_sync_task
+    participant API as Tushare/AkShare
+    participant DB as stock_data
+
+    CRON->>SH: run_data_sync YYYYMMDD
+    SH->>PY: source func.sh 后启动
+    PY->>CFG: load_sync_tasks(status=1)
+    loop 每条任务
+        PY->>API: 按 proxy_source 拉数
+        PY->>DB: 写入 target_table
+    end
+```
+
+**依赖安装（服务器首次）**
+
+```bash
+cd /root/stock_data && source dw-utils/func.sh
+install_sync_deps
+${PYTHON_BIN} -c "import pymysql, pandas, sqlalchemy, akshare; print('ok')"
+```
+
+**ODS 手工同步**
+
+```bash
+source dw-utils/func.sh
+run_data_sync                          # 全部 status=1 任务
+run_data_sync 20260616                 # 指定业务日
+run_data_sync --source-table daily_basic --force
+run_data_sync --dry-run                # 预览不写库
+```
+
+**新增 ODS 任务**：在 `db_sync_task` 插入记录，配置 `fetch_config` / `transform_config`（JSON）。占位符：`$trade_date`、`$full_start`、`$full_end`。停用：`UPDATE db_sync_task SET status=0 WHERE id=...`。
+
+**财务指标回补**（景气 DWM 前置，脚本 `dw-sync/sync_ods_fina_indicator.sh`）：
+
+```bash
+bash dw-sync/sync_ods_fina_indicator.sh
+# 或: bash dw-sync/sync_ods_fina_indicator.sh --start 20250101 --end 20260630
+```
+
+**查看同步配置与结果**
+
+```bash
+${data_config} -e "SELECT id, proxy_source, source_table, target_table, sync_mode, status FROM db_sync_task;"
+${data_mysql} -e "SELECT COUNT(*) FROM ods_trading_day;"
+```
 
 ---
 
@@ -189,6 +251,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8082
 | 入口 | 路径 |
 |------|------|
 | 主线榜页面 | `http://<host>:8082/dc/mainline` |
+| 量化主线页面 | `http://<host>:8082/dc/quant-mainline` |
 | 主线榜 API | `GET /api/v1/mainline/rank?trade_date=YYYYMMDD&top=20&ma_window=5` |
 | 兼容 API | `GET /api/rank/mainline?trade_date=YYYYMMDD` |
 | 历史得分 | `GET /api/v1/mainline/history?industry_code=BKxxxx.DC&days=60` |
@@ -254,8 +317,26 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 
 | 文件 | 说明 |
 |------|------|
+| [`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql) | **数仓 DDL 真相源** |
+| [`dw-utils/func.sh`](dw-utils/func.sh) | MySQL 环境、`run_data_sync`、DWM/DWS 封装 |
+| [`dw-sync/sync_runner.sh`](dw-sync/sync_runner.sh) | ODS 同步入口 |
+| [`dw-sync/sync_data.py`](dw-sync/sync_data.py) | 配置驱动同步 |
 | [`dw-utils/xxl_daily_batch.sh`](dw-utils/xxl_daily_batch.sh) | 日批一键 |
 | [`dw-utils/xxl_monthly_batch.sh`](dw-utils/xxl_monthly_batch.sh) | 月批 |
 | [`dw-utils/xxl_weekly_batch.sh`](dw-utils/xxl_weekly_batch.sh) | 周批 ETF 映射 |
 | [`dw-utils/xxl_mainline_batch.sh`](dw-utils/xxl_mainline_batch.sh) | 仅需求1 补跑 |
+| [`dw-dwm/pro_dwm_*`](dw-dwm/) | DWM ETL（东财/THS/SW 板块因子，**全部保留**） |
+| [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控/量化主线，**THS/SW 保留**） |
 | [`industry_fund_flow/sql/stock_read_grants.sql`](industry_fund_flow/sql/stock_read_grants.sql) | Web 只读授权 |
+
+---
+
+## 十二、常见问题
+
+| 现象 | 排查 |
+|------|------|
+| 任务成功但表无数据 | AkShare/Tushare 是否返回空；`run_data_sync --dry-run` 看行数 |
+| `Access denied` | 检查 `dw-utils/func.sh` 中 MySQL 账号 |
+| 1045 / 变量未加载 | 先 `source dw-utils/func.sh` 或走 `sync_runner.sh` |
+| Web 主线榜空 | 确认日批 ⑧ 已跑、`stock_read_grants.sql` 已执行 |
+| 量化主线 Top 为空 | 确认 ⑪ `run_dws_dc_industry_quant_mainline`；配置 `content_types=行业,概念` |

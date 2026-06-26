@@ -1,12 +1,17 @@
 """东财主线板块：监控榜与历史得分查询（需求1）。"""
 from __future__ import annotations
 
-from datetime import date, datetime
-from decimal import Decimal
 from typing import Any
 
 from app.db import fetch_all_stock, fetch_one_stock
-from app.dc_service import parse_csv_list, parse_trade_date
+from app.dc_query_util import (
+    list_trade_dates_from_table,
+    latest_trade_date_from_table,
+    resolve_trade_date,
+    serialize_row,
+    serialize_value,
+)
+from app.dc_service import parse_csv_list
 
 MONITOR_TABLE = "dws_dc_industry_mainline_monitor_di"
 SCORE_TABLE = "dws_dc_industry_mainline_score_di"
@@ -15,51 +20,25 @@ MAINLINE_LEVELS = ("超级主线", "主线", "轮动热点", "跟风")
 MA_COLUMNS = {3: "total_score_ma3", 5: "total_score_ma5", 10: "total_score_ma10"}
 
 
-def _serialize(value: Any) -> Any:
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()[:10]
-    if isinstance(value, Decimal):
-        return float(value)
-    return value
-
-
-def _serialize_row(row: dict) -> dict:
-    return {k: _serialize(v) for k, v in row.items()}
-
-
 def _ma_column(ma_window: int) -> str:
     return MA_COLUMNS.get(ma_window, "total_score_ma5")
 
 
 def latest_trade_date() -> str | None:
-    row = fetch_one_stock(f"SELECT MAX(trade_date) AS d FROM {MONITOR_TABLE}")
-    if row and row.get("d"):
-        return _serialize(row["d"])
-    row = fetch_one_stock(f"SELECT MAX(trade_date) AS d FROM {SCORE_TABLE}")
-    return _serialize(row["d"]) if row and row.get("d") else None
+    return latest_trade_date_from_table(MONITOR_TABLE, fallback_table=SCORE_TABLE)
 
 
 def list_trade_dates(limit: int = 60) -> list[str]:
-    limit = max(1, min(limit, 365))
-    rows = fetch_all_stock(
-        f"""
-        SELECT DISTINCT trade_date AS d
-        FROM {MONITOR_TABLE}
-        ORDER BY trade_date DESC
-        LIMIT {limit}
-        """
-    )
-    return [_serialize(r["d"]) for r in rows]
+    return list_trade_dates_from_table(MONITOR_TABLE, limit)
 
 
 def _resolve_trade_date(trade_date: str | None) -> str:
-    td = parse_trade_date(trade_date) if trade_date else None
-    if td:
-        return td
-    latest = latest_trade_date()
-    if not latest:
-        raise ValueError("暂无主线监控数据，请先运行 run_dws_dc_industry_mainline_monitor")
-    return latest
+    return resolve_trade_date(
+        trade_date,
+        table=MONITOR_TABLE,
+        fallback_table=SCORE_TABLE,
+        empty_msg="暂无主线监控数据，请先运行 run_dws_dc_industry_mainline_monitor",
+    )
 
 
 def _content_type_filter(content_types: list[str] | None) -> tuple[str, dict]:
@@ -83,7 +62,7 @@ def _level_filter(levels: list[str] | None) -> tuple[str, dict]:
 
 
 def _row_to_rank_item(row: dict, ma_window: int) -> dict:
-    item = _serialize_row(row)
+    item = serialize_row(row)
     ma_col = _ma_column(ma_window)
     display_score = item.get(ma_col) if item.get(ma_col) is not None else item.get("main_score")
     if display_score is None:
@@ -190,7 +169,7 @@ def get_industry_history(
     )
     if not rows and not header:
         raise ValueError(f"板块 {code} 暂无主线得分历史")
-    history = list(reversed([_serialize_row(r) for r in rows]))
+    history = list(reversed([serialize_row(r) for r in rows]))
     stage_rows = fetch_all_stock(
         f"""
         SELECT trade_date, mainline_stage, main_score, fund_cont_days, rs_5d, limit_up_cnt
@@ -201,7 +180,7 @@ def get_industry_history(
         """,
         {"ic": code, "end": end_date},
     )
-    stages = {str(_serialize(r["trade_date"])): _serialize_row(r) for r in stage_rows}
+    stages = {str(serialize_value(r["trade_date"])): serialize_row(r) for r in stage_rows}
     for pt in history:
         td = pt["trade_date"]
         if td in stages:
