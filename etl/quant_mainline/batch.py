@@ -207,7 +207,7 @@ def _load_leaders(engine, td: date) -> dict[str, dict[str, Any]]:
     sql = """
     SELECT s.industry_code, s.leader_composite_ts, s.leader_composite_name,
         d.pct_chg AS leader_pct_chg
-    FROM sector_dragon_summary_di s
+    FROM dwm_sector_dragon_summary_di s
     LEFT JOIN ods_stock_detail_di d
         ON d.trade_date = s.trade_date AND d.ts_code = s.leader_composite_ts
     WHERE s.trade_date = :td AND s.score_mode = 'mvp'
@@ -236,7 +236,7 @@ def _load_leader_excess(engine, td: date) -> dict[str, float]:
     )
     SELECT s.industry_code,
         (stk.ret_20d - br.ret_20d) * 100 AS leader_excess
-    FROM sector_dragon_summary_di s
+    FROM dwm_sector_dragon_summary_di s
     JOIN board_ret br ON br.ts_code = s.industry_code AND br.trade_date = :td
     JOIN stk_ret stk ON stk.ts_code = s.leader_composite_ts AND stk.trade_date = :td
     WHERE s.trade_date = :td AND s.score_mode = 'mvp'
@@ -716,7 +716,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--content-types",
         default="",
-        help="板块类型，逗号分隔，默认读 quant_mainline_config",
+        help="板块类型，逗号分隔，默认读 dwm_dc_mainline_config",
     )
     args = parser.parse_args(argv)
     td = parse_trade_date(args.trade_date)

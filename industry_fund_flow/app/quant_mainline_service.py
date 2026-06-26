@@ -14,7 +14,7 @@ from app.dc_service import parse_csv_list
 
 MAINLINE_TABLE = "dws_dc_industry_quant_mainline_di"
 SIGNAL_TABLE = "dws_dc_industry_quant_mainline_signal_di"
-CONFIG_TABLE = "quant_mainline_config"
+CONFIG_TABLE = "dwm_dc_mainline_config"
 DEFAULT_CONTENT_TYPES = ("行业", "概念")
 TOP_BOARD_TYPES = ("行业", "概念")
 DEFAULT_TOP_N = 10

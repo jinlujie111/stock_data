@@ -66,7 +66,7 @@ def ensure_schema(engine: Engine) -> None:
         conn.execute(
             text(
                 """
-                INSERT IGNORE INTO sector_dragon_config (
+                INSERT IGNORE INTO dwm_dc_sector_dragon_config (
                     config_key, score_mode, content_types, effective_date, is_active
                 ) VALUES ('__global__', 'mvp', '行业,概念', CURDATE(), 1)
                 """
@@ -82,7 +82,7 @@ def load_config(engine: Engine, content_types: list[str]) -> DragonConfig:
                 """
                 SELECT score_mode, content_types, fund_window_days, rs_cap, rs_cap_score,
                        min_constituents, mvp_weights
-                FROM sector_dragon_config
+                FROM dwm_dc_sector_dragon_config
                 WHERE config_key = '__global__' AND is_active = 1
                 ORDER BY effective_date DESC
                 LIMIT 1

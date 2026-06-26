@@ -66,7 +66,7 @@ ON DUPLICATE KEY UPDATE
 """
 
 SUMMARY_INSERT = """
-INSERT INTO sector_dragon_summary_di (
+INSERT INTO dwm_sector_dragon_summary_di (
     trade_date, industry_code, industry_name, content_type,
     leader_industry_ts, leader_industry_name,
     leader_fund_ts, leader_fund_name,
@@ -149,7 +149,7 @@ def run_batch(
         )
         conn.execute(
             text(
-                "DELETE FROM sector_dragon_summary_di "
+                "DELETE FROM dwm_sector_dragon_summary_di "
                 "WHERE trade_date = :td AND score_mode = :mode"
             ),
             {"td": trade_date, "mode": score_mode},

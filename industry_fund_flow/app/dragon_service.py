@@ -9,7 +9,7 @@ from app.db import fetch_all_stock, fetch_one_stock
 from app.dc_service import parse_csv_list, parse_trade_date
 
 SCORE_TABLE = "dwm_sector_stock_dragon_score_di"
-SUMMARY_TABLE = "sector_dragon_summary_di"
+SUMMARY_TABLE = "dwm_sector_dragon_summary_di"
 DEFAULT_CONTENT_TYPES = ("行业", "概念")
 
 

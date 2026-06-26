@@ -327,7 +327,7 @@ CREATE TABLE IF NOT EXISTS dwm_sector_stock_dragon_score_di (
     KEY idx_sector_dragon_composite (trade_date, content_type, score_composite)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块成分股龙头评分(DWM)';
 
-CREATE TABLE IF NOT EXISTS sector_dragon_summary_di (
+CREATE TABLE IF NOT EXISTS dwm_sector_dragon_summary_di (
     id                      BIGINT PRIMARY KEY AUTO_INCREMENT,
     trade_date              DATE           NOT NULL COMMENT '交易日期',
     industry_code           VARCHAR(32)    NOT NULL COMMENT '板块代码',
@@ -347,11 +347,11 @@ CREATE TABLE IF NOT EXISTS sector_dragon_summary_di (
     score_mode              VARCHAR(8)     NOT NULL DEFAULT 'mvp',
     created_at              DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_sector_dragon_summary (trade_date, industry_code, score_mode),
-    KEY idx_sector_dragon_summary_ct (trade_date, content_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头结论摘要';
+    UNIQUE KEY uk_dwm_sector_dragon_summary (trade_date, industry_code, score_mode),
+    KEY idx_dwm_sector_dragon_summary_ct (trade_date, content_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头结论摘要(DWM)';
 
-CREATE TABLE IF NOT EXISTS sector_dragon_config (
+CREATE TABLE IF NOT EXISTS dwm_dc_sector_dragon_config (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
     config_key      VARCHAR(64)    NOT NULL COMMENT '__global__或industry_code',
     score_mode      VARCHAR(8)     NOT NULL DEFAULT 'mvp',
@@ -370,10 +370,10 @@ CREATE TABLE IF NOT EXISTS sector_dragon_config (
     is_active       TINYINT        NOT NULL DEFAULT 1,
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_sector_dragon_config (config_key, effective_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头评分参数';
+    UNIQUE KEY uk_dwm_dc_sector_dragon_config (config_key, effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头评分参数(DWM)';
 
-CREATE TABLE IF NOT EXISTS quant_mainline_config (
+CREATE TABLE IF NOT EXISTS dwm_dc_mainline_config (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,
     config_key      VARCHAR(64)    NOT NULL DEFAULT '__global__' COMMENT '全局或板块代码',
     content_types   VARCHAR(64)    NOT NULL DEFAULT '行业,概念' COMMENT '评分板块类型,逗号分隔',
@@ -394,8 +394,8 @@ CREATE TABLE IF NOT EXISTS quant_mainline_config (
     is_active       TINYINT        NOT NULL DEFAULT 1,
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_quant_mainline_config (config_key, effective_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='量化主线FTELP参数(东财)';
+    UNIQUE KEY uk_dwm_dc_mainline_config (config_key, effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='量化主线FTELP参数(DWM,东财)';
 
 CREATE TABLE IF NOT EXISTS dws_dc_industry_quant_mainline_di (
     id                BIGINT PRIMARY KEY AUTO_INCREMENT,

@@ -438,7 +438,7 @@ run_ai_core_pool_batch "${n_date}"    # 本需求：建议在 DIM 刷新之后
 
 | 能力 | 接入点 |
 |------|--------|
-| 板块龙头 | `sector_dragon_summary_di` / `dwm_sector_stock_dragon_score_di` |
+| 板块龙头 | `dwm_sector_dragon_summary_di` / `dwm_sector_stock_dragon_score_di` |
 | 主线评分 | `dws_dc_industry_mainline_score_di` |
 | 赛道–东财映射 | `dim_industry_track.dc_board_code` → `ods_dc_member_di` 候选初筛 |
 

@@ -89,13 +89,13 @@ def ensure_schema(engine: Engine) -> None:
     """表结构以 mysql_tables/stock_data.sql 为准；此处仅种子默认配置。"""
     with engine.begin() as conn:
         cnt = conn.execute(
-            text("SELECT COUNT(*) FROM quant_mainline_config WHERE config_key='__global__'")
+            text("SELECT COUNT(*) FROM dwm_dc_mainline_config WHERE config_key='__global__'")
         ).scalar()
         if not cnt:
             conn.execute(
                 text(
                     """
-                    INSERT INTO quant_mainline_config (
+                    INSERT INTO dwm_dc_mainline_config (
                         config_key, content_types, top_n,
                         w_f, w_t, w_e, w_l, w_p,
                         f_weights, t_weights, e_weights, l_weights, p_weights,
@@ -122,7 +122,7 @@ def ensure_schema(engine: Engine) -> None:
 def load_config(engine: Engine, trade_date: date) -> QuantMainlineConfig:
     sql = """
     SELECT *
-    FROM quant_mainline_config
+    FROM dwm_dc_mainline_config
     WHERE config_key = '__global__'
       AND is_active = 1
       AND effective_date <= :td

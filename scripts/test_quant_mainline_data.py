@@ -39,7 +39,7 @@ def check_prerequisites(conn, td: date) -> list[str]:
         ("dwm_dc_industry_trend_strength_di", "SELECT COUNT(*) AS c FROM dwm_dc_industry_trend_strength_di WHERE trade_date=:td"),
         ("dwm_dc_industry_diffusion_di", "SELECT COUNT(*) AS c FROM dwm_dc_industry_diffusion_di WHERE trade_date=:td"),
         ("dwm_dc_industry_prosperity_di", "SELECT COUNT(*) AS c FROM dwm_dc_industry_prosperity_di WHERE trade_date=:td"),
-        ("sector_dragon_summary_di", "SELECT COUNT(*) AS c FROM sector_dragon_summary_di WHERE trade_date=:td AND score_mode='mvp'"),
+        ("dwm_sector_dragon_summary_di", "SELECT COUNT(*) AS c FROM dwm_sector_dragon_summary_di WHERE trade_date=:td AND score_mode='mvp'"),
     ]
     for name, sql in checks:
         c = _q(conn, sql, {"td": td})[0]["c"]
@@ -97,7 +97,7 @@ def check_output(conn, td: date) -> tuple[list[str], dict]:
         conn,
         """
         SELECT content_types, top_n, ma_window_rank
-        FROM quant_mainline_config
+        FROM dwm_dc_mainline_config
         WHERE config_key='__global__' AND is_active=1
         ORDER BY effective_date DESC LIMIT 1
         """,
