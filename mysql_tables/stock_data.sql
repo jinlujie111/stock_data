@@ -373,6 +373,82 @@ CREATE TABLE IF NOT EXISTS sector_dragon_config (
     UNIQUE KEY uk_sector_dragon_config (config_key, effective_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块龙头评分参数';
 
+CREATE TABLE IF NOT EXISTS quant_mainline_config (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    config_key      VARCHAR(64)    NOT NULL DEFAULT '__global__' COMMENT '全局或板块代码',
+    content_types   VARCHAR(64)    NOT NULL DEFAULT '行业,概念' COMMENT '评分板块类型,逗号分隔',
+    top_n           INT            NOT NULL DEFAULT 3 COMMENT '主线TopN',
+    w_f             DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    w_t             DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    w_e             DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    w_l             DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    w_p             DECIMAL(5, 4)  NOT NULL DEFAULT 0.2000,
+    f_weights       JSON           NULL,
+    t_weights       JSON           NULL,
+    e_weights       JSON           NULL,
+    l_weights       JSON           NULL,
+    p_weights       JSON           NULL,
+    signal_thresholds JSON         NULL,
+    ma_window_rank  INT            NOT NULL DEFAULT 5,
+    effective_date  DATE           NOT NULL,
+    is_active       TINYINT        NOT NULL DEFAULT 1,
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_quant_mainline_config (config_key, effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='量化主线FTELP参数(东财)';
+
+CREATE TABLE IF NOT EXISTS dws_dc_industry_quant_mainline_di (
+    id                BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date        DATE           NOT NULL,
+    content_type      VARCHAR(32)    NULL,
+    industry_code     VARCHAR(32)    NOT NULL,
+    industry_name     VARCHAR(128)   NULL,
+    score_f           DECIMAL(10, 2) NULL,
+    score_t           DECIMAL(10, 2) NULL,
+    score_e           DECIMAL(10, 2) NULL,
+    score_l           DECIMAL(10, 2) NULL,
+    score_p           DECIMAL(10, 2) NULL,
+    main_score        DECIMAL(10, 2) NULL,
+    main_score_ma3    DECIMAL(10, 2) NULL,
+    main_score_ma5    DECIMAL(10, 2) NULL,
+    main_score_ma10   DECIMAL(10, 2) NULL,
+    rank_no           INT            NULL,
+    rank_score        DECIMAL(10, 2) NULL COMMENT '排序用分(默认MA5)',
+    is_top3           TINYINT        NOT NULL DEFAULT 0,
+    amount_ratio      DECIMAL(20, 8) NULL,
+    rs_ratio          DECIMAL(10, 4) NULL,
+    limit_up_ratio    DECIMAL(20, 6) NULL,
+    leader_code       VARCHAR(16)    NULL,
+    leader_name       VARCHAR(64)    NULL,
+    leader_pct_chg    DECIMAL(10, 4) NULL,
+    detail_json       JSON           NULL,
+    config_version    VARCHAR(32)    NULL DEFAULT '__global__',
+    created_at        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dc_quant_mainline (trade_date, industry_code),
+    KEY idx_dc_quant_mainline_td (trade_date, content_type, is_top3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财量化主线FTELP得分(需求3)';
+
+CREATE TABLE IF NOT EXISTS dws_dc_industry_quant_mainline_signal_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL,
+    industry_code   VARCHAR(32)    NOT NULL,
+    industry_name   VARCHAR(128)   NULL,
+    content_type    VARCHAR(32)    NULL,
+    signal_start    TINYINT        NOT NULL DEFAULT 0,
+    signal_exit     TINYINT        NOT NULL DEFAULT 0,
+    signal_status   VARCHAR(16)    NULL COMMENT '观察/启动/退潮',
+    signal_reason   JSON           NULL,
+    leader_code     VARCHAR(16)    NULL,
+    leader_name     VARCHAR(64)    NULL,
+    leader_pct_chg  DECIMAL(10, 4) NULL,
+    config_version  VARCHAR(32)    NULL DEFAULT '__global__',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dc_quant_signal (trade_date, industry_code),
+    KEY idx_dc_quant_signal_td (trade_date, signal_start, signal_exit)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财量化主线启动退潮信号(需求3)';
+
 -- 废弃占位表（历史误建为 dc_hot 结构，新环境可手工 DROP）
 -- DROP TABLE IF EXISTS dwm_dc_stock_dragon_score_di;
 

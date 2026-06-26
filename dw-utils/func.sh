@@ -377,6 +377,15 @@ run_sector_dragon_batch() {
     bash "${runner}" "$@"
 }
 
+run_dws_dc_industry_quant_mainline() {
+    local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_quant_mainline_di.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_ods_data_check() {
     local runner="${DW_ROOT}/dw-monitor/pro_ods_data_check.sh"
     if [[ ! -f "${runner}" ]]; then

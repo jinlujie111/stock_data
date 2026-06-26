@@ -52,7 +52,16 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | ⑧ | `run_dws_*_mainline_score` + `run_dws_*_mainline_monitor` | 上述全部 DWM | **需求1 主线榜** |
 | ⑨ | `run_dim_industry_track` | ⑤ 市场热度 DWM | 需求4 |
 | ⑩ | `run_sector_dragon_batch` | 资金 DWM + `daily` / `moneyflow` | 需求2 |
-| ⑪ | `run_ods_data_check` | — | 监控告警 |
+| ⑪ | `run_dws_dc_industry_quant_mainline` | 全部东财 DWM + 龙头摘要 | **需求3 量化主线（东财行业）** |
+| ⑫ | `run_ods_data_check` | — | 监控告警 |
+
+**需求3 落库表（步骤 ⑪）**
+
+| 表 | 说明 |
+|----|------|
+| `dws_dc_industry_quant_mainline_di` | FTELP 五主因子、MainScore、Top3、MA3/5/10 |
+| `dws_dc_industry_quant_mainline_signal_di` | 启动 / 退潮 / 观察 + 原因 JSON |
+| `quant_mainline_config` | 权重与信号阈值（默认 `content_types=行业,概念`） |
 
 **需求1 落库表（步骤 ⑧）**
 

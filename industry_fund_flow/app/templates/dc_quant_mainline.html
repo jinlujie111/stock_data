@@ -1,0 +1,144 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<style>
+  .signal-start { color: #22c55e; font-weight: 600; }
+  .signal-exit { color: #ef4444; font-weight: 600; }
+  .signal-watch { color: var(--muted); }
+  .top-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    color: #fbbf24;
+  }
+  .ftelp-bar {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 72px;
+    background: rgba(255,255,255,0.06);
+  }
+  .ftelp-bar span { height: 100%; }
+  .dim-f { background: #3b82f6; }
+  .dim-t { background: #22c55e; }
+  .dim-e { background: #f59e0b; }
+  .dim-l { background: #a855f7; }
+  .dim-p { background: #ec4899; }
+  #history-card { margin-top: 1.25rem; }
+  #history-chart { min-height: 200px; margin-top: 0.75rem; }
+  .history-svg { width: 100%; height: 220px; }
+</style>
+
+<div class="page-head">
+  <h1>量化主线</h1>
+  <p class="muted">东方财富 · 行业+概念 · FTELP 五主因子 · Top3 主线 + 启动/退潮信号</p>
+</div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <select id="trade-date"></select>
+    </label>
+    <label class="filter-field">
+      <span>均分窗口</span>
+      <select id="ma-window">
+        <option value="5" selected>5 日</option>
+        <option value="3">3 日</option>
+        <option value="10">10 日</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>信号筛选</span>
+      <select id="signal-status">
+        <option value="">全部</option>
+        <option value="启动">启动</option>
+        <option value="退潮">退潮</option>
+        <option value="观察">观察</option>
+      </select>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+    </div>
+  </div>
+  <div id="filter-hint" class="filter-hint muted"></div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<section class="card">
+  <h2 class="section-title">Top3 主线（行业+概念）</h2>
+  <p id="top-updated" class="muted snapshot-time"></p>
+  <div class="table-wrap">
+    <table class="data-table" id="top-table">
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>类型</th>
+          <th>板块</th>
+          <th>展示分</th>
+          <th>MainScore</th>
+          <th>信号</th>
+          <th>龙头</th>
+          <th>FTELP</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="top-body"></tbody>
+    </table>
+  </div>
+  <div id="top-empty" class="table-empty hidden">暂无数据，请先运行 ETL：run_dws_dc_industry_quant_mainline</div>
+</section>
+
+<section class="card">
+  <h2 class="section-title">板块信号列表</h2>
+  <div class="table-wrap">
+    <table class="data-table" id="signal-table">
+      <thead>
+        <tr>
+          <th>板块</th>
+          <th>状态</th>
+          <th>启动</th>
+          <th>退潮</th>
+          <th>排名</th>
+          <th>MainScore</th>
+          <th>FTELP</th>
+        </tr>
+      </thead>
+      <tbody id="signal-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card hidden" id="history-card">
+  <div class="page-head">
+    <h2 id="history-title">历史得分</h2>
+    <button type="button" class="btn btn-ghost" id="btn-close-history">关闭</button>
+  </div>
+  <div id="history-chart"></div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>MainScore</th>
+          <th>MA3</th>
+          <th>MA5</th>
+          <th>MA10</th>
+          <th>信号</th>
+          <th>Top3</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dc_quant_mainline.js?v=20260616"></script>
+{% endblock %}
