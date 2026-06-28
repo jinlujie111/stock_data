@@ -1,6 +1,6 @@
 # stock_data — XXL-JOB 调度执行顺序
 
-> 维护日期：2026-06-18  
+> 维护日期：2026-06-28  
 > 项目路径（服务器）：`/root/stock_data`  
 > 执行前统一：`cd /root/stock_data && source dw-utils/func.sh`  
 > **表结构真相源**：[`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql)（ETL 脚本内 `CREATE IF NOT EXISTS` 与之对齐）
@@ -236,29 +236,159 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 
 ---
 
-## 八、Web / API 上线（需求1）
+## 八、启动报表页面（Web）
 
-日批 ⑧ 完成后，Web 读 `dws_dc_industry_mainline_monitor_di`。
+> **与日批分离**：报表 Web **不写入** `xxl_daily_batch.sh` / `func.sh`，仅在本节文档维护启动命令；日批只负责写 `stock_data` 数仓。
+
+报表由 **`industry_fund_flow`**（FastAPI + uvicorn）提供。默认端口 **8082**（避开 XXL-JOB 8080）。
+
+### 8.1 首次部署（服务器执行一次）
 
 ```bash
-# 1) 授权（root 执行一次）
+cd /root/stock_data
+
+# 1) 用户库 + stock_data 只读授权
+mysql -u root -p < mysql_tables/data_industry_grants.sql
 mysql -u root -p < industry_fund_flow/sql/stock_read_grants.sql
 
-# 2) 启动（默认 8082）
-cd industry_fund_flow
-source ../dw-utils/func.sh   # 导出 IFF_* / STOCK_* 环境变量
-uvicorn app.main:app --host 0.0.0.0 --port 8082
+# 2) 初始化登录用户表（data_industry.app_user）
+source dw-utils/func.sh
+init_data_industry_schema
+
+# 3) 生产环境必设 JWT 密钥（写入 func.sh 或 export）
+export IFF_JWT_SECRET='请改为随机长字符串'
 ```
 
-| 入口 | 路径 |
-|------|------|
-| 主线榜页面 | `http://<host>:8082/dc/mainline` |
-| 量化主线页面 | `http://<host>:8082/dc/quant-mainline` |
-| 主线榜 API | `GET /api/v1/mainline/rank?trade_date=YYYYMMDD&top=20&ma_window=5` |
-| 兼容 API | `GET /api/rank/mainline?trade_date=YYYYMMDD` |
-| 历史得分 | `GET /api/v1/mainline/history?industry_code=BKxxxx.DC&days=60` |
+| 库 | 用途 | 连接变量 |
+|----|------|----------|
+| `data_industry` | 注册 / 登录 | `IFF_MYSQL_*`（func.sh 从 `INDUSTRY_MYSQL_*` 导出） |
+| `stock_data` | 板块 / 主线 / 龙头 / AI 核心池 | `STOCK_MYSQL_*` → Web 侧 `IFF_STOCK_MYSQL_*` |
 
-登录后 Cookie 名为 **`iff_token`**。浏览器已登录可直接访问 API；命令行见需求文档 §测试或下文 §九。
+### 8.2 启动 / 重启
+
+Web **不纳入日批 / XXL-JOB**，需单独手工或 systemd 维护；以下命令复制即用。
+
+**依赖（首次）**
+
+```bash
+cd /root/stock_data
+source dw-utils/func.sh
+"${PYTHON_BIN}" -m pip install -r industry_fund_flow/requirements.txt
+```
+
+**开发 / 调试（前台）**
+
+```bash
+cd /root/stock_data
+source dw-utils/func.sh
+export IFF_JWT_SECRET='请改为随机长字符串'   # 生产必设
+
+cd industry_fund_flow
+"${PYTHON_BIN}" -m uvicorn app.main:app --host 0.0.0.0 --port 8082 --reload
+```
+
+**生产（后台）**
+
+```bash
+cd /root/stock_data
+source dw-utils/func.sh
+export IFF_JWT_SECRET='请改为随机长字符串'
+mkdir -p /root/log/stock_log/web
+
+pkill -f "uvicorn app.main:app" 2>/dev/null || true
+
+cd industry_fund_flow
+nohup "${PYTHON_BIN}" -m uvicorn app.main:app \
+  --host 0.0.0.0 --port 8082 \
+  >> /root/log/stock_log/web/industry_fund_flow.log 2>&1 &
+
+sleep 1
+curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
+# 期望 200
+```
+
+| 环境变量 | 默认 | 说明 |
+|----------|------|------|
+| `IFF_PORT` | `8082` | 启动时 `--port`；与 XXL-JOB 8080 冲突可改 8083 |
+| `IFF_JWT_SECRET` | — | **生产必设**，否则重启后登录态失效 |
+| `STOCK_MYSQL_*` | func.sh 导出 | 读 `stock_data`；`source func.sh` 后自动可用 |
+
+外网访问需在安全组 / 防火墙放行 `8082`（或实际端口）。登录 Cookie 名：**`iff_token`**。
+
+### 8.3 报表页面与日批依赖
+
+日批完成后访问对应页面；**无数据时先查第二节步骤是否已跑、再查 §8.5 SQL**。
+
+| 页面 | URL | 日批步骤 | 主要读表 |
+|------|-----|----------|----------|
+| 首页（市场广度） | `/` | ② | `dwm_market_breadth_di` |
+| **主线板块**（需求1） | `/dc/mainline` | ⑧ | `dws_dc_industry_mainline_monitor_di` |
+| **量化主线**（需求3） | `/dc/quant-mainline` | ⑪ | `dws_dc_industry_quant_mainline_di`、`dws_dc_industry_quant_mainline_signal_di` |
+| **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
+| **AI 核心池**（需求4） | `/dc/ai-core` | ⑨ + ⑨b | `dwm_industry_stock_core_di`、`dwm_industry_stock_ai_score_di` |
+| 资金强度 | `/dc/fund-flow` | ③ | `dwm_dc_industry_fund_flow_di` |
+| 趋势强度 | `/dc/trend-strength` | ④ | `dwm_dc_industry_trend_strength_di` |
+| 市场热度 | `/dc/market-heat` | ⑤ | `dwm_dc_industry_market_heat_di` |
+| 产业景气 | `/dc/prosperity` | ⑦ | `dwm_dc_industry_prosperity_di` |
+| 扩散效应 | `/dc/diffusion` | ⑥ | `dwm_dc_industry_diffusion_di` |
+| 登录 / 注册 | `/login` `/register` | — | `data_industry.app_user` |
+
+导航栏「东财板块」下拉与各 `/dc/{slug}` 维度页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册。
+
+**推荐访问顺序（收盘后）**
+
+1. 等日批 `xxl_daily_batch.sh` 跑完（或 XXL-JOB `stock_daily_all` 成功）
+2. 浏览器打开 `http://<host>:8082/login` 登录
+3. 首页看市场广度 → 主线榜 → 量化主线 → 板块龙头 → AI 核心池
+
+### 8.4 API 速查（需登录 Cookie）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/me` | 当前用户 |
+| GET | `/api/v1/mainline/rank?trade_date=YYYYMMDD&top=20` | 需求1 主线榜 |
+| GET | `/api/v1/mainline/history?industry_code=BKxxxx.DC&days=60` | 主线历史得分 |
+| GET | `/api/v1/quant-mainline/top-groups?trade_date=YYYYMMDD` | 需求3 行业/概念分榜 Top10 |
+| GET | `/api/v1/quant-mainline/signals?trade_date=YYYYMMDD` | 启动 / 退潮信号 |
+| GET | `/api/v1/dragon/leaders?trade_date=YYYYMMDD` | 需求2 龙头摘要 |
+| GET | `/api/v1/ai-core/pool?trade_date=YYYYMMDD` | 需求4 核心池 |
+| GET | `/api/v1/ai-core/scores?trade_date=YYYYMMDD&industry_id=...` | 需求4 全量评分 |
+| GET | `/api/dc/{slug}?trade_date=YYYYMMDD` | 五维 DWM 通用榜单 |
+
+命令行测 API（先登录拿 Cookie）：
+
+```bash
+curl -c cookies.txt -b cookies.txt -X POST "http://127.0.0.1:8082/login" \
+  -d "username=你的用户&password=你的密码" -L -s -o /dev/null
+
+curl -b cookies.txt -s "http://127.0.0.1:8082/api/v1/mainline/rank?top=20" | python3 -m json.tool
+curl -b cookies.txt -s "http://127.0.0.1:8082/api/v1/ai-core/pool?trade_date=20260626" | python3 -m json.tool
+```
+
+### 8.5 页面无数据速查 SQL
+
+将 `@d` 换成实际交易日（`YYYY-MM-DD`）。
+
+```sql
+USE stock_data;
+SET @d = '2026-06-26';
+
+SELECT 'mainline' AS page, COUNT(*) FROM dws_dc_industry_mainline_monitor_di WHERE trade_date = @d
+UNION ALL SELECT 'quant', COUNT(*) FROM dws_dc_industry_quant_mainline_di WHERE trade_date = @d
+UNION ALL SELECT 'dragon', COUNT(*) FROM dwm_sector_stock_dragon_score_di WHERE trade_date = @d
+UNION ALL SELECT 'ai_core', COUNT(*) FROM dwm_industry_stock_core_di WHERE trade_date = @d
+UNION ALL SELECT 'ai_score', COUNT(*) FROM dwm_industry_stock_ai_score_di WHERE trade_date = @d;
+```
+
+| 页面空 | 常见原因 |
+|--------|----------|
+| 主线榜 | 日批 ⑧ 未跑；`stock_read_grants.sql` 未执行 |
+| 量化主线 | 日批 ⑪ 未跑 |
+| 板块龙头 | 日批 ⑩ 未跑；成分 `<3` 的板块被跳过 |
+| AI 核心池 | ⑨b 未跑或失败；核心池分数 `< score_threshold` 时 `core_di` 可能为 0 但 `ai_score_di` 应有全量 |
+| 五维维度页 | 对应 DWM 步骤 ③～⑦ 未跑 |
+
+Web 日志：`/root/log/stock_log/web/industry_fund_flow.log`
 
 ---
 
@@ -292,7 +422,7 @@ GROUP BY mainline_stage;
 
 **已知限制**：「机构化」依赖 `dim_industry_etf_map`（周批自动）+ `ods_etf_share_size_di` + 东财板块名与申万行业名模糊匹配；概念板块常无样本，**无手工维护可接受**，不影响主线榜主体验收。
 
-**API 快速测**（先登录拿 Cookie）：
+**API 快速测**（先登录拿 Cookie，详见 §八.4）：
 
 ```bash
 curl -c cookies.txt -b cookies.txt -X POST "http://127.0.0.1:8082/login" \
@@ -331,6 +461,7 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | [`dw-dwm/pro_dwm_ai_core_pool_di.sh`](dw-dwm/pro_dwm_ai_core_pool_di.sh) | 需求4 AI 核心池批处理 |
 | [`dw-dwm/pro_dwm_*`](dw-dwm/) | DWM ETL（东财/THS/SW 板块因子，**全部保留**） |
 | [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控/量化主线，**THS/SW 保留**） |
+| [`industry_fund_flow/README.md`](industry_fund_flow/README.md) | 报表 Web 说明（启动见 §八，不进批处理） |
 | [`industry_fund_flow/sql/stock_read_grants.sql`](industry_fund_flow/sql/stock_read_grants.sql) | Web 只读授权 |
 
 ---
@@ -342,5 +473,8 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | 任务成功但表无数据 | AkShare/Tushare 是否返回空；`run_data_sync --dry-run` 看行数 |
 | `Access denied` | 检查 `dw-utils/func.sh` 中 MySQL 账号 |
 | 1045 / 变量未加载 | 先 `source dw-utils/func.sh` 或走 `sync_runner.sh` |
-| Web 主线榜空 | 确认日批 ⑧ 已跑、`stock_read_grants.sql` 已执行 |
+| Web 主线榜空 | 确认日批 ⑧ 已跑、`stock_read_grants.sql` 已执行（§八.5） |
 | 量化主线 Top 为空 | 确认 ⑪ `run_dws_dc_industry_quant_mainline`；配置 `content_types=行业,概念` |
+| AI 核心池页空 | 确认 ⑨b 已跑；`ai_score_di` 有数但 `core_di` 为 0 属正常（未达入池分） |
+| Web 无法访问 | 检查 uvicorn 进程、端口 8082、安全组（启动见 §八.2） |
+| uvicorn 端口占用 | 换 `--port 8083` 或 `pkill -f "uvicorn app.main:app"` 后重启 |
