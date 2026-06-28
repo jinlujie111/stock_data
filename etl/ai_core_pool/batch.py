@@ -136,9 +136,24 @@ def run_batch(
         return {"ok": False, "message": "no tracks", "scores": 0, "core": 0}
 
     candidates = list_candidates(as_of, industry_id=industry_id, engine=engine)
+    raw_candidate_cnt = len(candidates)
     candidates = filter_candidates(
         candidates, trade_date, mode=mode, force=force, max_stocks=max_stocks, engine=engine
     )
+    if not candidates:
+        if raw_candidate_cnt == 0:
+            msg = (
+                f"无候选股：dim_industry_track_stock(as_of={as_of}) 为空。"
+                "请检查 ods_dc_member_di 是否有当日数据，并重跑 run_dim_industry_track"
+            )
+        else:
+            msg = (
+                f"delta 模式过滤后 0 只待处理（原始 {raw_candidate_cnt} 只）。"
+                "首跑请用 --mode full --force"
+            )
+        logger.error(msg)
+        return {"ok": False, "message": msg, "scores": 0, "core": 0}
+
     logger.info(
         "ai_core_pool trade_date=%s mode=%s tracks=%s candidates=%s llm=%s provider=%s rules=%s",
         trade_date,

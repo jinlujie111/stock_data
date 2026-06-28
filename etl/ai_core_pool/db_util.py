@@ -78,9 +78,21 @@ def ensure_schema(engine: Engine | None = None) -> None:
 def load_config(trade_date: date, engine: Engine | None = None) -> AiCoreConfig:
     eng = engine or get_engine_stock()
     with eng.connect() as conn:
-        row = conn.execute(
-            text(
-                """
+        has_provider = int(
+            conn.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = 'ai_core_pool_config'
+                      AND column_name = 'llm_provider'
+                    """
+                )
+            ).scalar()
+            or 0
+        ) >= 1
+        if has_provider:
+            sql = """
                 SELECT model_name, llm_provider, prompt_version, temperature, max_tokens,
                        score_threshold, reject_score, mainbz_min_pct,
                        batch_size, rate_limit_rpm
@@ -90,10 +102,20 @@ def load_config(trade_date: date, engine: Engine | None = None) -> AiCoreConfig:
                   AND effective_date <= :td
                 ORDER BY effective_date DESC
                 LIMIT 1
-                """
-            ),
-            {"td": trade_date},
-        ).mappings().first()
+            """
+        else:
+            sql = """
+                SELECT model_name, prompt_version, temperature, max_tokens,
+                       score_threshold, reject_score, mainbz_min_pct,
+                       batch_size, rate_limit_rpm
+                FROM ai_core_pool_config
+                WHERE config_key = '__global__'
+                  AND is_active = 1
+                  AND effective_date <= :td
+                ORDER BY effective_date DESC
+                LIMIT 1
+            """
+        row = conn.execute(text(sql), {"td": trade_date}).mappings().first()
     if not row:
         return AiCoreConfig()
     return AiCoreConfig(
