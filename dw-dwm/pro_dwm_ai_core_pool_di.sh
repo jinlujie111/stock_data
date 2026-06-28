@@ -6,7 +6,7 @@
 #   bash dw-dwm/pro_dwm_ai_core_pool_di.sh
 #   bash dw-dwm/pro_dwm_ai_core_pool_di.sh 20260626
 #   bash dw-dwm/pro_dwm_ai_core_pool_di.sh 20260626 --mode full --force
-#   bash dw-dwm/pro_dwm_ai_core_pool_di.sh 20260626 --industry-id BK1036.DC --max-stocks 20
+#   bash dw-dwm/pro_dwm_ai_core_pool_di.sh 20260626 --force-trade-day  # 非交易日也跑
 #   或: run_ai_core_pool_batch 20260626
 #
 # 环境变量（db_llm_token 无有效记录时的兜底）:
@@ -26,6 +26,7 @@ DW_ROOT="$(cd "${SCRIPT_PATH}/.." && pwd)"
 # shellcheck source=/dev/null
 source "${DW_ROOT}/dw-utils/func.sh"
 
+FORCE_TRADE=0
 EXTRA_ARGS=()
 if [[ $# -gt 0 && "${1}" =~ ^[0-9]{8}$ ]]; then
   n_date="$(get_date "$1")"
@@ -33,7 +34,12 @@ if [[ $# -gt 0 && "${1}" =~ ^[0-9]{8}$ ]]; then
 else
   n_date="$(get_date "")"
 fi
-EXTRA_ARGS=("$@")
+for arg in "$@"; do
+  case "${arg}" in
+    --force-trade-day|-f) FORCE_TRADE=1 ;;
+    *) EXTRA_ARGS+=("${arg}") ;;
+  esac
+done
 
 LOG_PATH="/root/log/stock_log/${n_date}"
 mkdir -p "${LOG_PATH}"
@@ -42,15 +48,23 @@ LOG_FILE="${LOG_PATH}/pro_dwm_ai_core_pool_${n_date}.log"
 export PYTHONPATH="${DW_ROOT}:${DW_ROOT}/dw-utils:${PYTHONPATH:-}"
 
 trade_flag="$(trade_day_flag "${n_date}" 2>/dev/null || echo 0)"
-if [[ "${trade_flag}" != "1" ]]; then
-  echo "[SKIP] ${n_date} 非交易日，跳过 AI 核心池"
+if [[ "${trade_flag}" != "1" && "${FORCE_TRADE}" != "1" ]]; then
+  echo "[SKIP] ${n_date} 非交易日，跳过 AI 核心池（加 --force-trade-day 可强制执行）"
   exit 0
 fi
 
-exec >>"${LOG_FILE}" 2>&1
-echo "======== $(date '+%F %T') pro_dwm_ai_core_pool trade_date=${n_date} ========"
+echo "日志: ${LOG_FILE}" >&2
+echo "======== $(date '+%F %T') pro_dwm_ai_core_pool trade_date=${n_date} ========" >>"${LOG_FILE}"
 
-"${PYTHON_BIN}" -m etl.ai_core_pool.batch "${n_date}" "${EXTRA_ARGS[@]}"
+set +e
+"${PYTHON_BIN}" -m etl.ai_core_pool.batch "${n_date}" "${EXTRA_ARGS[@]}" >>"${LOG_FILE}" 2>&1
 rc=$?
-echo "======== DONE exit=${rc} ========"
+set -e
+
+echo "======== DONE exit=${rc} ========" >>"${LOG_FILE}"
+
+if [[ "${rc}" -ne 0 ]]; then
+  echo "[ERROR] AI 核心池失败 exit=${rc}，日志: ${LOG_FILE}" >&2
+  tail -25 "${LOG_FILE}" >&2
+fi
 exit "${rc}"

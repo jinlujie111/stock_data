@@ -56,23 +56,28 @@ def get_engine_stock() -> Engine:
 def ensure_schema(engine: Engine | None = None) -> None:
     """表结构以 mysql_tables/stock_data.sql 为准；此处仅确保默认配置存在。"""
     eng = engine or get_engine_stock()
-    with eng.begin() as conn:
-        cnt = conn.execute(text("SELECT COUNT(*) FROM ai_core_pool_config")).scalar()
-        if int(cnt or 0) == 0:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO ai_core_pool_config (
-                        config_key, model_name, prompt_version, temperature, max_tokens,
-                        score_threshold, reject_score, mainbz_min_pct, batch_size,
-                        rate_limit_rpm, effective_date, is_active
-                    ) VALUES (
-                        '__global__', 'gpt-4o-mini', 'v1', 0.20, 1024,
-                        60, 20, 10.00, 10, 60, CURDATE(), 1
+    try:
+        with eng.begin() as conn:
+            cnt = conn.execute(text("SELECT COUNT(*) FROM ai_core_pool_config")).scalar()
+            if int(cnt or 0) == 0:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO ai_core_pool_config (
+                            config_key, model_name, prompt_version, temperature, max_tokens,
+                            score_threshold, reject_score, mainbz_min_pct, batch_size,
+                            rate_limit_rpm, effective_date, is_active
+                        ) VALUES (
+                            '__global__', 'gpt-4o-mini', 'v1', 0.20, 1024,
+                            60, 20, 10.00, 10, 60, CURDATE(), 1
+                        )
+                        """
                     )
-                    """
                 )
-            )
+    except Exception as exc:
+        raise RuntimeError(
+            "ai_core_pool_config 表不存在或不可写，请先在 stock_data 执行 mysql_tables/stock_data.sql 中需求4 DDL"
+        ) from exc
 
 
 def load_config(trade_date: date, engine: Engine | None = None) -> AiCoreConfig:

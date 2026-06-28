@@ -42,7 +42,7 @@ INSERT INTO dwm_industry_stock_ai_score_di (
 ) VALUES (
     :trade_date, :industry_id, :industry_name, :ts_code, :stock_name,
     :industry_match, :segment, :core_degree, :score, :level, :reason,
-    :model_name, :prompt_version, CAST(:raw_json AS JSON)
+    :model_name, :prompt_version, :raw_json
 )
 ON DUPLICATE KEY UPDATE
     industry_name=VALUES(industry_name), stock_name=VALUES(stock_name),
@@ -127,7 +127,7 @@ def run_batch(
     engine = get_engine_stock()
     ensure_schema(engine)
     cfg = load_config(trade_date, engine)
-    llm_cred = resolve_llm_credentials(cfg)
+    llm_cred = None if use_rules else resolve_llm_credentials(cfg)
 
     as_of = trade_date
     tracks = list_tracks(as_of, industry_id=industry_id, engine=engine)
@@ -244,22 +244,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    if args.trade_date:
-        td = parse_trade_date(args.trade_date)
-    else:
-        td = date.today()
-    result = run_batch(
-        td,
-        mode=args.mode,
-        industry_id=args.industry_id,
-        dry_run=args.dry_run,
-        force=args.force,
-        max_stocks=args.max_stocks,
-        use_rules=args.use_rules,
-    )
-    if not result.get("ok"):
+    try:
+        if args.trade_date:
+            td = parse_trade_date(args.trade_date)
+        else:
+            td = date.today()
+        result = run_batch(
+            td,
+            mode=args.mode,
+            industry_id=args.industry_id,
+            dry_run=args.dry_run,
+            force=args.force,
+            max_stocks=args.max_stocks,
+            use_rules=args.use_rules,
+        )
+        if not result.get("ok"):
+            logger.error("ai_core_pool 结束: %s", result.get("message", "unknown"))
+            return 1
+        return 0
+    except Exception:
+        logger.exception("ai_core_pool 异常退出")
         return 1
-    return 0
 
 
 if __name__ == "__main__":

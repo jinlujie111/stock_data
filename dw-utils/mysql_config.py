@@ -108,6 +108,7 @@ def load_llm_token(
     """
     从 data_config.db_llm_token 读取有效大模型配置。
     优先级：provider+model_name > model_name > provider > is_default > priority 最小。
+    表不存在或查询失败时返回 None（规则引擎可继续）。
     """
     base = """
         SELECT id, provider, model_name, api_key, api_url, status, is_default, priority, remark
@@ -116,38 +117,44 @@ def load_llm_token(
           AND (start_date IS NULL OR start_date <= NOW())
           AND (end_date IS NULL OR end_date >= NOW())
     """
-    engine = get_config_engine()
-    with engine.connect() as conn:
-        if provider and model_name:
+    try:
+        engine = get_config_engine()
+        with engine.connect() as conn:
+            if provider and model_name:
+                row = conn.execute(
+                    text(base + " AND provider = :p AND model_name = :m ORDER BY priority ASC, id DESC LIMIT 1"),
+                    {"p": provider, "m": model_name},
+                ).mappings().first()
+                if row:
+                    return dict(row)
+            if model_name:
+                row = conn.execute(
+                    text(base + " AND model_name = :m ORDER BY priority ASC, id DESC LIMIT 1"),
+                    {"m": model_name},
+                ).mappings().first()
+                if row:
+                    return dict(row)
+            if provider:
+                row = conn.execute(
+                    text(base + " AND provider = :p ORDER BY priority ASC, id DESC LIMIT 1"),
+                    {"p": provider},
+                ).mappings().first()
+                if row:
+                    return dict(row)
             row = conn.execute(
-                text(base + " AND provider = :p AND model_name = :m ORDER BY priority ASC, id DESC LIMIT 1"),
-                {"p": provider, "m": model_name},
+                text(base + " AND is_default = 1 ORDER BY priority ASC, id DESC LIMIT 1"),
             ).mappings().first()
             if row:
                 return dict(row)
-        if model_name:
             row = conn.execute(
-                text(base + " AND model_name = :m ORDER BY priority ASC, id DESC LIMIT 1"),
-                {"m": model_name},
+                text(base + " ORDER BY priority ASC, id DESC LIMIT 1"),
             ).mappings().first()
-            if row:
-                return dict(row)
-        if provider:
-            row = conn.execute(
-                text(base + " AND provider = :p ORDER BY priority ASC, id DESC LIMIT 1"),
-                {"p": provider},
-            ).mappings().first()
-            if row:
-                return dict(row)
-        row = conn.execute(
-            text(base + " AND is_default = 1 ORDER BY priority ASC, id DESC LIMIT 1"),
-        ).mappings().first()
-        if row:
-            return dict(row)
-        row = conn.execute(
-            text(base + " ORDER BY priority ASC, id DESC LIMIT 1"),
-        ).mappings().first()
-    return dict(row) if row else None
+        return dict(row) if row else None
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning("读取 db_llm_token 失败，将跳过 LLM: %s", exc)
+        return None
 
 
 def load_sync_tasks(
