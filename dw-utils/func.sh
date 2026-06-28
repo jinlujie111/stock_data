@@ -166,6 +166,15 @@ run_data_sync_range() {
     bash "${runner}" "${start}" --end-date "${end}" "$@"
 }
 
+backfill_fina_indicator_period() {
+    local runner="${DW_ROOT}/dw-sync/backfill_fina_indicator_period.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_dwm_market_breadth() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_market_breadth_di.sh"
     if [[ ! -f "${runner}" ]]; then
