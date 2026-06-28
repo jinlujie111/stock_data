@@ -386,15 +386,6 @@ run_dws_dc_industry_quant_mainline() {
     bash "${runner}" "$@"
 }
 
-run_ods_data_check() {
-    local runner="${DW_ROOT}/dw-monitor/pro_ods_data_check.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_ods_completeness_monitor() {
     local runner="${DW_ROOT}/dw-monitor/pro_ods_completeness.sh"
     if [[ ! -f "${runner}" ]]; then

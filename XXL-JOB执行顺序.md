@@ -10,7 +10,7 @@
 - 任务类型：BEAN / GLUE(Shell) 均可；推荐直接调用仓库脚本（见第三节）
 - 调度参数：可传 `${n_date}`（`YYYYMMDD`），不传则默认当天
 - 建议 Cron：交易日 **22:30**（收盘后 Tushare / 东财热榜数据较全）
-- 失败告警：依赖 exit code；`run_ods_data_check` 返回 1 表示 ODS 有缺口
+- 失败告警：依赖 exit code；`run_ods_completeness_monitor` 返回 1 表示 ODS 有 ALERT
 - Web 展示默认端口：**8082**（`industry_fund_flow`，避免与 XXL-JOB 8080 冲突）
 
 **相关文档**
@@ -115,7 +115,7 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | ⑨ | `run_dim_industry_track` | ⑤ 市场热度 DWM | 需求4 |
 | ⑩ | `run_sector_dragon_batch` | 资金 DWM + `daily` / `moneyflow` | 需求2 |
 | ⑪ | `run_dws_dc_industry_quant_mainline` | 全部东财 DWM + 龙头摘要 | **需求3 量化主线（东财行业）** |
-| ⑫ | `run_ods_data_check` | — | 监控告警 |
+| ⑫ | `run_ods_completeness_monitor` | — | ODS 完整度监控告警 |
 
 **需求3 落库表（步骤 ⑪）**
 
@@ -228,9 +228,9 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 | `run_dim_industry_track` | 需求4 要 | 不做 AI 核心池可不跑 |
 | `run_sector_dragon_batch` | 需求2 要 | 不做板块龙头页可不跑 |
 | `xxl_weekly_batch` | 建议 | 提升「机构化」命中率；无则仍可出榜 |
-| `run_ods_data_check` | 建议 | 生产环境告警 |
+| `run_ods_completeness_monitor` | 建议 | 生产环境 ODS 完整度告警 |
 
-需求4 AI ETL（`run_ai_core_pool_batch`）尚未实现，上线后插在 `run_dim_industry_track` 之后、`run_ods_data_check` 之前。
+需求4 AI ETL（`run_ai_core_pool_batch`）尚未实现，上线后插在 `run_dim_industry_track` 之后、`run_ods_completeness_monitor` 之前。
 
 ---
 
@@ -325,6 +325,7 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | [`dw-utils/xxl_monthly_batch.sh`](dw-utils/xxl_monthly_batch.sh) | 月批 |
 | [`dw-utils/xxl_weekly_batch.sh`](dw-utils/xxl_weekly_batch.sh) | 周批 ETF 映射 |
 | [`dw-utils/xxl_mainline_batch.sh`](dw-utils/xxl_mainline_batch.sh) | 仅需求1 补跑 |
+| [`dw-monitor/pro_ods_completeness.sh`](dw-monitor/pro_ods_completeness.sh) | ODS 完整度监控（配置见 `ods_checks.json`） |
 | [`dw-dwm/pro_dwm_*`](dw-dwm/) | DWM ETL（东财/THS/SW 板块因子，**全部保留**） |
 | [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控/量化主线，**THS/SW 保留**） |
 | [`industry_fund_flow/sql/stock_read_grants.sql`](industry_fund_flow/sql/stock_read_grants.sql) | Web 只读授权 |

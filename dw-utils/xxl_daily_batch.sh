@@ -75,7 +75,7 @@ run_sector_dragon_batch "${n_date}"
 # --- 11) 量化主线 FTELP（需求3，东财行业口径）---
 run_dws_dc_industry_quant_mainline "${n_date}"
 
-# --- 12) ODS 监控（有缺口 exit 1，便于 XXL-JOB 告警）---
-run_ods_data_check "${n_date}"
+# --- 12) ODS 完整度监控（有 ALERT 则 exit 1，便于 XXL-JOB 告警）---
+run_ods_completeness_monitor "${n_date}"
 
 echo "======== stock_data 日批完成 ${n_date} $(date '+%F %T') ========"
