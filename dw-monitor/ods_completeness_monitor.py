@@ -86,6 +86,22 @@ def _where_clause(spec: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return f" AND ({w})", {}
 
 
+def column_exists(conn, table: str, column: str) -> bool:
+    row = conn.execute(
+        text(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = :t
+              AND column_name = :c
+            """
+        ),
+        {"t": table, "c": column},
+    ).scalar()
+    return int(row or 0) >= 1
+
+
 def check_full(conn, spec: dict[str, Any]) -> CheckResult:
     table = spec["table"]
     label = spec.get("label") or table
@@ -99,6 +115,12 @@ def check_full(conn, spec: dict[str, Any]) -> CheckResult:
     metrics: dict[str, Any] = {"total_rows": total}
 
     if min_distinct and distinct_col:
+        if not column_exists(conn, table, distinct_col):
+            return CheckResult(
+                table, "full", Level.ALERT,
+                f"配置 distinct_column={distinct_col} 不存在",
+                label, metrics,
+            )
         dcnt = conn.execute(
             text(f"SELECT COUNT(DISTINCT `{distinct_col}`) FROM `{table}` WHERE 1=1{extra_where}")
         ).scalar()
@@ -135,6 +157,9 @@ def _snapshot_metrics(
     metrics: dict[str, Any] = {"date": d.isoformat(), "rows": int(rows or 0)}
     distinct_col = spec.get("distinct_column")
     if distinct_col:
+        if not column_exists(conn, table, distinct_col):
+            metrics["distinct_error"] = f"列 {distinct_col} 不存在"
+            return metrics
         dcnt = conn.execute(
             text(
                 f"SELECT COUNT(DISTINCT `{distinct_col}`) FROM `{table}`"
@@ -162,6 +187,12 @@ def check_snapshot_one(
         return CheckResult(
             table, "snapshot", Level.ALERT,
             f"{tag} rows={metrics['rows']} require>={min_rows}",
+            label, metrics,
+        )
+    if min_distinct and metrics.get("distinct_error"):
+        return CheckResult(
+            table, "snapshot", Level.ALERT,
+            f"{tag} {metrics['distinct_error']}",
             label, metrics,
         )
     if min_distinct and metrics.get("distinct", 0) < int(min_distinct):
