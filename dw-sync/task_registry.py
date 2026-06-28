@@ -1139,6 +1139,19 @@ def sync_ths_hot(task: TaskDict, trade_date: date | None, dry_run: bool) -> Sync
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     out = apply_transform(df, task)
 
+    # ths_hot 与 dc_hot 相同：接口可能返回多日快照，snapshot 只删业务日，须过滤
+    if not out.empty and "trade_date" in out.columns:
+        before_filter = len(out)
+        out = out[out["trade_date"] == td].copy()
+        if before_filter != len(out):
+            logger.info(
+                "ths_hot id=%s 过滤 trade_date=%s: %s -> %s",
+                task["id"],
+                td,
+                before_filter,
+                len(out),
+            )
+
     logger.info(
         "ths_hot id=%s markets=%s 原始=%s 映射后=%s",
         task["id"],
@@ -1231,6 +1244,19 @@ def sync_dc_hot(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncR
 
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     out = apply_transform(df, task)
+
+    # dc_hot 按 trade_date 入参拉数，但接口会返回多日快照；snapshot 只删业务日，须过滤
+    if not out.empty and "trade_date" in out.columns:
+        before_filter = len(out)
+        out = out[out["trade_date"] == td].copy()
+        if before_filter != len(out):
+            logger.info(
+                "dc_hot id=%s 过滤 trade_date=%s: %s -> %s",
+                task["id"],
+                td,
+                before_filter,
+                len(out),
+            )
 
     logger.info(
         "dc_hot id=%s calls=%s 原始=%s 映射后=%s",

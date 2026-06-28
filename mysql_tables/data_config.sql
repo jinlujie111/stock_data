@@ -138,6 +138,7 @@ INSERT INTO db_sync_task (
             'buy_sm_amount', 'buy_sm_amount_rate',
             'buy_sm_amount_stock', 'rank'
         )
+        )
     ),
     1, '东财行业/概念/地域板块资金流向日快照(Tushare moneyflow_ind_dc)'
 );
