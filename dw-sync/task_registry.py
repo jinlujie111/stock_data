@@ -468,7 +468,7 @@ def sync_fina_mainbz_vip(
                 time.sleep(sleep_s)
 
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-    out = apply_transform(df, task)
+    out = _normalize_mainbz_df(apply_transform(df, task))
 
     logger.info(
         "fina_mainbz_vip id=%s 原始=%s 映射后=%s mode=%s periods=%s",
@@ -525,6 +525,26 @@ def sync_fina_mainbz_vip(
     )
 
 
+_MAINBZ_UK_ITEM_LEN = 128
+
+
+def _normalize_mainbz_df(df: pd.DataFrame) -> pd.DataFrame:
+    """与 uk_fina_mainbz(ts_code,end_date,bz_type,bz_item(128)) 对齐，避免前缀冲突导致 Duplicate entry。"""
+    if df.empty or "bz_item" not in df.columns:
+        return df
+    out = df.copy()
+    items = out["bz_item"]
+    truncated = items.astype("string").str.slice(0, _MAINBZ_UK_ITEM_LEN)
+    out["bz_item"] = truncated.where(items.notna(), None)
+    keys = [c for c in ("ts_code", "end_date", "bz_type", "bz_item") if c in out.columns]
+    if keys:
+        before = len(out)
+        out = out.drop_duplicates(subset=keys, keep="last")
+        if before != len(out):
+            logger.info("mainbz 去重 %s -> %s（uk 含 bz_item 前 %s 字）", before, len(out), _MAINBZ_UK_ITEM_LEN)
+    return out
+
+
 def _delete_ts_codes(database: str, table: str, codes: list[str], *, bz_type: str | None = None) -> None:
     if not codes:
         return
@@ -560,18 +580,19 @@ def _load_mainbz_stock_codes(task: TaskDict, trade_date: date | None) -> list[st
     if missing_only and periods:
         from datetime import datetime
 
-        placeholders = ", ".join(f":p{i}" for i in range(len(periods)))
+        period_dates = [datetime.strptime(p, "%Y%m%d").date() for p in periods]
         params: dict[str, Any] = {
-            f"p{i}": datetime.strptime(p, "%Y%m%d").date() for i, p in enumerate(periods)
+            f"p{i}": d for i, d in enumerate(period_dates)
         }
+        missing_any = " OR ".join(
+            f"NOT EXISTS (SELECT 1 FROM `{task['target_table']}` m"
+            f" WHERE m.ts_code = c.ts_code AND m.end_date = :p{i})"
+            for i in range(len(period_dates))
+        )
         sql = f"""
             SELECT c.ts_code
             FROM `{stock_table}` c
-            WHERE NOT EXISTS (
-                SELECT 1 FROM `{task['target_table']}` m
-                WHERE m.ts_code = c.ts_code
-                  AND m.end_date IN ({placeholders})
-            )
+            WHERE {missing_any}
             ORDER BY c.ts_code
         """
         with engine.connect() as conn:
@@ -613,56 +634,33 @@ def sync_fina_mainbz(task: TaskDict, trade_date: date | None, dry_run: bool) -> 
         )
 
     logger.info("fina_mainbz 待拉取 %s 只股票 type=%s", len(codes), bz_type)
-    frames: list[pd.DataFrame] = []
-    ok_cnt = 0
-    for i, ts_code in enumerate(codes, start=1):
-        try:
-            kwargs: dict[str, Any] = {"ts_code": ts_code, "type": bz_type}
-            if fields:
-                kwargs["fields"] = fields
-            part = fetch_tushare("fina_mainbz", token_type=token_type, **kwargs)
-        except Exception as exc:
-            logger.warning("fina_mainbz ts_code=%s 失败: %s", ts_code, exc)
-            continue
-        if not part.empty:
-            frames.append(part)
-            ok_cnt += 1
-        if log_every > 0 and i % log_every == 0:
-            logger.info("fina_mainbz 进度 %s/%s ok=%s", i, len(codes), ok_cnt)
-        if sleep_s > 0 and i < len(codes):
-            time.sleep(sleep_s)
-
-    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-    out = apply_transform(df, task)
-    refreshed = sorted(out["ts_code"].dropna().unique().tolist()) if not out.empty and "ts_code" in out.columns else []
-
-    logger.info(
-        "fina_mainbz id=%s 股票=%s 成功=%s 原始行=%s 映射后=%s",
-        task["id"],
-        len(codes),
-        ok_cnt,
-        len(df),
-        len(out),
-    )
 
     if dry_run:
+        preview_rows = 0
+        ok_cnt = 0
+        for i, ts_code in enumerate(codes, start=1):
+            try:
+                kwargs: dict[str, Any] = {"ts_code": ts_code, "type": bz_type}
+                if fields:
+                    kwargs["fields"] = fields
+                part = fetch_tushare("fina_mainbz", token_type=token_type, **kwargs)
+            except Exception as exc:
+                logger.warning("fina_mainbz ts_code=%s 失败: %s", ts_code, exc)
+                continue
+            if not part.empty:
+                preview_rows += len(_normalize_mainbz_df(apply_transform(part, task)))
+                ok_cnt += 1
+            if log_every > 0 and i % log_every == 0:
+                logger.info("fina_mainbz 进度 %s/%s ok=%s", i, len(codes), ok_cnt)
+            if sleep_s > 0 and i < len(codes):
+                time.sleep(sleep_s)
         return SyncResult(
             task_id=task["id"],
             source_table=task["source_table"],
             target_table=task["target_table"],
-            rows_affected=len(out),
+            rows_affected=preview_rows,
             ok=True,
             message="dry-run",
-        )
-
-    if out.empty:
-        return SyncResult(
-            task_id=task["id"],
-            source_table=task["source_table"],
-            target_table=task["target_table"],
-            rows_affected=0,
-            ok=False,
-            message=f"fina_mainbz 未拉到数据（待补 {len(codes)} 只）",
         )
 
     if sync_mode == "full":
@@ -671,28 +669,81 @@ def sync_fina_mainbz(task: TaskDict, trade_date: date | None, dry_run: bool) -> 
         engine = get_target_engine(task["target_database"])
         with engine.begin() as conn:
             conn.execute(text(f"TRUNCATE TABLE `{task['target_table']}`"))
-    else:
-        _delete_ts_codes(
-            task["target_database"],
-            task["target_table"],
-            refreshed,
-            bz_type=bz_type if "bz_type" in out.columns else None,
+
+    total_rows = 0
+    ok_cnt = 0
+    write_fail = 0
+    for i, ts_code in enumerate(codes, start=1):
+        try:
+            kwargs = {"ts_code": ts_code, "type": bz_type}
+            if fields:
+                kwargs["fields"] = fields
+            part = fetch_tushare("fina_mainbz", token_type=token_type, **kwargs)
+        except Exception as exc:
+            logger.warning("fina_mainbz ts_code=%s 拉取失败: %s", ts_code, exc)
+            continue
+        if part.empty:
+            continue
+        out = _normalize_mainbz_df(apply_transform(part, task))
+        if out.empty:
+            continue
+        try:
+            if sync_mode != "full":
+                _delete_ts_codes(
+                    task["target_database"],
+                    task["target_table"],
+                    [ts_code],
+                    bz_type=bz_type if "bz_type" in out.columns else None,
+                )
+            total_rows += write_dataframe(
+                database=task["target_database"],
+                table=task["target_table"],
+                df=out,
+                sync_mode="append",
+                trade_date=None,
+            )
+            ok_cnt += 1
+        except Exception as exc:
+            write_fail += 1
+            logger.warning("fina_mainbz ts_code=%s 写入失败: %s", ts_code, exc)
+        if log_every > 0 and i % log_every == 0:
+            logger.info(
+                "fina_mainbz 进度 %s/%s 写入成功=%s 行=%s 失败=%s",
+                i,
+                len(codes),
+                ok_cnt,
+                total_rows,
+                write_fail,
+            )
+        if sleep_s > 0 and i < len(codes):
+            time.sleep(sleep_s)
+
+    logger.info(
+        "fina_mainbz id=%s 股票=%s 写入成功=%s 行=%s 写入失败=%s",
+        task["id"],
+        len(codes),
+        ok_cnt,
+        total_rows,
+        write_fail,
+    )
+
+    if ok_cnt == 0:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=write_fail == 0,
+            message=f"fina_mainbz 未写入数据（待补 {len(codes)} 只，写入失败 {write_fail}）",
         )
 
-    rows = write_dataframe(
-        database=task["target_database"],
-        table=task["target_table"],
-        df=out,
-        sync_mode="append",
-        trade_date=None,
-    )
     return SyncResult(
         task_id=task["id"],
         source_table=task["source_table"],
         target_table=task["target_table"],
-        rows_affected=rows,
-        ok=True,
-        message=f"补全 {len(refreshed)} 只股票",
+        rows_affected=total_rows,
+        ok=write_fail == 0,
+        message=f"补全 {ok_cnt} 只股票" + (f"，{write_fail} 只写入失败" if write_fail else ""),
     )
 
 
