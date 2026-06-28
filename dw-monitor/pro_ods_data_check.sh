@@ -1,6 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # ODS 层数据完整性监控：按交易日核查各表是否有数据，缺失则报警
+# （轻量版；完整度监控请用 pro_ods_completeness.sh / run_ods_completeness_monitor）
 #
 # 用法（必须用 bash）:
 #   bash dw-monitor/pro_ods_data_check.sh              # 默认检查昨日

@@ -1,0 +1,196 @@
+{
+  "defaults": {
+    "continuity_trade_days": 5,
+    "period_lookback": 2
+  },
+  "checks": [
+    {
+      "table": "ods_stock_detail_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 4000,
+      "min_distinct": 4000,
+      "distinct_column": "ts_code",
+      "continuity": true,
+      "label": "A股日线 daily"
+    },
+    {
+      "table": "ods_daily_basic_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 4000,
+      "min_distinct": 4000,
+      "distinct_column": "ts_code",
+      "continuity": true,
+      "label": "A股每日指标 daily_basic"
+    },
+    {
+      "table": "ods_stock_fund_flow_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 4000,
+      "min_distinct": 4000,
+      "distinct_column": "ts_code",
+      "continuity": true,
+      "label": "个股资金流 moneyflow"
+    },
+    {
+      "table": "ods_industry_daily_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 30,
+      "continuity": true,
+      "label": "申万行业日线 sw_daily"
+    },
+    {
+      "table": "ods_industry_fund_flow_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 50,
+      "continuity": true,
+      "label": "东财行业资金流 moneyflow_ind_dc"
+    },
+    {
+      "table": "ods_dc_index_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 50,
+      "continuity": true,
+      "label": "东财板块指数 dc_index"
+    },
+    {
+      "table": "ods_dc_daily_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 50,
+      "continuity": true,
+      "label": "东财板块日线 dc_daily"
+    },
+    {
+      "table": "ods_dc_member_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 1000,
+      "continuity": true,
+      "label": "东财板块成分 dc_member"
+    },
+    {
+      "table": "ods_dc_hot_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 50,
+      "label": "东财热榜 dc_hot"
+    },
+    {
+      "table": "ods_ths_daily_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 100,
+      "continuity": true,
+      "label": "同花顺板块日线 ths_daily"
+    },
+    {
+      "table": "ods_ths_hot_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 50,
+      "label": "同花顺热榜 ths_hot"
+    },
+    {
+      "table": "ods_limit_list_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 5,
+      "label": "涨跌停 limit_list_d"
+    },
+    {
+      "table": "ods_index_daily_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 3,
+      "continuity": true,
+      "label": "指数日线 index_daily"
+    },
+    {
+      "table": "ods_report_rc_di",
+      "type": "snapshot",
+      "date_column": "report_date",
+      "min_rows": 1,
+      "label": "卖方预测 report_rc"
+    },
+    {
+      "table": "ods_etf_share_size_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 100,
+      "continuity": true,
+      "label": "ETF份额 etf_share_size"
+    },
+    {
+      "table": "ods_trading_day",
+      "type": "full",
+      "min_rows": 5000,
+      "label": "交易日历 AkShare"
+    },
+    {
+      "table": "ods_industry_classify",
+      "type": "full",
+      "min_rows": 200,
+      "label": "申万行业分类 index_classify"
+    },
+    {
+      "table": "ods_index_member_all",
+      "type": "full",
+      "min_rows": 5000,
+      "min_distinct": 5000,
+      "distinct_column": "con_code",
+      "label": "申万成分 index_member_all"
+    },
+    {
+      "table": "ods_stock_company_di",
+      "type": "full",
+      "min_rows": 5000,
+      "min_distinct": 5000,
+      "distinct_column": "ts_code",
+      "label": "上市公司基本信息 stock_company"
+    },
+    {
+      "table": "ods_etf_basic_di",
+      "type": "full",
+      "min_rows": 50,
+      "label": "ETF基础 etf_basic"
+    },
+    {
+      "table": "ods_ths_index_di",
+      "type": "full",
+      "min_rows": 200,
+      "label": "同花顺板块指数 ths_index"
+    },
+    {
+      "table": "ods_ths_member_di",
+      "type": "full",
+      "min_rows": 5000,
+      "label": "同花顺板块成分 ths_member"
+    },
+    {
+      "table": "ods_fina_indicator",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 3,
+      "min_distinct": 4000,
+      "distinct_column": "ts_code",
+      "label": "财务指标 fina_indicator_vip"
+    },
+    {
+      "table": "ods_fina_mainbz_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_distinct": 3000,
+      "distinct_column": "ts_code",
+      "where": "bz_type = 'P'",
+      "min_rows_per_period": 5000,
+      "label": "主营业务构成 fina_mainbz"
+    }
+  ]
+}
