@@ -100,6 +100,56 @@ def load_db_token(token_type: str = "tushare") -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+def load_llm_token(
+    *,
+    provider: str | None = None,
+    model_name: str | None = None,
+) -> dict[str, Any] | None:
+    """
+    从 data_config.db_llm_token 读取有效大模型配置。
+    优先级：provider+model_name > model_name > provider > is_default > priority 最小。
+    """
+    base = """
+        SELECT id, provider, model_name, api_key, api_url, status, is_default, priority, remark
+        FROM db_llm_token
+        WHERE status = 1
+          AND (start_date IS NULL OR start_date <= NOW())
+          AND (end_date IS NULL OR end_date >= NOW())
+    """
+    engine = get_config_engine()
+    with engine.connect() as conn:
+        if provider and model_name:
+            row = conn.execute(
+                text(base + " AND provider = :p AND model_name = :m ORDER BY priority ASC, id DESC LIMIT 1"),
+                {"p": provider, "m": model_name},
+            ).mappings().first()
+            if row:
+                return dict(row)
+        if model_name:
+            row = conn.execute(
+                text(base + " AND model_name = :m ORDER BY priority ASC, id DESC LIMIT 1"),
+                {"m": model_name},
+            ).mappings().first()
+            if row:
+                return dict(row)
+        if provider:
+            row = conn.execute(
+                text(base + " AND provider = :p ORDER BY priority ASC, id DESC LIMIT 1"),
+                {"p": provider},
+            ).mappings().first()
+            if row:
+                return dict(row)
+        row = conn.execute(
+            text(base + " AND is_default = 1 ORDER BY priority ASC, id DESC LIMIT 1"),
+        ).mappings().first()
+        if row:
+            return dict(row)
+        row = conn.execute(
+            text(base + " ORDER BY priority ASC, id DESC LIMIT 1"),
+        ).mappings().first()
+    return dict(row) if row else None
+
+
 def load_sync_tasks(
     *,
     task_id: int | None = None,

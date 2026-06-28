@@ -141,6 +141,7 @@ NAV_ITEMS = [
     {"slug": "prosperity", "label": "产业景气", "href": "/dc/prosperity"},
     {"slug": "diffusion", "label": "扩散效应", "href": "/dc/diffusion"},
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon"},
+    {"slug": "ai-core", "label": "AI 核心池", "href": "/dc/ai-core"},
 ]
 
 CONTENT_TYPES = ["行业", "概念", "地域"]

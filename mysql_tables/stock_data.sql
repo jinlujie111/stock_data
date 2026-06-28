@@ -966,3 +966,66 @@ CREATE TABLE IF NOT EXISTS dim_industry_track_stock (
     UNIQUE KEY uk_track_stock (industry_id, as_of_date, ts_code),
     KEY idx_track_stock_asof (as_of_date, industry_id, is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池-东财板块成分候选股';
+
+CREATE TABLE IF NOT EXISTS ai_core_pool_config (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    config_key      VARCHAR(64)  NOT NULL DEFAULT '__global__',
+    model_name      VARCHAR(64)  NOT NULL DEFAULT 'gpt-4o-mini',
+    llm_provider    VARCHAR(32)  NULL COMMENT '对应 data_config.db_llm_token.provider',
+    prompt_version  VARCHAR(16)  NOT NULL DEFAULT 'v1',
+    temperature     DECIMAL(3,2) NOT NULL DEFAULT 0.20,
+    max_tokens      INT          NOT NULL DEFAULT 1024,
+    score_threshold INT          NOT NULL DEFAULT 60 COMMENT '入核心池最低分',
+    reject_score    INT          NOT NULL DEFAULT 20 COMMENT '概念股剔除线',
+    mainbz_min_pct  DECIMAL(5,2) NOT NULL DEFAULT 10.00 COMMENT '主业占比下限%',
+    batch_size      INT          NOT NULL DEFAULT 10,
+    rate_limit_rpm  INT          NOT NULL DEFAULT 60,
+    effective_date  DATE         NOT NULL,
+    is_active       TINYINT      NOT NULL DEFAULT 1,
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_ai_core_config (config_key, effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池全局配置';
+
+CREATE TABLE IF NOT EXISTS dwm_industry_stock_ai_score_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE         NOT NULL,
+    industry_id     VARCHAR(32)  NOT NULL,
+    industry_name   VARCHAR(128) NOT NULL,
+    ts_code         VARCHAR(16)  NOT NULL,
+    stock_name      VARCHAR(64)  NULL,
+    industry_match  TINYINT      NOT NULL DEFAULT 0,
+    segment         VARCHAR(64)  NULL,
+    core_degree     VARCHAR(16)  NULL,
+    score           DECIMAL(5,2) NULL,
+    level           CHAR(1)      NULL COMMENT 'S/A/B/C',
+    reason          TEXT         NULL,
+    model_name      VARCHAR(64)  NULL,
+    prompt_version  VARCHAR(16)  NULL,
+    raw_json        JSON         NULL,
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_ai_score (trade_date, industry_id, ts_code),
+    KEY idx_ai_score_industry (trade_date, industry_id, level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI赛道归属评分(全量留痕)';
+
+CREATE TABLE IF NOT EXISTS dwm_industry_stock_core_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date    DATE         NOT NULL,
+    industry_id   VARCHAR(32)  NOT NULL,
+    industry_name VARCHAR(128) NOT NULL,
+    ts_code       VARCHAR(16)  NOT NULL,
+    stock_name    VARCHAR(64)  NULL,
+    score         DECIMAL(5,2) NOT NULL,
+    level         CHAR(1)      NOT NULL COMMENT 'S/A/B',
+    weight        DECIMAL(10,6) NULL COMMENT '赛道内归一化权重',
+    segment       VARCHAR(64)  NULL,
+    reason        TEXT         NULL,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_core_pool (trade_date, industry_id, ts_code),
+    KEY idx_core_pool_industry (trade_date, industry_id, level)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池(剔除后)';
+
+-- 已有库升级（按需执行一次）:
+-- ALTER TABLE ai_core_pool_config ADD COLUMN llm_provider VARCHAR(32) NULL
+--   COMMENT '对应 data_config.db_llm_token.provider' AFTER model_name;

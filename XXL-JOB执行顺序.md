@@ -112,7 +112,8 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | ⑥ | `run_dwm_dc_industry_diffusion` / `run_dwm_ths_industry_diffusion` / `run_dwm_sw_industry_diffusion` | 成分 + 涨停 + 广度 | 需求1 五维 |
 | ⑦ | `run_dwm_dc_industry_prosperity` / `run_dwm_ths_industry_prosperity` / `run_dwm_sw_industry_prosperity` | 成分 + `ods_fina_indicator` + `ods_report_rc_di` | 需求1 五维 |
 | ⑧ | `run_dws_*_mainline_score` + `run_dws_*_mainline_monitor` | 上述全部 DWM | **需求1 主线榜** |
-| ⑨ | `run_dim_industry_track` | ⑤ 市场热度 DWM | 需求4 |
+| ⑨ | `run_dim_industry_track` | ⑤ 市场热度 DWM | 需求4 DIM |
+| ⑨b | `run_ai_core_pool_batch` | ⑨ DIM + ODS 公司/财报/研报 | **需求4 核心池** |
 | ⑩ | `run_sector_dragon_batch` | 资金 DWM + `daily` / `moneyflow` | 需求2 |
 | ⑪ | `run_dws_dc_industry_quant_mainline` | 全部东财 DWM + 龙头摘要 | **需求3 量化主线（东财行业）** |
 | ⑫ | `run_ods_completeness_monitor` | — | ODS 完整度监控告警 |
@@ -226,11 +227,12 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 | `run_data_sync` | 是* | 下游 DWM 都依赖当日 ODS；*热榜建议 22:30 后 |
 | DWM / DWS 主线（⑧） | **需求1 要** | 不做 `/dc/mainline` 可不跑 |
 | `run_dim_industry_track` | 需求4 要 | 不做 AI 核心池可不跑 |
+| `run_ai_core_pool_batch` | 需求4 要 | 无 LLM Key 时走规则引擎 |
 | `run_sector_dragon_batch` | 需求2 要 | 不做板块龙头页可不跑 |
 | `xxl_weekly_batch` | 建议 | 提升「机构化」命中率；无则仍可出榜 |
 | `run_ods_completeness_monitor` | 建议 | 生产环境 ODS 完整度告警 |
 
-需求4 AI ETL（`run_ai_core_pool_batch`）尚未实现，上线后插在 `run_dim_industry_track` 之后、`run_ods_completeness_monitor` 之前。
+需求4 AI ETL（`run_ai_core_pool_batch`）已接入日批，位于 `run_dim_industry_track` 之后、`run_sector_dragon_batch` 之前。
 
 ---
 
@@ -326,6 +328,7 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | [`dw-utils/xxl_weekly_batch.sh`](dw-utils/xxl_weekly_batch.sh) | 周批 ETF 映射 |
 | [`dw-utils/xxl_mainline_batch.sh`](dw-utils/xxl_mainline_batch.sh) | 仅需求1 补跑 |
 | [`dw-monitor/pro_ods_completeness.sh`](dw-monitor/pro_ods_completeness.sh) | ODS 完整度监控（配置见 `ods_checks.json`） |
+| [`dw-dwm/pro_dwm_ai_core_pool_di.sh`](dw-dwm/pro_dwm_ai_core_pool_di.sh) | 需求4 AI 核心池批处理 |
 | [`dw-dwm/pro_dwm_*`](dw-dwm/) | DWM ETL（东财/THS/SW 板块因子，**全部保留**） |
 | [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控/量化主线，**THS/SW 保留**） |
 | [`industry_fund_flow/sql/stock_read_grants.sql`](industry_fund_flow/sql/stock_read_grants.sql) | Web 只读授权 |

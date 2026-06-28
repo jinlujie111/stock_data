@@ -69,6 +69,9 @@ run_dws_sw_industry_mainline_monitor "${n_date}"
 # 环境变量可选：AI_CORE_TRACK_TOP_N=50  AI_CORE_TRACK_CONTENT_TYPES=概念,行业
 run_dim_industry_track "${n_date}"
 
+# --- 9b) AI 核心池（需求4；无 LLM Key 时自动走规则引擎）---
+run_ai_core_pool_batch "${n_date}"
+
 # --- 10) 板块龙头 MVP（需求2）---
 run_sector_dragon_batch "${n_date}"
 

@@ -25,6 +25,48 @@ INSERT INTO db_token (token_type, token_id, api_url, status, remark, start_date,
 ('tushare', '0ced3a73b7055fc7e38a2a7665db0fa371b51518e838dfce9fba5ae5', NULL, 0, '历史 Tushare Pro', '1999-01-01', '2999-12-31'),
 ('tushare', 'kOxsKJfSHCAsIrePsxWkfUdGIbMhfLWyTEfPSdueqnzMsqGigIeIaprTDglfSstX', 'http://a.sszhixia.cn/', 1, '当前 Tushare Pro（代理）', '1999-01-01', '2026-11-22');
 
+-- db_llm_token：大模型 API（OpenAI 兼容），供需求4 AI 核心池等场景
+CREATE TABLE IF NOT EXISTS db_llm_token (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    provider      VARCHAR(32)  NOT NULL COMMENT '厂商标识 openai/deepseek/qwen/doubao/custom',
+    model_name    VARCHAR(64)  NOT NULL COMMENT 'API model 参数，如 gpt-4o-mini',
+    api_key       VARCHAR(512) NOT NULL COMMENT 'API Key / Token',
+    api_url       VARCHAR(256) NOT NULL COMMENT 'OpenAI 兼容根地址，如 https://api.openai.com/v1',
+    status        TINYINT      NOT NULL DEFAULT 1 COMMENT '1=有效 0=停用',
+    is_default    TINYINT      NOT NULL DEFAULT 0 COMMENT '1=未指定 model 时的默认',
+    priority      INT          NOT NULL DEFAULT 100 COMMENT '越小越优先',
+    remark        VARCHAR(256) NULL,
+    start_date    DATETIME     NULL,
+    end_date      DATETIME     NULL,
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_llm_provider_model (provider, model_name),
+    KEY idx_llm_status_default (status, is_default, priority)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='大模型 API Token（需求4 等）';
+
+-- 示例行（status=0，填入真实 api_key 后改 status=1；同一时刻建议仅一个 is_default=1）
+INSERT INTO db_llm_token (
+    provider, model_name, api_key, api_url, status, is_default, priority, remark, start_date, end_date
+) VALUES
+(
+    'openai', 'gpt-4o-mini', 'REPLACE_WITH_YOUR_KEY',
+    'https://api.openai.com/v1', 0, 1, 10,
+    'OpenAI 官方；启用: UPDATE db_llm_token SET api_key=..., status=1 WHERE provider=''openai''',
+    '1999-01-01', '2999-12-31'
+),
+(
+    'deepseek', 'deepseek-chat', 'REPLACE_WITH_YOUR_KEY',
+    'https://api.deepseek.com/v1', 0, 0, 20,
+    'DeepSeek OpenAI 兼容接口',
+    '1999-01-01', '2999-12-31'
+),
+(
+    'qwen', 'qwen-plus', 'REPLACE_WITH_YOUR_KEY',
+    'https://dashscope.aliyuncs.com/compatible-mode/v1', 0, 0, 30,
+    '通义千问 compatible-mode',
+    '1999-01-01', '2999-12-31'
+);
+
 -- db_sync_task
 CREATE TABLE IF NOT EXISTS db_sync_task (
     id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
