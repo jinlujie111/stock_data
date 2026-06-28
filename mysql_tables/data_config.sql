@@ -362,6 +362,9 @@ INSERT INTO db_sync_task (
     JSON_OBJECT(
         'token_type', 'tushare',
         'params', JSON_OBJECT('is_new', 'Y'),
+        'page_size', 2000,
+        'max_pages', 4,
+        'sleep_seconds', 0.3,
         'inject_date_range', FALSE
     ),
     JSON_OBJECT(
@@ -373,7 +376,7 @@ INSERT INTO db_sync_task (
             'ts_code', 'name', 'in_date', 'out_date', 'is_new'
         )
     ),
-    1, '全量更新申万行业成分(Tushare index_member_all, is_new=Y)'
+    1, '全量更新申万行业成分(Tushare index_member_all, is_new=Y；offset 分页最多4页×2000行)'
 );
 
 -- Tushare fina_indicator_vip → ods_fina_indicator（全市场一季/一日；需约5000积分）

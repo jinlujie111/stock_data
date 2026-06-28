@@ -150,6 +150,56 @@ def fetch_by_proxy(
     raise ValueError(f"不支持的 proxy_source: {proxy_source}")
 
 
+def fetch_tushare_paged(
+    source_table: str,
+    *,
+    token_type: str = "tushare",
+    page_size: int = 2000,
+    max_pages: int | None = None,
+    sleep_s: float = 0.3,
+    **base_kwargs: Any,
+) -> pd.DataFrame:
+    """
+    Tushare 接口 limit/offset 分页拉全量（如 index_member_all 单次最大 2000 行）。
+    max_pages 有值时固定最多拉 N 页（未满 page_size 也继续，以防 API 提前截断）。
+    """
+    frames: list[pd.DataFrame] = []
+    offset = 0
+    page = 0
+    while True:
+        page += 1
+        if max_pages is not None and page > max_pages:
+            break
+        kwargs = dict(base_kwargs)
+        kwargs["limit"] = page_size
+        kwargs["offset"] = offset
+        part = fetch_tushare(source_table, token_type=token_type, **kwargs)
+        n = len(part)
+        logger.info(
+            "%s 分页 %s/%s: offset=%s rows=%s",
+            source_table,
+            page,
+            max_pages or "?",
+            offset,
+            n,
+        )
+        if part.empty:
+            break
+        frames.append(part)
+        if max_pages is None and n < page_size:
+            break
+        if max_pages is not None and page >= max_pages:
+            break
+        offset += page_size
+        if sleep_s > 0:
+            time.sleep(sleep_s)
+    if not frames:
+        return pd.DataFrame()
+    if len(frames) == 1:
+        return frames[0]
+    return pd.concat(frames, ignore_index=True)
+
+
 def fetch_task_dataframe(task: TaskDict, trade_date: date | None) -> pd.DataFrame:
     proxy = task["proxy_source"]
     api_name = task["source_table"]
@@ -271,6 +321,77 @@ def sync_stock_company(task: TaskDict, trade_date: date | None, dry_run: bool) -
             rows_affected=0,
             ok=False,
             message="stock_company 返回 0 行，请检查 Tushare 积分与代理 API",
+        )
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode=sync_mode,
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
+@register("tushare", "index_member_all")
+def sync_index_member_all(
+    task: TaskDict, trade_date: date | None, dry_run: bool
+) -> SyncResult:
+    """index_member_all 单次最大 2000 行，固定最多 4 页 offset 分页拉全量后写入。"""
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    page_size = int(fetch_cfg.get("page_size") or 2000)
+    max_pages = int(fetch_cfg.get("max_pages") or 4)
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.3)
+    base_params = dict(fetch_cfg.get("params") or {})
+    sync_mode = (task.get("sync_mode") or "full").lower()
+
+    df = fetch_tushare_paged(
+        "index_member_all",
+        token_type=token_type,
+        page_size=page_size,
+        max_pages=max_pages,
+        sleep_s=sleep_s,
+        **base_params,
+    )
+    out = apply_transform(df, task)
+    stock_cnt = out["ts_code"].nunique() if not out.empty and "ts_code" in out.columns else 0
+
+    logger.info(
+        "index_member_all id=%s 原始=%s 映射后=%s stocks=%s mode=%s",
+        task["id"],
+        len(df),
+        len(out),
+        stock_cnt,
+        sync_mode,
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if out.empty:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message="index_member_all 返回 0 行，请检查 Tushare 积分(约2000)与代理 API",
         )
 
     rows = write_dataframe(
