@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, fmtPct, apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
+  const { fmtNum, fmtPct, apiGet, toApiTradeDate, initTradeDateCalendar, renderHistoryChart } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elTop = document.getElementById("top-n");
