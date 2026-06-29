@@ -536,13 +536,26 @@ body {
   min-width: 260px;
 }
 
-.filter-field select {
+.filter-field select,
+.filter-field input.date-input {
   padding: 0.72rem 0.9rem;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(15, 20, 25, 0.95);
   color: var(--text);
   font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.filter-field input.date-input {
+  min-width: 11rem;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.filter-field input.date-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
 }
 
 .board-picker {

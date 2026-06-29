@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, apiGet, renderHistoryChart } = window.DcBoard;
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, renderHistoryChart } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elSignalStatus = document.getElementById("signal-status");
@@ -139,7 +139,7 @@
   async function loadHistory(code, name) {
     clearError();
     try {
-      const td = elDate.value ? elDate.value.replace(/-/g, "") : "";
+      const td = elDate.value ? toApiTradeDate(elDate.value) : "";
       const q = td ? `?industry_code=${encodeURIComponent(code)}&trade_date=${td}&days=60` : `?industry_code=${encodeURIComponent(code)}&days=60`;
       const data = await apiGet(`/api/v1/quant-mainline/history${q}`);
       elHistoryTitle.textContent = `${name || data.industry_name || code} · FTELP 近60日`;
@@ -168,11 +168,7 @@
   }
 
   async function loadTradeDates() {
-    const data = await apiGet("/api/v1/quant-mainline/trade-dates?limit=90");
-    elDate.innerHTML = (data.dates || [])
-      .map((d) => `<option value="${d}">${d}</option>`)
-      .join("");
-    if (data.latest && !elDate.value) elDate.value = data.latest;
+    await initTradeDateCalendar(elDate, "/api/v1/quant-mainline/trade-dates?limit=90");
   }
 
   function selectedContentTypesParam() {
@@ -194,7 +190,7 @@
     clearError();
     elFilterHint.textContent = "查询中…";
     try {
-      const td = elDate.value ? elDate.value.replace(/-/g, "") : "";
+      const td = elDate.value ? toApiTradeDate(elDate.value) : "";
       const ma = elMa.value;
       const ctypes = selectedContentTypesParam();
       const topData = await apiGet(

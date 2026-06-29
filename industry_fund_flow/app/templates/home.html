@@ -2,7 +2,7 @@
 {% block app_content %}
 <div class="page-head">
   <h1>欢迎，{{ user.username }}</h1>
-  <p class="muted">市场广度与东方财富主线板块、五维明细一览。</p>
+  <p class="muted">沪深 A 股全市场广度概览。</p>
 </div>
 
 <section class="card breadth-card">
@@ -13,7 +13,7 @@
     </div>
     <label class="filter-field breadth-date-field">
       <span>交易日期</span>
-      <select id="breadth-date"></select>
+      <input type="date" id="breadth-date" class="date-input" />
     </label>
   </div>
   <div id="breadth-error" class="alert alert-error hidden"></div>
@@ -26,24 +26,9 @@
     <div id="breadth-trend-chart"></div>
   </div>
 </section>
-
-<h2 class="section-title section-title--spaced">业务入口</h2>
-<div class="dash-grid">
-  <a href="/dc/mainline" class="dash-card dash-card--featured">
-    <div class="dash-card-title">主线板块</div>
-    <div class="dash-card-desc">五维加权得分 · 等级 · 三阶段监控榜</div>
-  </a>
-  {% for item in nav_items %}
-  {% if item.slug != 'mainline' %}
-  <a href="{{ item.href }}" class="dash-card">
-    <div class="dash-card-title">{{ item.label }}</div>
-    <div class="dash-card-desc">查看东财板块明细列表</div>
-  </a>
-  {% endif %}
-  {% endfor %}
-</div>
 {% endblock %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="/static/js/home.js"></script>
+<script src="/static/js/dc_board_common.js?v=20260626"></script>
+<script src="/static/js/home.js?v=20260626"></script>
 {% endblock %}

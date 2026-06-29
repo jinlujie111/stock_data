@@ -8,7 +8,7 @@
   <div class="filters">
     <label class="filter-field">
       <span>交易日期</span>
-      <select id="trade-date"></select>
+      <input type="date" id="trade-date" class="date-input" />
     </label>
     <label class="filter-field filter-field--wide">
       <span>板块类型</span>
@@ -100,52 +100,11 @@
   <div id="table-empty" class="table-empty hidden">暂无数据，请换交易日或放宽筛选条件</div>
   <div id="table-error" class="alert alert-error hidden"></div>
 </div>
-
-<section class="card charts-card">
-  <div class="charts-head">
-    <h2 class="section-title">近30日趋势</h2>
-    <div class="charts-toolbar">
-      <label class="filter-field filter-field--grow">
-        <span>图表板块（可输入名称/代码搜索后点选）</span>
-        <div class="board-picker" id="chart-board-picker">
-          <div class="board-selected" id="chart-board-selected"></div>
-          <input
-            type="text"
-            id="chart-board-search"
-            class="board-search"
-            placeholder="输入板块名称或代码，模糊匹配…"
-            autocomplete="off"
-          />
-          <div class="board-dropdown hidden" id="chart-board-dropdown"></div>
-        </div>
-      </label>
-      <div class="charts-toolbar-actions">
-        <button type="button" class="btn btn-primary charts-refresh-btn" id="btn-chart-refresh">刷新图表</button>
-        <button type="button" class="btn btn-ghost" id="btn-reset-chart-boards">恢复默认</button>
-      </div>
-    </div>
-  </div>
-  <div id="chart-error" class="alert alert-error hidden"></div>
-  <div class="chart-grid">
-    <div class="chart-box">
-      <h3 class="chart-title">板块主力净流入趋势（亿）</h3>
-      <div class="chart-canvas-wrap"><canvas id="chart-net-yi"></canvas></div>
-    </div>
-    <div class="chart-box">
-      <h3 class="chart-title">板块主力净流入占比趋势（%）</h3>
-      <div class="chart-canvas-wrap"><canvas id="chart-net-rate"></canvas></div>
-    </div>
-    <div class="chart-box">
-      <h3 class="chart-title">板块资金流排名趋势</h3>
-      <div class="chart-canvas-wrap"><canvas id="chart-rank"></canvas></div>
-    </div>
-  </div>
-</section>
 {% endblock %}
 {% block scripts %}
 <script>
   window.__DC_PAGE__ = {{ dimension_json | safe }}
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="/static/js/dc_fund_flow.js?v=20260610b"></script>
+<script src="/static/js/dc_board_common.js?v=20260626"></script>
+<script src="/static/js/dc_fund_flow.js?v=20260626"></script>
 {% endblock %}

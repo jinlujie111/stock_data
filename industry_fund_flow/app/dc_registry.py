@@ -132,19 +132,18 @@ DC_DIMENSIONS: dict[str, DimensionDef] = {
     },
 }
 
+CONTENT_TYPES = ["行业", "概念"]
+
+# 已下线 Web 入口（ETL/数仓仍保留）
+DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "diffusion"})
+
 NAV_ITEMS = [
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline"},
     {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline"},
     {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow"},
-    {"slug": "trend-strength", "label": "趋势强度", "href": "/dc/trend-strength"},
-    {"slug": "market-heat", "label": "市场热度", "href": "/dc/market-heat"},
-    {"slug": "prosperity", "label": "产业景气", "href": "/dc/prosperity"},
-    {"slug": "diffusion", "label": "扩散效应", "href": "/dc/diffusion"},
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon"},
     {"slug": "ai-core", "label": "AI 核心池", "href": "/dc/ai-core"},
 ]
-
-CONTENT_TYPES = ["行业", "概念", "地域"]
 
 
 def get_dimension(slug: str) -> DimensionDef:

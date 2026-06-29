@@ -1,4 +1,4 @@
-/** 东财板块页面公共工具（主线榜 / 量化主线共用） */
+/** 东财板块页面公共工具（主线榜 / 量化主线 / 资金强度共用） */
 (function () {
   function fmtNum(v, d) {
     if (v === null || v === undefined || v === "") return "—";
@@ -18,6 +18,30 @@
     const res = await fetch(path, { credentials: "same-origin" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || "请求失败");
+    return data;
+  }
+
+  /** YYYY-MM-DD 或 YYYYMMDD → YYYY-MM-DD（供 input[type=date]） */
+  function normalizeIsoDate(raw) {
+    if (!raw) return "";
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+    return s;
+  }
+
+  /** input[type=date] → API 参数 YYYYMMDD */
+  function toApiTradeDate(isoDate) {
+    if (!isoDate) return "";
+    return String(isoDate).replace(/-/g, "");
+  }
+
+  /** 拉取最新交易日并写入日历控件 */
+  async function initTradeDateCalendar(inputEl, datesApiUrl) {
+    if (!inputEl) return null;
+    const data = await apiGet(datesApiUrl);
+    const latest = normalizeIsoDate(data.latest || (data.dates && data.dates[0]) || "");
+    if (latest) inputEl.value = latest;
     return data;
   }
 
@@ -55,6 +79,9 @@
     fmtNum,
     fmtPct,
     apiGet,
+    normalizeIsoDate,
+    toApiTradeDate,
+    initTradeDateCalendar,
     renderHistoryChart,
   };
 })();

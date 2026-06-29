@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.deps import require_user
-from app.dc_registry import DC_DIMENSIONS, NAV_ITEMS, get_dimension
+from app.dc_registry import DC_DIMENSIONS, DISABLED_DC_SLUGS, NAV_ITEMS, get_dimension
 from app.dc_service import (
     latest_trade_date,
     list_boards,
@@ -35,13 +35,15 @@ def _ctx(user: dict, active_nav: str, **extra):
         "user": user,
         "nav_items": NAV_ITEMS,
         "active_nav": active_nav,
-        "content_types": ["行业", "概念", "地域"],
+        "content_types": ["行业", "概念"],
         **extra,
     }
 
 
 @page_router.get("/dc/{slug}", response_class=HTMLResponse)
 def dc_list_page(slug: str, request: Request, user: dict = Depends(require_user)):
+    if slug in DISABLED_DC_SLUGS:
+        raise HTTPException(status_code=404, detail="该功能已下线")
     try:
         dim = get_dimension(slug)
     except KeyError as exc:
@@ -55,8 +57,6 @@ def dc_list_page(slug: str, request: Request, user: dict = Depends(require_user)
         "default_sort_key": dim.get("default_sort_key", ""),
         "default_sort_dir": dim.get("default_sort_dir", "asc"),
     }
-    if slug == "fund-flow":
-        page_cfg["chart_default_boards"] = ff_svc.DEFAULT_CHART_BOARDS
     return _templates.TemplateResponse(
         request,
         template,
@@ -79,6 +79,7 @@ def api_dimensions(_user: dict = Depends(require_user)):
             "href": f"/dc/{d['slug']}",
         }
         for d in DC_DIMENSIONS.values()
+        if d["slug"] not in DISABLED_DC_SLUGS
     ]
 
 
@@ -89,6 +90,8 @@ def api_trade_dates(
     _user: dict = Depends(require_user),
 ):
     try:
+        if slug in DISABLED_DC_SLUGS:
+            raise HTTPException(status_code=404, detail="该功能已下线")
         get_dimension(slug)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="未知维度") from exc
@@ -109,6 +112,8 @@ def api_boards(
     _user: dict = Depends(require_user),
 ):
     try:
+        if slug in DISABLED_DC_SLUGS:
+            raise HTTPException(status_code=404, detail="该功能已下线")
         get_dimension(slug)
         td = parse_trade_date(trade_date)
         if not td:
@@ -180,6 +185,8 @@ def api_dimension_list(
     _user: dict = Depends(require_user),
 ):
     try:
+        if slug in DISABLED_DC_SLUGS:
+            raise HTTPException(status_code=404, detail="该功能已下线")
         get_dimension(slug)
         td = parse_trade_date(trade_date) if trade_date else latest_trade_date(slug)
         if not td:

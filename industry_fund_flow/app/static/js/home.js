@@ -1,4 +1,5 @@
 (function () {
+  const { apiGet, normalizeIsoDate, initTradeDateCalendar } = window.DcBoard;
   const elDate = document.getElementById("breadth-date");
   const elGrid = document.getElementById("breadth-metrics");
   const elEmpty = document.getElementById("breadth-empty");
@@ -19,13 +20,6 @@
       return pct.toLocaleString("zh-CN", { maximumFractionDigits: 2 }) + "%";
     }
     return val;
-  }
-
-  async function apiGet(path) {
-    const res = await fetch(path, { credentials: "same-origin" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || "请求失败");
-    return data;
   }
 
   function renderMetrics(payload) {
@@ -169,19 +163,6 @@
     });
   }
 
-  async function loadDates() {
-    const res = await apiGet("/api/market-breadth/trade-dates");
-    elDate.innerHTML = res.dates
-      .map((d) => `<option value="${d}">${d}</option>`)
-      .join("");
-    if (res.latest) {
-      if (!res.dates.includes(res.latest)) {
-        elDate.insertAdjacentHTML("afterbegin", `<option value="${res.latest}">${res.latest}</option>`);
-      }
-      elDate.value = res.latest;
-    }
-  }
-
   async function loadBreadth() {
     elError.classList.add("hidden");
     const td = elDate.value;
@@ -189,8 +170,9 @@
       ? `/api/market-breadth?trade_date=${encodeURIComponent(td)}`
       : "/api/market-breadth";
     const payload = await apiGet(url);
-    if (payload.trade_date && elDate.value !== payload.trade_date) {
-      elDate.value = payload.trade_date;
+    if (payload.trade_date) {
+      const iso = normalizeIsoDate(payload.trade_date);
+      if (iso && elDate.value !== iso) elDate.value = iso;
     }
     renderMetrics(payload);
   }
@@ -207,8 +189,8 @@
     });
   });
 
-  Promise.all([loadDates(), loadTrend()])
-    .then(() => loadBreadth())
+  initTradeDateCalendar(elDate, "/api/market-breadth/trade-dates?limit=90")
+    .then(() => Promise.all([loadBreadth(), loadTrend()]))
     .catch((err) => {
       elError.textContent = err.message;
       elError.classList.remove("hidden");

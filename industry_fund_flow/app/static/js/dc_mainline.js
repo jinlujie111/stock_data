@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, fmtPct, apiGet, renderHistoryChart } = window.DcBoard;
+  const { fmtNum, fmtPct, apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elTop = document.getElementById("top-n");
@@ -111,7 +111,7 @@
 
   function buildRankUrl() {
     const params = new URLSearchParams();
-    if (elDate.value) params.set("trade_date", elDate.value.replace(/-/g, ""));
+    if (elDate.value) params.set("trade_date", toApiTradeDate(elDate.value));
     params.set("ma_window", elMa.value);
     params.set("top", elTop.value);
     if (selectedTypes.length) params.set("content_types", selectedTypes.join(","));
@@ -163,7 +163,7 @@
   async function loadHistory(code, name) {
     clearError();
     try {
-      const td = elDate.value ? elDate.value.replace(/-/g, "") : "";
+      const td = elDate.value ? toApiTradeDate(elDate.value) : "";
       const q = td ? `?industry_code=${encodeURIComponent(code)}&trade_date=${td}&days=60` : `?industry_code=${encodeURIComponent(code)}&days=60`;
       const data = await apiGet(`/api/v1/mainline/history${q}`);
       elHistoryTitle.textContent = `${name || data.industry_name || code} · 近60日得分`;
@@ -192,11 +192,7 @@
   }
 
   async function loadTradeDates() {
-    const data = await apiGet("/api/v1/mainline/trade-dates?limit=90");
-    elDate.innerHTML = (data.dates || [])
-      .map((d) => `<option value="${d}">${d}</option>`)
-      .join("");
-    if (data.latest && !elDate.value) elDate.value = data.latest;
+    await initTradeDateCalendar(elDate, "/api/v1/mainline/trade-dates?limit=90");
   }
 
   async function queryRank() {
