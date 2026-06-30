@@ -17,3 +17,24 @@ CREATE TABLE IF NOT EXISTS app_user (
     UNIQUE KEY uk_app_user_username (username),
     UNIQUE KEY uk_app_user_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行业资金流网站用户';
+
+CREATE TABLE IF NOT EXISTS app_user_board_favorite (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id       BIGINT       NOT NULL COMMENT 'app_user.id',
+    industry_code VARCHAR(32)  NOT NULL COMMENT '东财板块代码',
+    industry_name VARCHAR(128) NULL COMMENT '板块名称',
+    content_type  VARCHAR(16)  NULL COMMENT '行业/概念',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_board (user_id, industry_code),
+    KEY idx_board_fav_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户板块自选';
+
+CREATE TABLE IF NOT EXISTS app_user_stock_favorite (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id     BIGINT       NOT NULL COMMENT 'app_user.id',
+    ts_code     VARCHAR(16)  NOT NULL COMMENT '股票TS代码',
+    stock_name  VARCHAR(64)  NULL COMMENT '股票简称',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_stock (user_id, ts_code),
+    KEY idx_stock_fav_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户股票自选';

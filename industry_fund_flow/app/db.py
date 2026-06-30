@@ -66,6 +66,12 @@ def init_schema() -> None:
                 conn.execute(text(s))
 
 
+def fetch_all(sql: str, params: dict | None = None) -> list[dict]:
+    with get_engine().connect() as conn:
+        rows = conn.execute(text(sql), params or {}).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def fetch_one(sql: str, params: dict | None = None) -> dict | None:
     with get_engine().connect() as conn:
         row = conn.execute(text(sql), params or {}).mappings().first()

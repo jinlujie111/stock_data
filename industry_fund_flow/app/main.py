@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
-from app import auth_service, routes_ai_core, routes_dc, routes_dragon, routes_mainline, routes_quant_mainline
+from app import auth_service, routes_ai_core, routes_dc, routes_dragon, routes_hot_stocks, routes_limit_up, routes_mainline, routes_quant_mainline, routes_sectors
 from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
 from app.deps import current_user, require_user
@@ -29,11 +29,21 @@ routes_dc.init_dc_routes(_TEMPLATES)
 routes_dragon.init_dragon_routes(_TEMPLATES)
 routes_mainline.init_mainline_routes(_TEMPLATES)
 routes_quant_mainline.init_quant_mainline_routes(_TEMPLATES)
+routes_sectors.init_sectors_routes(_TEMPLATES)
+routes_hot_stocks.init_hot_stocks_routes(_TEMPLATES)
+routes_limit_up.init_limit_up_routes(_TEMPLATES)
 routes_ai_core.init_ai_core_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_quant_mainline.page_router)
 app.include_router(routes_quant_mainline.api_router)
+app.include_router(routes_sectors.page_router)
+app.include_router(routes_sectors.api_router)
+app.include_router(routes_sectors.fav_router)
+app.include_router(routes_hot_stocks.page_router)
+app.include_router(routes_hot_stocks.api_router)
+app.include_router(routes_limit_up.page_router)
+app.include_router(routes_limit_up.api_router)
 app.include_router(routes_dragon.page_router)
 app.include_router(routes_dragon.api_router)
 app.include_router(routes_ai_core.page_router)

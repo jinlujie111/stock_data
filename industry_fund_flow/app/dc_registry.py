@@ -140,6 +140,9 @@ DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "d
 NAV_ITEMS = [
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline"},
     {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline"},
+    {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors"},
+    {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks"},
+    {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up"},
     {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow"},
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon"},
     {"slug": "ai-core", "label": "AI 核心池", "href": "/dc/ai-core"},
