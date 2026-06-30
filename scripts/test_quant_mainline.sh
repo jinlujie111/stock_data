@@ -3,10 +3,10 @@
 # 需求3 量化主线 — 测试一键脚本（行业 Top10 + 概念 Top10 分榜）
 #
 # 用法:
-#   cd /root/stock_data && bash scripts/test_quant_mainline.sh
-#   cd /root/stock_data && bash scripts/test_quant_mainline.sh 20260625
-#   cd /root/stock_data && bash scripts/test_quant_mainline.sh 20260625 --run-etl
-#   cd /root/stock_data && bash scripts/test_quant_mainline.sh 20260625 --api
+#   cd /opt/stock_data && bash scripts/test_quant_mainline.sh
+#   cd /opt/stock_data && bash scripts/test_quant_mainline.sh 20260625
+#   cd /opt/stock_data && bash scripts/test_quant_mainline.sh 20260625 --run-etl
+#   cd /opt/stock_data && bash scripts/test_quant_mainline.sh 20260625 --api
 #
 # API 测试需 Cookie:
 #   export IFF_TOKEN_COOKIE='iff_token=你的token'

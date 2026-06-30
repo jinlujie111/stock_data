@@ -7,7 +7,7 @@
 #   bash dw-utils/xxl_daily_batch.sh 20260616     # 指定业务日 YYYYMMDD
 #
 # XXL-JOB GLUE Shell: 将本文件内容粘贴，或:
-#   cd /root/stock_data && bash dw-utils/xxl_daily_batch.sh ${n_date}
+#   cd /opt/stock_data && bash dw-utils/xxl_daily_batch.sh ${n_date}
 # =============================================================================
 if [ -z "${BASH_VERSION:-}" ]; then
   exec bash "$0" "$@"

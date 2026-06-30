@@ -137,18 +137,40 @@ CONTENT_TYPES = ["行业", "概念"]
 # 已下线 Web 入口（ETL/数仓仍保留）
 DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "diffusion"})
 
-NAV_ITEMS = [
-    {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline"},
-    {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline"},
-    {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors"},
-    {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards"},
-    {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks"},
-    {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks"},
-    {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up"},
-    {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow"},
-    {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon"},
-    {"slug": "ai-core", "label": "AI 核心池", "href": "/dc/ai-core"},
+_NAV_RAW: list[dict[str, str]] = [
+    # 主线决策
+    {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "主线决策"},
+    {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline", "section": "主线决策"},
+    {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "主线决策"},
+    {"slug": "ai-core", "label": "AI 核心池", "href": "/dc/ai-core", "section": "主线决策"},
+    # 板块分析
+    {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "板块分析"},
+    {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow", "section": "板块分析"},
+    # 短线雷达
+    {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks", "section": "短线雷达"},
+    {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up", "section": "短线雷达"},
+    # 我的自选
+    {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
+    {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks", "section": "我的自选"},
 ]
+
+
+def _build_nav_sections(raw: list[dict[str, str]]) -> list[dict]:
+    sections: list[dict] = []
+    index: dict[str, int] = {}
+    for item in raw:
+        title = item["section"]
+        if title not in index:
+            index[title] = len(sections)
+            sections.append({"title": title, "items": []})
+        sections[index[title]]["items"].append(
+            {k: v for k, v in item.items() if k != "section"}
+        )
+    return sections
+
+
+NAV_ITEMS = [{k: v for k, v in item.items() if k != "section"} for item in _NAV_RAW]
+NAV_SECTIONS = _build_nav_sections(_NAV_RAW)
 
 
 def get_dimension(slug: str) -> DimensionDef:

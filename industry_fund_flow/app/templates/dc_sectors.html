@@ -1,99 +1,103 @@
 {% extends "app_layout.html" %}
 {% block app_content %}
-<style>
-  .sectors-page { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1rem; align-items: start; }
-  .sectors-fav-panel {
-    position: sticky; top: 1rem;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 1rem; max-height: calc(100vh - 120px); overflow: auto;
-  }
-  .fav-block + .fav-block { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
-  .fav-block h3 { font-size: 0.875rem; margin-bottom: 0.5rem; }
-  .fav-search { width: 100%; padding: 0.45rem 0.6rem; border-radius: 8px; border: 1px solid var(--border);
-    background: #0f1419; color: var(--text); font-size: 0.8125rem; margin-bottom: 0.5rem; }
-  .fav-dropdown { max-height: 160px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem; }
-  .fav-option { display: block; width: 100%; text-align: left; padding: 0.4rem 0.6rem; border: none; background: transparent;
-    color: var(--text); font-size: 0.75rem; cursor: pointer; }
-  .fav-option:hover { background: rgba(59,130,246,0.12); }
-  .fav-list { display: flex; flex-direction: column; gap: 0.35rem; }
-  .fav-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.45rem 0.5rem;
-    border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 0.8125rem; cursor: pointer; }
-  .fav-item:hover { border-color: rgba(59,130,246,0.35); }
-  .fav-item-main { min-width: 0; flex: 1; }
-  .fav-item-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .fav-item-meta { font-size: 0.7rem; color: var(--muted); }
-  .fav-item-del { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 0.2rem; }
-  .fav-item-del:hover { color: var(--danger); }
-  .fav-empty { font-size: 0.75rem; color: var(--muted); padding: 0.5rem 0; }
-  .link-name { color: #60a5fa; cursor: pointer; text-decoration: none; background: none; border: none; font: inherit; padding: 0; }
-  .link-name:hover { text-decoration: underline; }
-  .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
-  .members-card { margin-top: 1rem; }
-  .members-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08); }
-  .members-head h2 { font-size: 1rem; margin: 0; }
-  .star-btn { border: none; background: transparent; cursor: pointer; color: var(--muted); font-size: 0.9rem; padding: 0 0.25rem; }
-  .star-btn.is-fav { color: #fbbf24; }
-  .fav-item.active { border-color: rgba(59,130,246,0.6); background: rgba(59,130,246,0.1); }
-  .kline-card { margin-bottom: 1rem; padding: 0; overflow: hidden; }
-  .kline-card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
-  .kline-card-body { padding: 1rem 1.25rem 1.25rem; }
-  .kline-head { margin-bottom: 0.75rem; }
-  .kline-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
-  .kline-title { font-size: 1.25rem; margin: 0 0 0.25rem; }
-  .kline-code { font-size: 0.8125rem; }
-  .kline-price-block { text-align: right; }
-  .kline-price { font-size: 1.75rem; font-weight: 700; margin-right: 0.5rem; }
-  .kline-pct { font-size: 1rem; font-weight: 600; }
-  .kline-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem 1rem; }
-  .kline-metric { font-size: 0.75rem; color: var(--muted); }
-  .kline-metric strong { display: block; color: var(--text); font-size: 0.875rem; font-weight: 600; margin-top: 0.15rem; }
-  #kline-chart { width: 100%; min-height: 420px; }
-  @media (max-width: 960px) {
-    .sectors-page { grid-template-columns: 1fr; }
-    .sectors-fav-panel { position: static; max-height: none; }
-  }
-</style>
-
-<div class="page-head">
-  <h1>行业板块</h1>
-  <p class="muted">东方财富 · 行业/概念板块涨幅榜，默认按涨幅降序；可查看成分股与板块龙头</p>
+<div class="page-head page-head--row">
+  <div>
+    <h1>行业板块</h1>
+    <p class="muted page-head-desc">东方财富 · 行业/概念涨幅榜，点击板块名查看 K 线，「成分」查看个股</p>
+  </div>
+  <div class="page-head-actions">
+    <a href="/favorites/boards" class="btn btn-ghost btn-sm">板块自选</a>
+    <a href="/favorites/stocks" class="btn btn-ghost btn-sm">股票自选</a>
+  </div>
 </div>
 
 <div id="page-error" class="alert alert-error hidden"></div>
 
-<div class="sectors-page">
-  <div class="sectors-main">
-    <div class="card filters-card">
-      <div class="filters">
-        <label class="filter-field">
-          <span>交易日期</span>
-          <input type="date" id="trade-date" class="date-input" />
-        </label>
-        <label class="filter-field filter-field--wide">
-          <span>板块类型</span>
-          <div class="chip-group" id="content-type-chips">
-            {% for ct in content_types %}
-            <button type="button" class="chip{% if loop.first %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
-            {% endfor %}
-          </div>
-        </label>
-        <label class="filter-field filter-field--grow">
-          <span>板块搜索</span>
-          <input type="text" id="sector-keyword" class="board-search" placeholder="名称或代码，留空显示全部" />
-        </label>
-        <div class="filter-actions">
-          <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+<div class="sectors-layout">
+  <div class="card filters-card">
+    <div class="filters">
+      <label class="filter-field">
+        <span>交易日期</span>
+        <input type="date" id="trade-date" class="date-input" />
+      </label>
+      <label class="filter-field filter-field--wide">
+        <span>板块类型</span>
+        <div class="chip-group" id="content-type-chips">
+          {% for ct in content_types %}
+          <button type="button" class="chip{% if loop.first %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
+          {% endfor %}
         </div>
+      </label>
+      <label class="filter-field filter-field--grow">
+        <span>板块搜索</span>
+        <input type="text" id="sector-keyword" class="board-search" placeholder="名称或代码，留空显示全部" />
+      </label>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-primary" id="btn-query">查询</button>
       </div>
-      <p id="filter-hint" class="filter-hint muted"></p>
+    </div>
+    <p id="filter-hint" class="filter-hint muted"></p>
+  </div>
+
+  <div class="sectors-workspace" id="sectors-workspace">
+    <div class="sectors-primary">
+      <section class="card table-card">
+        <div class="table-toolbar">
+          <span id="sector-updated" class="muted">—</span>
+        </div>
+        <div class="table-wrap sectors-table-wrap">
+          <table class="data-table" id="sector-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>涨幅</th>
+                <th>资金流入</th>
+                <th>成交额</th>
+                <th>换手</th>
+                <th>上涨/下跌</th>
+                <th>涨停数</th>
+                <th>流通市值</th>
+                <th>板块龙头</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="sector-body"></tbody>
+          </table>
+        </div>
+        <div id="sector-empty" class="table-empty hidden">暂无板块数据</div>
+      </section>
+
+      <section class="card table-card members-card hidden" id="members-card">
+        <div class="members-head">
+          <h2 id="members-title">成分股</h2>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-close-members">关闭</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="members-table">
+            <thead>
+              <tr>
+                <th>代码</th>
+                <th>名称</th>
+                <th>涨幅</th>
+                <th>收盘价</th>
+                <th>成交额</th>
+                <th>换手</th>
+                <th>市盈率</th>
+                <th>资金流入</th>
+                <th>自选</th>
+              </tr>
+            </thead>
+            <tbody id="members-body"></tbody>
+          </table>
+        </div>
+        <div id="members-empty" class="table-empty hidden">暂无成分股</div>
+      </section>
     </div>
 
-    <section class="card kline-card hidden" id="kline-card">
+    <aside class="card sectors-detail hidden" id="kline-card">
       <div class="kline-card-head">
-        <span class="muted" id="kline-subtitle">K 线</span>
-        <div>
+        <span class="muted" id="kline-subtitle">板块 K 线</span>
+        <div class="kline-card-actions">
           <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-kline-members">成分股</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-close-kline">关闭</button>
         </div>
@@ -103,59 +107,7 @@
         <div id="kline-chart"></div>
         <div id="kline-empty" class="table-empty hidden">暂无 K 线数据</div>
       </div>
-    </section>
-
-    <section class="card table-card">
-      <div class="table-toolbar">
-        <span id="sector-updated" class="muted">—</span>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table" id="sector-table">
-          <thead>
-            <tr>
-              <th>名称</th>
-              <th>涨幅</th>
-              <th>资金流入</th>
-              <th>成交额</th>
-              <th>换手</th>
-              <th>上涨/下跌</th>
-              <th>涨停数</th>
-              <th>流通市值</th>
-              <th>板块龙头</th>
-              <th>成分</th>
-            </tr>
-          </thead>
-          <tbody id="sector-body"></tbody>
-        </table>
-      </div>
-      <div id="sector-empty" class="table-empty hidden">暂无板块数据</div>
-    </section>
-
-    <section class="card table-card members-card hidden" id="members-card">
-      <div class="members-head">
-        <h2 id="members-title">成分股</h2>
-        <button type="button" class="btn btn-ghost btn-sm" id="btn-close-members">关闭</button>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table" id="members-table">
-          <thead>
-            <tr>
-              <th>代码</th>
-              <th>名称</th>
-              <th>涨幅</th>
-              <th>收盘价</th>
-              <th>成交额</th>
-              <th>换手</th>
-              <th>市盈率</th>
-              <th>资金流入</th>
-              <th>自选</th>
-            </tr>
-          </thead>
-          <tbody id="members-body"></tbody>
-        </table>
-      </div>
-      <div id="members-empty" class="table-empty hidden">暂无成分股</div>
-    </section>
+    </aside>
   </div>
 </div>
 {% endblock %}

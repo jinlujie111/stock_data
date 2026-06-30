@@ -13,7 +13,7 @@ from app import auth_service, routes_ai_core, routes_dc, routes_dragon, routes_h
 from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
 from app.deps import current_user, require_user
-from app.dc_registry import NAV_ITEMS
+from app.dc_registry import NAV_ITEMS, NAV_SECTIONS
 from app import market_breadth_service as mb_svc
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 _BASE = Path(__file__).resolve().parent
 _STATIC = _BASE / "static"
 _TEMPLATES = Jinja2Templates(directory=str(_BASE / "templates"))
+_TEMPLATES.env.globals["nav_sections"] = NAV_SECTIONS
 
 app = FastAPI(title=APP_TITLE)
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")

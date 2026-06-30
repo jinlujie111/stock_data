@@ -1,8 +1,8 @@
 # stock_data — XXL-JOB 调度执行顺序
 
 > 维护日期：2026-06-28  
-> 项目路径（服务器）：`/root/stock_data`  
-> 执行前统一：`cd /root/stock_data && source dw-utils/func.sh`  
+> 项目路径（服务器）：`/opt/stock_data`  
+> 执行前统一：`cd /opt/stock_data && source dw-utils/func.sh`  
 > **表结构真相源**：[`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql)（ETL 脚本内 `CREATE IF NOT EXISTS` 与之对齐）
 
 **XXL-JOB 建议**
@@ -49,7 +49,7 @@ sequenceDiagram
 **依赖安装（服务器首次）**
 
 ```bash
-cd /root/stock_data && source dw-utils/func.sh
+cd /opt/stock_data && source dw-utils/func.sh
 install_sync_deps
 ${PYTHON_BIN} -c "import pymysql, pandas, sqlalchemy, akshare; print('ok')"
 ```
@@ -141,7 +141,7 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 **仓库脚本**（与下文内容一致，便于版本管理）：
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 bash dw-utils/xxl_daily_batch.sh          # 今天
 bash dw-utils/xxl_daily_batch.sh 20260616 # 指定业务日
 ```
@@ -151,7 +151,7 @@ bash dw-utils/xxl_daily_batch.sh 20260616 # 指定业务日
 ```bash
 #!/bin/bash
 set -euo pipefail
-cd /root/stock_data
+cd /opt/stock_data
 bash dw-utils/xxl_daily_batch.sh "${1:-$(date +%Y%m%d)}"
 ```
 
@@ -164,7 +164,7 @@ bash dw-utils/xxl_daily_batch.sh "${1:-$(date +%Y%m%d)}"
 `stock_company`、`fina_mainbz` 在 `db_sync_task` 中为 `schedule_type=monthly`。日批 `run_data_sync` 在非 1 号会跳过；本 Job 用 `--force` 显式执行。
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 bash dw-utils/xxl_monthly_batch.sh
 # 或指定日期
 bash dw-utils/xxl_monthly_batch.sh 20260601
@@ -179,7 +179,7 @@ bash dw-utils/xxl_monthly_batch.sh 20260601
 用于刷新 `dim_industry_etf_map`（自动 `index_match`），支撑需求1 **机构化**阶段判定；**不依赖手工维护**，手工 `manual` 映射仅作补强。
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 bash dw-utils/xxl_weekly_batch.sh
 ```
 
@@ -190,7 +190,7 @@ bash dw-utils/xxl_weekly_batch.sh
 ## 六、排障 / 补跑
 
 ```bash
-cd /root/stock_data && source dw-utils/func.sh
+cd /opt/stock_data && source dw-utils/func.sh
 
 # 只同步 ODS 某一表
 run_data_sync 20260616 --source-table daily_basic --force
@@ -245,7 +245,7 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 ### 8.1 首次部署（服务器执行一次）
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 
 # 1) 用户库 + stock_data 只读授权
 mysql -u root -p < mysql_tables/data_industry_grants.sql
@@ -256,7 +256,7 @@ source dw-utils/func.sh
 init_data_industry_schema
 
 # 3) 生产环境必设 JWT 密钥（写入 func.sh 或 export）
-export IFF_JWT_SECRET='请改为随机长字符串'
+export IFF_JWT_SECRET="$(openssl rand -hex 32)"
 ```
 
 | 库 | 用途 | 连接变量 |
@@ -271,7 +271,7 @@ Web **不纳入日批 / XXL-JOB**，需单独手工或 systemd 维护；以下�
 **依赖（首次）**
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 source dw-utils/func.sh
 "${PYTHON_BIN}" -m pip install -r industry_fund_flow/requirements.txt
 ```
@@ -279,9 +279,9 @@ source dw-utils/func.sh
 **开发 / 调试（前台）**
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 source dw-utils/func.sh
-export IFF_JWT_SECRET='请改为随机长字符串'   # 生产必设
+export IFF_JWT_SECRET="$(openssl rand -hex 32)"   # 生产必设
 
 cd industry_fund_flow
 "${PYTHON_BIN}" -m uvicorn app.main:app --host 0.0.0.0 --port 8082 --reload
@@ -290,9 +290,9 @@ cd industry_fund_flow
 **生产（后台）**
 
 ```bash
-cd /root/stock_data
+cd /opt/stock_data
 source dw-utils/func.sh
-export IFF_JWT_SECRET='请改为随机长字符串'
+export IFF_JWT_SECRET="$(openssl rand -hex 32)"
 mkdir -p /root/log/stock_log/web
 
 pkill -f "uvicorn app.main:app" 2>/dev/null || true

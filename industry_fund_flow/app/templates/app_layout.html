@@ -13,8 +13,13 @@
     <div class="sidebar-title">业务菜单</div>
     <nav class="sidebar-nav">
       <a href="/" class="nav-item{% if active_nav == 'home' %} active{% endif %}">首页</a>
-      {% for item in nav_items %}
-      <a href="{{ item.href }}" class="nav-item{% if active_nav == item.slug %} active{% endif %}">{{ item.label }}</a>
+      {% for section in nav_sections %}
+      <div class="nav-group">
+        <div class="nav-group-title">{{ section.title }}</div>
+        {% for item in section.items %}
+        <a href="{{ item.href }}" class="nav-item{% if active_nav == item.slug %} active{% endif %}">{{ item.label }}</a>
+        {% endfor %}
+      </div>
       {% endfor %}
     </nav>
     <div class="sidebar-foot">数据源 · 东方财富</div>

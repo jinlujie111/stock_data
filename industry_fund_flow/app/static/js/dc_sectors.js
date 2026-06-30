@@ -29,6 +29,7 @@
   const elKlineSubtitle = document.getElementById("kline-subtitle");
   const btnCloseKline = document.getElementById("btn-close-kline");
   const btnKlineMembers = document.getElementById("btn-kline-members");
+  const elWorkspace = document.getElementById("sectors-workspace");
 
   let contentType = "行业";
   let boardFavCodes = new Set();
@@ -134,7 +135,7 @@
       <tr data-code="${row.industry_code}">
         <td>
           <button type="button" class="star-btn${isFav ? " is-fav" : ""}" data-action="fav-board" data-code="${row.industry_code}" data-name="${row.industry_name || ""}" data-ct="${row.content_type || ""}" title="加入板块自选">★</button>
-          <button type="button" class="link-name" data-action="members" data-code="${row.industry_code}" data-name="${row.industry_name || ""}">${row.industry_name || "—"}</button>
+          <button type="button" class="link-name" data-action="kline" data-code="${row.industry_code}" data-name="${row.industry_name || ""}">${row.industry_name || "—"}</button>
         </td>
         <td class="${cellClass(row.pct_change)}">${fmtPctCell(row.pct_change)}</td>
         <td class="${cellClass(row.net_amount_yi)}">${row.net_amount_yi != null ? fmtYi(row.net_amount_yi) : "—"}</td>
@@ -154,6 +155,9 @@
   function bindSectorActions() {
     elSectorBody.querySelectorAll("[data-action=members]").forEach((btn) => {
       btn.addEventListener("click", () => loadMembers(btn.dataset.code, btn.dataset.name));
+    });
+    elSectorBody.querySelectorAll("[data-action=kline]").forEach((btn) => {
+      btn.addEventListener("click", () => loadBoardKline(btn.dataset.code, btn.dataset.name));
     });
     elSectorBody.querySelectorAll("[data-action=fav-board]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -179,10 +183,12 @@
   function showKlineCard() {
     elKlineCard.classList.remove("hidden");
     elKlineEmpty.classList.add("hidden");
+    if (elWorkspace) elWorkspace.classList.add("is-detail-open");
   }
 
   function hideKlineCard() {
     elKlineCard.classList.add("hidden");
+    if (elWorkspace) elWorkspace.classList.remove("is-detail-open");
     activeKlineBoard = null;
     btnKlineMembers.classList.add("hidden");
     setFavActive(null, null);
@@ -206,7 +212,6 @@
       renderSnapshotHeader(elKlineHeader, data);
       klineChart = renderKlineChart(elKlineChart, data, klineChart);
       showKlineCard();
-      elKlineCard.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       showError(err.message);
     }
@@ -227,7 +232,6 @@
       renderSnapshotHeader(elKlineHeader, data);
       klineChart = renderKlineChart(elKlineChart, data, klineChart);
       showKlineCard();
-      elKlineCard.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       showError(err.message);
     }
