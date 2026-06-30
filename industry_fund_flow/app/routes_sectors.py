@@ -24,6 +24,20 @@ def init_sectors_routes(templates: Jinja2Templates) -> None:
     _templates = templates
 
 
+def _render_favorites_page(request: Request, user: dict, title: str, active_nav: str, template_name: str, favorites_kind: str) -> HTMLResponse:
+    return _templates.TemplateResponse(
+        request,
+        template_name,
+        {
+            "user": user,
+            "nav_items": NAV_ITEMS,
+            "active_nav": active_nav,
+            "title": title,
+            "favorites_kind": favorites_kind,
+        },
+    )
+
+
 class BoardFavoriteBody(BaseModel):
     industry_code: str
     industry_name: str | None = None
@@ -48,6 +62,16 @@ def sectors_page(request: Request, user: dict = Depends(require_user)):
             "title": "行业板块",
         },
     )
+
+
+@page_router.get("/favorites/boards", response_class=HTMLResponse)
+def board_favorites_page(request: Request, user: dict = Depends(require_user)):
+    return _render_favorites_page(request, user, "板块自选", "board-favorites", "favorites_board.html", "board")
+
+
+@page_router.get("/favorites/stocks", response_class=HTMLResponse)
+def stock_favorites_page(request: Request, user: dict = Depends(require_user)):
+    return _render_favorites_page(request, user, "股票自选", "stock-favorites", "favorites_stock.html", "stock")
 
 
 @api_router.get("/trade-dates")

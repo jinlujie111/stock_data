@@ -141,6 +141,8 @@ NAV_ITEMS = [
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline"},
     {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline"},
     {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors"},
+    {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards"},
+    {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks"},
     {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks"},
     {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up"},
     {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow"},

@@ -164,12 +164,16 @@
   }
 
   function setFavActive(kind, code) {
-    elBoardFavList.querySelectorAll(".fav-item").forEach((el) => {
-      el.classList.toggle("active", kind === "board" && el.dataset.code === code);
-    });
-    elStockFavList.querySelectorAll(".fav-item").forEach((el) => {
-      el.classList.toggle("active", kind === "stock" && el.dataset.code === code);
-    });
+    if (elBoardFavList) {
+      elBoardFavList.querySelectorAll(".fav-item").forEach((el) => {
+        el.classList.toggle("active", kind === "board" && el.dataset.code === code);
+      });
+    }
+    if (elStockFavList) {
+      elStockFavList.querySelectorAll(".fav-item").forEach((el) => {
+        el.classList.toggle("active", kind === "stock" && el.dataset.code === code);
+      });
+    }
   }
 
   function showKlineCard() {
@@ -283,6 +287,7 @@
   }
 
   async function loadBoardFavorites() {
+    if (!elBoardFavList) return;
     const td = tdParam();
     const q = td ? `?trade_date=${td}` : "";
     const data = await apiGet(`/api/v1/favorites/boards${q}`);
@@ -318,6 +323,7 @@
   }
 
   async function loadStockFavorites() {
+    if (!elStockFavList) return;
     const td = tdParam();
     const q = td ? `?trade_date=${td}` : "";
     const data = await apiGet(`/api/v1/favorites/stocks${q}`);
@@ -451,15 +457,19 @@
     });
   }
 
-  bindFavSearch(elBoardFavSearch, elBoardFavDropdown, "/api/v1/sectors/lookup/board", (item) => {
-    addBoardFav(item.industry_code, item.industry_name, item.content_type)
-      .then(() => querySectors())
-      .catch((e) => showError(e.message));
-  });
+  if (elBoardFavSearch && elBoardFavDropdown) {
+    bindFavSearch(elBoardFavSearch, elBoardFavDropdown, "/api/v1/sectors/lookup/board", (item) => {
+      addBoardFav(item.industry_code, item.industry_name, item.content_type)
+        .then(() => querySectors())
+        .catch((e) => showError(e.message));
+    });
+  }
 
-  bindFavSearch(elStockFavSearch, elStockFavDropdown, "/api/v1/sectors/lookup/stock", (item) => {
-    addStockFav(item.ts_code, item.stock_name).catch((e) => showError(e.message));
-  });
+  if (elStockFavSearch && elStockFavDropdown) {
+    bindFavSearch(elStockFavSearch, elStockFavDropdown, "/api/v1/sectors/lookup/stock", (item) => {
+      addStockFav(item.ts_code, item.stock_name).catch((e) => showError(e.message));
+    });
+  }
 
   btnQuery.addEventListener("click", async () => {
     await refreshFavorites();
