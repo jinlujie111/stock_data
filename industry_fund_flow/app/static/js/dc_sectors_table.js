@@ -1,6 +1,14 @@
 /** 行业板块表格：排序与渲染（行业板块 / 板块自选共用） */
 (function () {
-  const { fmtNum } = window.DcBoard;
+  const fmtNum =
+    window.DcBoard && window.DcBoard.fmtNum
+      ? window.DcBoard.fmtNum
+      : function (v, d) {
+          if (v === null || v === undefined || v === "") return "—";
+          const n = Number(v);
+          if (Number.isNaN(n)) return v;
+          return n.toFixed(d === undefined ? 1 : d);
+        };
 
   const SORT_COLUMNS = [
     { key: "pct_change", label: "涨幅" },

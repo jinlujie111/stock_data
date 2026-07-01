@@ -1,6 +1,7 @@
 """东财板块 Web 查询公共服务（序列化、交易日解析）。"""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -14,6 +15,13 @@ def serialize_value(value: Any) -> Any:
         return value.isoformat()[:10]
     if isinstance(value, Decimal):
         return float(value)
+    if isinstance(value, str):
+        s = value.strip()
+        m = re.match(r"^(\d{4}-\d{2}-\d{2})", s)
+        if m:
+            return m.group(1)
+        if len(s) == 8 and s.isdigit():
+            return f"{s[0:4]}-{s[4:6]}-{s[6:8]}"
     return value
 
 

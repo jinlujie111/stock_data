@@ -3,7 +3,7 @@
 <div class="page-head page-head--row">
   <div>
     <h1>板块自选</h1>
-    <p class="muted page-head-desc">筛选自选板块，表格字段与「行业板块」一致</p>
+    <p class="muted page-head-desc">查看全部自选板块，表格字段与「行业板块」一致</p>
   </div>
   <div class="page-head-actions">
     <a href="/dc/sectors" class="btn btn-ghost btn-sm">行业板块</a>
@@ -19,35 +19,16 @@
       <span>交易日期</span>
       <input type="date" id="trade-date" class="date-input" />
     </label>
-    <label class="filter-field filter-field--wide">
-      <span>板块类型</span>
-      <div class="chip-group" id="content-type-chips">
-        {% for ct in content_types %}
-        <button type="button" class="chip{% if loop.first %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
-        {% endfor %}
-      </div>
-    </label>
-    <label class="filter-field filter-field--grow">
-      <span>板块筛选（默认全部自选，可输入名称/代码搜索后点选）</span>
-      <div class="board-picker" id="board-picker">
-        <div class="board-selected" id="board-selected"></div>
-        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，模糊匹配…" autocomplete="off" />
-        <div class="board-dropdown hidden" id="board-dropdown"></div>
-      </div>
-    </label>
-    <div class="filter-actions">
-      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
-      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空筛选</button>
-    </div>
-  </div>
-  <div class="filters filters--secondary">
     <label class="filter-field filter-field--grow">
       <span>添加自选板块</span>
-      <div class="board-picker">
+      <div class="board-picker" id="board-add-picker">
         <input type="text" id="board-add-search" class="board-search" placeholder="搜索板块名称/代码，点选添加…" autocomplete="off" />
         <div class="board-dropdown hidden" id="board-add-dropdown"></div>
       </div>
     </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+    </div>
   </div>
   <p id="filter-hint" class="filter-hint muted"></p>
 </div>
@@ -64,7 +45,7 @@
       <tbody id="sector-body"></tbody>
     </table>
   </div>
-  <div id="sector-empty" class="table-empty hidden">暂无自选板块数据，请先添加自选或调整筛选</div>
+  <div id="sector-empty" class="table-empty hidden">暂无自选板块，请先搜索添加</div>
 </section>
 
 <section class="card table-card members-card hidden" id="members-card">

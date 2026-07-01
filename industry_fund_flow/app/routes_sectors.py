@@ -92,7 +92,6 @@ def stock_favorites_page(request: Request, user: dict = Depends(require_user)):
             "active_nav": "stock-favorites",
             "title": "股票自选",
             "favorites_kind": "stock",
-            "content_types": CONTENT_TYPES,
         },
     )
 
@@ -216,7 +215,7 @@ def api_sector_members(
 @fav_router.get("/boards/table")
 def api_board_favorites_table(
     trade_date: str | None = Query(None),
-    content_type: str = Query("行业"),
+    content_type: str = Query("全部"),
     industry_codes: str | None = Query(None, description="逗号分隔，筛选自选板块子集"),
     user: dict = Depends(require_user),
 ):

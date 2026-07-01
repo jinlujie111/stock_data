@@ -3,7 +3,7 @@
 <div class="page-head page-head--row">
   <div>
     <h1>股票自选</h1>
-    <p class="muted page-head-desc">先选板块缩小范围，再搜索成分股添加自选</p>
+    <p class="muted page-head-desc">搜索代码或名称添加自选，查看行情与资金指标</p>
   </div>
   <div class="page-head-actions">
     <a href="/dc/sectors" class="btn btn-ghost btn-sm">行业板块</a>
@@ -19,31 +19,10 @@
       <span>交易日期</span>
       <input type="date" id="trade-date" class="date-input" />
     </label>
-    <label class="filter-field filter-field--wide">
-      <span>板块类型</span>
-      <div class="chip-group" id="content-type-chips">
-        {% for ct in content_types %}
-        <button type="button" class="chip{% if loop.first %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
-        {% endfor %}
-      </div>
-    </label>
     <label class="filter-field filter-field--grow">
-      <span>板块筛选（可选，优先自选板块，可输入名称/代码搜索后点选）</span>
-      <div class="board-picker" id="board-picker">
-        <div class="board-selected" id="board-selected"></div>
-        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，模糊匹配…" autocomplete="off" />
-        <div class="board-dropdown hidden" id="board-dropdown"></div>
-      </div>
-    </label>
-    <div class="filter-actions">
-      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
-    </div>
-  </div>
-  <div class="filters filters--secondary">
-    <label class="filter-field filter-field--grow">
-      <span>添加股票（代码或名称模糊搜索，点选添加）</span>
-      <div class="board-picker" id="stock-picker">
-        <input type="text" id="stock-add-search" class="board-search" placeholder="输入代码或汉字，如 600519 或 茅台…" autocomplete="off" />
+      <span>添加股票</span>
+      <div class="board-picker" id="stock-add-picker">
+        <input type="text" id="stock-add-search" class="board-search" placeholder="输入代码或名称，如 600519 或 茅台…" autocomplete="off" />
         <div class="board-dropdown hidden" id="stock-add-dropdown"></div>
       </div>
     </label>
@@ -51,7 +30,6 @@
       <button type="button" class="btn btn-primary" id="btn-query">刷新</button>
     </div>
   </div>
-  <p id="filter-hint" class="filter-hint muted"></p>
 </div>
 
 <section class="card table-card">
@@ -78,7 +56,7 @@
       <tbody id="stock-body"></tbody>
     </table>
   </div>
-  <div id="stock-empty" class="table-empty hidden">暂无自选股票，请先选择板块并搜索添加</div>
+  <div id="stock-empty" class="table-empty hidden">暂无自选股票，请搜索添加</div>
 </section>
 {% endblock %}
 

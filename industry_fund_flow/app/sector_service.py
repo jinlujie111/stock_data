@@ -34,11 +34,14 @@ def _board_code_variants(industry_code: str) -> list[str]:
 
 
 def latest_trade_date() -> str | None:
-    return latest_trade_date_from_table(FUND_TABLE)
+    return latest_trade_date_from_table(FUND_TABLE, fallback_table="ods_trading_day")
 
 
 def list_trade_dates(limit: int = 90) -> list[str]:
-    return list_trade_dates_from_table(FUND_TABLE, limit)
+    dates = list_trade_dates_from_table(FUND_TABLE, limit)
+    if dates:
+        return dates
+    return list_trade_dates_from_table("ods_trading_day", limit)
 
 
 def _resolve_trade_date(trade_date: str | None) -> str:
@@ -71,10 +74,17 @@ def get_sector_list(
     industry_codes: list[str] | None = None,
 ) -> dict[str, Any]:
     td = _resolve_trade_date(trade_date)
-    if content_type not in DEFAULT_CONTENT_TYPES:
-        content_type = "行业"
     limit = max(1, min(limit, 1000))
-    params: dict[str, Any] = {"td": td, "ct": content_type}
+    params: dict[str, Any] = {"td": td}
+    if content_type in (None, "", "全部"):
+        ct_sql = " AND ff.content_type IN ('行业', '概念')"
+        ct_label = "全部"
+    else:
+        if content_type not in DEFAULT_CONTENT_TYPES:
+            content_type = "行业"
+        ct_sql = " AND ff.content_type = :ct"
+        params["ct"] = content_type
+        ct_label = content_type
     kw_sql = ""
     if keyword and keyword.strip():
         kw_sql = " AND (ff.industry_name LIKE :kw OR ff.industry_code LIKE :kw)"
@@ -112,7 +122,7 @@ def get_sector_list(
            AND ds.industry_code = ff.industry_code
            AND ds.score_mode = 'mvp'
         WHERE ff.trade_date = :td
-          AND ff.content_type = :ct
+          {ct_sql}
           {kw_sql}
           {codes_sql}
         ORDER BY ff.pct_change IS NULL, ff.pct_change DESC, ff.industry_name
@@ -125,7 +135,7 @@ def get_sector_list(
 
     return {
         "trade_date": td,
-        "content_type": content_type,
+        "content_type": ct_label,
         "sort": "pct_change",
         "order": "desc",
         "items": items,

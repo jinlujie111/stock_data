@@ -1,16 +1,18 @@
 (function () {
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
-  const {
-    DEFAULT_SORT,
-    fmtPctCell,
-    fmtYi,
-    cellClass,
-    sortItems,
-    renderTableHead,
-    bindSortHeaders,
-    renderTableBody,
-    toolbarText,
-  } = window.DcSectorTable;
+  const board = window.DcBoard;
+  if (!board) return;
+
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar } = board;
+
+  function sectorTable() {
+    return window.DcSectorTable;
+  }
+
+  function requireSectorTable() {
+    const st = sectorTable();
+    if (!st) throw new Error("表格脚本未加载，请强制刷新页面（Ctrl+F5）");
+    return st;
+  }
 
   const elDate = document.getElementById("trade-date");
   const typeChips = document.getElementById("content-type-chips");
@@ -32,7 +34,7 @@
   let boardFavCodes = new Set();
   let stockFavCodes = new Set();
   let tableRows = [];
-  const sortState = { sortKey: DEFAULT_SORT.key, sortDir: DEFAULT_SORT.dir };
+  const sortState = { sortKey: "pct_change", sortDir: "desc" };
 
   function tdParam() {
     return elDate.value ? toApiTradeDate(elDate.value) : "";
@@ -87,13 +89,14 @@
   }
 
   function applySortAndRender(meta) {
-    const sorted = sortItems(tableRows, sortState.sortKey, sortState.sortDir);
-    renderTableHead(elSectorHeadRow, sortState.sortKey, sortState.sortDir);
-    bindSortHeaders(elSectorHeadRow.closest("thead"), sortState, () => {
+    const st = requireSectorTable();
+    const sorted = st.sortItems(tableRows, sortState.sortKey, sortState.sortDir);
+    st.renderTableHead(elSectorHeadRow, sortState.sortKey, sortState.sortDir);
+    st.bindSortHeaders(elSectorHeadRow.closest("thead"), sortState, () => {
       applySortAndRender(meta);
     });
-    renderTableBody(elSectorBody, sorted, { boardFavCodes });
-    elSectorUpdated.textContent = toolbarText(meta, sortState.sortKey, sortState.sortDir, sorted.length);
+    st.renderTableBody(elSectorBody, sorted, { boardFavCodes });
+    elSectorUpdated.textContent = st.toolbarText(meta, sortState.sortKey, sortState.sortDir, sorted.length);
     bindSectorActions();
   }
 
@@ -123,6 +126,7 @@
 
   async function loadMembers(code, name) {
     clearError();
+    const st = requireSectorTable();
     try {
       const td = tdParam();
       const q = td ? `?trade_date=${td}` : "";
@@ -140,12 +144,12 @@
           <tr>
             <td>${row.ts_code || "—"}</td>
             <td>${row.stock_name || "—"}</td>
-            <td class="${cellClass(row.pct_chg)}">${fmtPctCell(row.pct_chg)}</td>
+            <td class="${st.cellClass(row.pct_chg)}">${st.fmtPctCell(row.pct_chg)}</td>
             <td>${row.close != null ? fmtNum(row.close, 2) : "—"}</td>
-            <td>${row.amount_yi != null ? fmtYi(row.amount_yi) : "—"}</td>
+            <td>${row.amount_yi != null ? st.fmtYi(row.amount_yi) : "—"}</td>
             <td>${row.turnover_rate != null ? fmtNum(row.turnover_rate, 2) + "%" : "—"}</td>
             <td>${row.pe_ttm != null ? fmtNum(row.pe_ttm, 2) : "—"}</td>
-            <td class="${cellClass(row.net_mf_yi)}">${row.net_mf_yi != null ? fmtYi(row.net_mf_yi) : "—"}</td>
+            <td class="${st.cellClass(row.net_mf_yi)}">${row.net_mf_yi != null ? st.fmtYi(row.net_mf_yi) : "—"}</td>
             <td><button type="button" class="star-btn${isFav ? " is-fav" : ""}" data-ts="${row.ts_code}" data-name="${row.stock_name || ""}">★</button></td>
           </tr>`;
           })
@@ -175,14 +179,18 @@
   }
 
   async function refreshFavCodes() {
-    const td = tdParam();
-    const q = td ? `?trade_date=${td}` : "";
-    const [boards, stocks] = await Promise.all([
-      apiGet(`/api/v1/favorites/boards${q}`),
-      apiGet(`/api/v1/favorites/stocks${td ? `?trade_date=${td}` : ""}`),
-    ]);
-    boardFavCodes = new Set(boards.items.map((x) => x.industry_code));
-    stockFavCodes = new Set(stocks.items.map((x) => x.ts_code));
+    try {
+      const td = tdParam();
+      const q = td ? `?trade_date=${td}` : "";
+      const [boards, stocks] = await Promise.all([
+        apiGet(`/api/v1/favorites/boards${q}`),
+        apiGet(`/api/v1/favorites/stocks${td ? `?trade_date=${td}` : ""}`),
+      ]);
+      boardFavCodes = new Set(boards.items.map((x) => x.industry_code));
+      stockFavCodes = new Set(stocks.items.map((x) => x.ts_code));
+    } catch (_) {
+      /* 自选接口失败不影响板块列表 */
+    }
   }
 
   async function addBoardFav(code, name, ct) {
@@ -248,11 +256,22 @@
 
   (async function init() {
     try {
+      if (!sectorTable()) {
+        showError("表格脚本未加载，请强制刷新页面（Ctrl+F5）");
+        return;
+      }
+      sortState.sortKey = sectorTable().DEFAULT_SORT.key;
+      sortState.sortDir = sectorTable().DEFAULT_SORT.dir;
       await initTradeDateCalendar(elDate, "/api/v1/sectors/trade-dates?limit=90");
-      await refreshFavCodes();
       await querySectors();
+      refreshFavCodes();
     } catch (err) {
       showError(err.message);
+      try {
+        await querySectors();
+      } catch (_) {
+        /* ignore */
+      }
     }
   })();
 })();

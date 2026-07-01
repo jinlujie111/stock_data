@@ -114,7 +114,7 @@ def _favorite_board_codes(user_id: int) -> list[str]:
 def get_board_favorites_table(
     user_id: int,
     trade_date: str | None,
-    content_type: str = "行业",
+    content_type: str | None = "全部",
     industry_codes: list[str] | None = None,
 ) -> dict[str, Any]:
     fav_codes = _favorite_board_codes(user_id)

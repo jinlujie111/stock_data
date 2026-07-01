@@ -21,13 +21,14 @@
     return data;
   }
 
-  /** YYYY-MM-DD 或 YYYYMMDD → YYYY-MM-DD（供 input[type=date]） */
+  /** YYYY-MM-DD、YYYYMMDD、带时间的 datetime 字符串 → YYYY-MM-DD（供 input[type=date]） */
   function normalizeIsoDate(raw) {
     if (!raw) return "";
     const s = String(raw).trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
     if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-    return s;
+    return "";
   }
 
   /** input[type=date] → API 参数 YYYYMMDD */
@@ -40,8 +41,14 @@
   async function initTradeDateCalendar(inputEl, datesApiUrl) {
     if (!inputEl) return null;
     const data = await apiGet(datesApiUrl);
-    const latest = normalizeIsoDate(data.latest || (data.dates && data.dates[0]) || "");
-    if (latest) inputEl.value = latest;
+    const candidates = [data.latest, ...(data.dates || [])];
+    for (const raw of candidates) {
+      const iso = normalizeIsoDate(raw);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+        inputEl.value = iso;
+        return data;
+      }
+    }
     return data;
   }
 
