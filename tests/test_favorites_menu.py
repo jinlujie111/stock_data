@@ -12,6 +12,7 @@ def test_favorites_menu_items_and_routes_exist():
     assert "/favorites/boards" in paths
     assert "/favorites/stocks" in paths
     assert "/api/v1/favorites/boards" in paths
+    assert "/api/v1/favorites/boards/table" in paths
     assert "/api/v1/favorites/stocks" in paths
 
     nav_labels = {item["label"] for item in NAV_ITEMS}

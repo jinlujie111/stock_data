@@ -49,11 +49,26 @@ def _resolve_trade_date(trade_date: str | None) -> str:
     )
 
 
+def _format_sector_row(r: dict) -> dict:
+    item = _serialize_row(r)
+    net = item.get("net_amount")
+    item["net_amount_yi"] = round(float(net) / 1e8, 2) if net is not None else None
+    amt = item.get("board_amount")
+    item["board_amount_yi"] = round(float(amt) / 1e8, 2) if amt is not None else None
+    mv = item.get("total_mv")
+    item["total_mv_yi"] = round(float(mv) / 10000, 2) if mv is not None else None
+    up = item.get("up_num")
+    down = item.get("down_num")
+    item["up_down"] = float(up) if up is not None and down is not None else None
+    return item
+
+
 def get_sector_list(
     trade_date: str | None = None,
     content_type: str = "行业",
     keyword: str | None = None,
     limit: int = 500,
+    industry_codes: list[str] | None = None,
 ) -> dict[str, Any]:
     td = _resolve_trade_date(trade_date)
     if content_type not in DEFAULT_CONTENT_TYPES:
@@ -64,6 +79,13 @@ def get_sector_list(
     if keyword and keyword.strip():
         kw_sql = " AND (ff.industry_name LIKE :kw OR ff.industry_code LIKE :kw)"
         params["kw"] = f"%{keyword.strip()}%"
+
+    codes_sql = ""
+    if industry_codes:
+        codes = [c.strip() for c in industry_codes if c and c.strip()]
+        if codes:
+            codes_sql = " AND ff.industry_code IN (" + ", ".join(f":ic{i}" for i in range(len(codes))) + ")"
+            params.update({f"ic{i}": c for i, c in enumerate(codes)})
 
     rows = fetch_all_stock(
         f"""
@@ -92,22 +114,14 @@ def get_sector_list(
         WHERE ff.trade_date = :td
           AND ff.content_type = :ct
           {kw_sql}
+          {codes_sql}
         ORDER BY ff.pct_change IS NULL, ff.pct_change DESC, ff.industry_name
         LIMIT {limit}
         """,
         params,
     )
 
-    items = []
-    for r in rows:
-        item = _serialize_row(r)
-        net = item.get("net_amount")
-        item["net_amount_yi"] = round(float(net) / 1e8, 2) if net is not None else None
-        amt = item.get("board_amount")
-        item["board_amount_yi"] = round(float(amt) / 1e8, 2) if amt is not None else None
-        mv = item.get("total_mv")
-        item["total_mv_yi"] = round(float(mv) / 10000, 2) if mv is not None else None
-        items.append(item)
+    items = [_format_sector_row(r) for r in rows]
 
     return {
         "trade_date": td,
@@ -244,18 +258,12 @@ def lookup_stock(trade_date: str | None, keyword: str) -> list[dict]:
     kw = f"%{keyword.strip()}%"
     rows = fetch_all_stock(
         f"""
-        SELECT d.ts_code, d.pct_chg, d.close, d.amount,
-               COALESCE(m.name, d.ts_code) AS stock_name
-        FROM ods_stock_detail_di d
-        LEFT JOIN (
-            SELECT con_code, MAX(name) AS name
-            FROM ods_dc_member_di
-            WHERE trade_date <= :td AND (con_code LIKE :kw OR name LIKE :kw)
-            GROUP BY con_code
-        ) m ON m.con_code = d.ts_code
-        WHERE d.trade_date = :td
-          AND (d.ts_code LIKE :kw OR m.name LIKE :kw)
-        ORDER BY d.pct_chg IS NULL, d.pct_chg DESC
+        SELECT c.ts_code, c.name AS stock_name, d.pct_chg, d.close, d.amount
+        FROM ods_stock_company_di c
+        LEFT JOIN ods_stock_detail_di d
+            ON d.trade_date = :td AND d.ts_code = c.ts_code
+        WHERE c.ts_code LIKE :kw OR c.name LIKE :kw
+        ORDER BY d.amount IS NULL, d.amount DESC, c.name
         LIMIT 20
         """,
         {"td": td, "kw": kw},

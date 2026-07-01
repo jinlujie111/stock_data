@@ -1,164 +1,100 @@
 {% extends "app_layout.html" %}
 {% block app_content %}
-<style>
-  .favorites-page { display: flex; flex-direction: column; gap: 1rem; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
-  .fav-search { width: 100%; padding: 0.55rem 0.7rem; border-radius: 8px; border: 1px solid var(--border); background: #0f1419; color: var(--text); font-size: 0.875rem; margin-bottom: 0.6rem; }
-  .fav-dropdown { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.6rem; }
-  .fav-option { display: block; width: 100%; text-align: left; padding: 0.45rem 0.6rem; border: none; background: transparent; color: var(--text); cursor: pointer; }
-  .fav-option:hover { background: rgba(59,130,246,0.12); }
-  .fav-list { display: flex; flex-direction: column; gap: 0.45rem; }
-  .fav-item { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.6rem 0.7rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
-  .fav-item-main { min-width: 0; flex: 1; }
-  .fav-item-name { font-weight: 600; }
-  .fav-item-meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
-  .fav-item-del { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; }
-  .fav-item-del:hover { color: var(--danger); }
-  .fav-empty { color: var(--muted); font-size: 0.875rem; }
-</style>
-
-<div class="page-head">
-  <h1>板块自选</h1>
-  <p class="muted">集中查看和维护你关注的板块，自行业板块页面的自选收藏迁移到这里。</p>
+<div class="page-head page-head--row">
+  <div>
+    <h1>板块自选</h1>
+    <p class="muted page-head-desc">筛选自选板块，表格字段与「行业板块」一致</p>
+  </div>
+  <div class="page-head-actions">
+    <a href="/dc/sectors" class="btn btn-ghost btn-sm">行业板块</a>
+    <a href="/favorites/stocks" class="btn btn-ghost btn-sm">股票自选</a>
+  </div>
 </div>
 
-<div class="favorites-page">
-  <section class="card">
-    <input type="text" id="board-fav-search" class="fav-search" placeholder="搜索板块名称/代码…" autocomplete="off" />
-    <div id="board-fav-dropdown" class="fav-dropdown hidden"></div>
-    <div id="board-fav-list" class="fav-list"></div>
-  </section>
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <input type="date" id="trade-date" class="date-input" />
+    </label>
+    <label class="filter-field filter-field--wide">
+      <span>板块类型</span>
+      <div class="chip-group" id="content-type-chips">
+        {% for ct in content_types %}
+        <button type="button" class="chip{% if loop.first %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
+        {% endfor %}
+      </div>
+    </label>
+    <label class="filter-field filter-field--grow">
+      <span>板块筛选（默认全部自选，可输入名称/代码搜索后点选）</span>
+      <div class="board-picker" id="board-picker">
+        <div class="board-selected" id="board-selected"></div>
+        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，模糊匹配…" autocomplete="off" />
+        <div class="board-dropdown hidden" id="board-dropdown"></div>
+      </div>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空筛选</button>
+    </div>
+  </div>
+  <div class="filters filters--secondary">
+    <label class="filter-field filter-field--grow">
+      <span>添加自选板块</span>
+      <div class="board-picker">
+        <input type="text" id="board-add-search" class="board-search" placeholder="搜索板块名称/代码，点选添加…" autocomplete="off" />
+        <div class="board-dropdown hidden" id="board-add-dropdown"></div>
+      </div>
+    </label>
+  </div>
+  <p id="filter-hint" class="filter-hint muted"></p>
 </div>
+
+<section class="card table-card">
+  <div class="table-toolbar">
+    <span id="sector-updated" class="muted">—</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="sector-table">
+      <thead>
+        <tr id="sector-head-row"></tr>
+      </thead>
+      <tbody id="sector-body"></tbody>
+    </table>
+  </div>
+  <div id="sector-empty" class="table-empty hidden">暂无自选板块数据，请先添加自选或调整筛选</div>
+</section>
+
+<section class="card table-card members-card hidden" id="members-card">
+  <div class="members-head">
+    <h2 id="members-title">成分股</h2>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-close-members">关闭</button>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="members-table">
+      <thead>
+        <tr>
+          <th>代码</th>
+          <th>名称</th>
+          <th>涨幅</th>
+          <th>收盘价</th>
+          <th>成交额</th>
+          <th>换手</th>
+          <th>市盈率</th>
+          <th>资金流入</th>
+        </tr>
+      </thead>
+      <tbody id="members-body"></tbody>
+    </table>
+  </div>
+  <div id="members-empty" class="table-empty hidden">暂无成分股</div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/js/dc_board_common.js"></script>
-<script>
-  const elBoardFavSearch = document.getElementById('board-fav-search');
-  const elBoardFavDropdown = document.getElementById('board-fav-dropdown');
-  const elBoardFavList = document.getElementById('board-fav-list');
-  let boardFavCodes = new Set();
-
-  function showError(message) {
-    const msg = message || '操作失败';
-    window.alert(msg);
-  }
-
-  async function apiGet(path) {
-    const resp = await fetch(path, { credentials: 'same-origin' });
-    if (!resp.ok) {
-      const data = await resp.json().catch(() => ({}));
-      throw new Error(data.detail || '请求失败');
-    }
-    return resp.json();
-  }
-
-  async function apiPost(path, body) {
-    const resp = await fetch(path, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
-      const data = await resp.json().catch(() => ({}));
-      throw new Error(data.detail || '请求失败');
-    }
-    return resp.json();
-  }
-
-  async function apiDelete(path) {
-    const resp = await fetch(path, {
-      method: 'DELETE',
-      credentials: 'same-origin',
-    });
-    if (!resp.ok) {
-      const data = await resp.json().catch(() => ({}));
-      throw new Error(data.detail || '请求失败');
-    }
-    return resp.json();
-  }
-
-  function fmtPctCell(val) {
-    if (val == null) return '—';
-    const n = Number(val);
-    return `${n > 0 ? '+' : ''}${n.toFixed(2)}%`;
-  }
-
-  function cellClass(val) {
-    if (val == null) return '';
-    return val > 0 ? 'text-up' : val < 0 ? 'text-down' : '';
-  }
-
-  async function loadBoardFavorites() {
-    const data = await apiGet('/api/v1/favorites/boards');
-    boardFavCodes = new Set(data.items.map((x) => x.industry_code));
-    if (!data.items.length) {
-      elBoardFavList.innerHTML = '<div class="fav-empty">暂无自选板块</div>';
-      return;
-    }
-    elBoardFavList.innerHTML = data.items.map((item) => {
-      const pct = item.pct_change != null ? fmtPctCell(item.pct_change) : '—';
-      return `
-        <div class="fav-item" data-code="${item.industry_code}" data-name="${item.industry_name || item.industry_code}">
-          <div class="fav-item-main">
-            <div class="fav-item-name">${item.industry_name || item.industry_code}</div>
-            <div class="fav-item-meta">${item.content_type || ''} · <span class="${cellClass(item.pct_change)}">${pct}</span></div>
-          </div>
-          <button type="button" class="fav-item-del" data-del-board="${item.industry_code}" title="移除">×</button>
-        </div>`;
-    }).join('');
-    elBoardFavList.querySelectorAll('[data-del-board]').forEach((btn) => {
-      btn.addEventListener('click', () => removeBoardFav(btn.dataset.delBoard));
-    });
-  }
-
-  async function addBoardFav(code, name, ct) {
-    await apiPost('/api/v1/favorites/boards', { industry_code: code, industry_name: name || null, content_type: ct || null });
-    await loadBoardFavorites();
-  }
-
-  async function removeBoardFav(code) {
-    await apiDelete(`/api/v1/favorites/boards/${encodeURIComponent(code)}`);
-    await loadBoardFavorites();
-  }
-
-  function bindBoardFavSearch() {
-    let debounceTimer = null;
-    elBoardFavSearch.addEventListener('input', () => {
-      clearTimeout(debounceTimer);
-      const kw = elBoardFavSearch.value.trim();
-      if (!kw) {
-        elBoardFavDropdown.innerHTML = '';
-        elBoardFavDropdown.classList.add('hidden');
-        return;
-      }
-      debounceTimer = setTimeout(async () => {
-        try {
-          const data = await apiGet(`/api/v1/sectors/lookup/board?keyword=${encodeURIComponent(kw)}`);
-          const items = data.items || [];
-          if (!items.length) {
-            elBoardFavDropdown.innerHTML = '<div class="fav-option">无匹配结果</div>';
-            elBoardFavDropdown.classList.remove('hidden');
-            return;
-          }
-          elBoardFavDropdown.innerHTML = items.map((item, idx) => `<button type="button" class="fav-option" data-idx="${idx}">${item.industry_name || item.industry_code} (${item.industry_code})</button>`).join('');
-          elBoardFavDropdown.classList.remove('hidden');
-          elBoardFavDropdown.querySelectorAll('.fav-option[data-idx]').forEach((btn) => {
-            btn.addEventListener('click', () => {
-              const selectedItem = items[Number(btn.dataset.idx)];
-              addBoardFav(selectedItem.industry_code, selectedItem.industry_name, selectedItem.content_type).catch((e) => showError(e.message));
-              elBoardFavDropdown.classList.add('hidden');
-            });
-          });
-        } catch (e) {
-          showError(e.message);
-        }
-      }, 250);
-    });
-  }
-
-  bindBoardFavSearch();
-  loadBoardFavorites().catch((e) => showError(e.message));
-</script>
+<script src="/static/js/dc_sectors_table.js"></script>
+<script src="/static/js/favorites_board.js"></script>
 {% endblock %}

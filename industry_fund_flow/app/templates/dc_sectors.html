@@ -3,7 +3,7 @@
 <div class="page-head page-head--row">
   <div>
     <h1>行业板块</h1>
-    <p class="muted page-head-desc">东方财富 · 行业/概念涨幅榜，点击板块名查看 K 线，「成分」查看个股</p>
+    <p class="muted page-head-desc">东方财富 · 行业/概念涨幅榜，点击表头排序，「成分」查看个股</p>
   </div>
   <div class="page-head-actions">
     <a href="/favorites/boards" class="btn btn-ghost btn-sm">板块自选</a>
@@ -39,82 +39,51 @@
     <p id="filter-hint" class="filter-hint muted"></p>
   </div>
 
-  <div class="sectors-workspace" id="sectors-workspace">
-    <div class="sectors-primary">
-      <section class="card table-card">
-        <div class="table-toolbar">
-          <span id="sector-updated" class="muted">—</span>
-        </div>
-        <div class="table-wrap sectors-table-wrap">
-          <table class="data-table" id="sector-table">
-            <thead>
-              <tr>
-                <th>名称</th>
-                <th>涨幅</th>
-                <th>资金流入</th>
-                <th>成交额</th>
-                <th>换手</th>
-                <th>上涨/下跌</th>
-                <th>涨停数</th>
-                <th>流通市值</th>
-                <th>板块龙头</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="sector-body"></tbody>
-          </table>
-        </div>
-        <div id="sector-empty" class="table-empty hidden">暂无板块数据</div>
-      </section>
-
-      <section class="card table-card members-card hidden" id="members-card">
-        <div class="members-head">
-          <h2 id="members-title">成分股</h2>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-close-members">关闭</button>
-        </div>
-        <div class="table-wrap">
-          <table class="data-table" id="members-table">
-            <thead>
-              <tr>
-                <th>代码</th>
-                <th>名称</th>
-                <th>涨幅</th>
-                <th>收盘价</th>
-                <th>成交额</th>
-                <th>换手</th>
-                <th>市盈率</th>
-                <th>资金流入</th>
-                <th>自选</th>
-              </tr>
-            </thead>
-            <tbody id="members-body"></tbody>
-          </table>
-        </div>
-        <div id="members-empty" class="table-empty hidden">暂无成分股</div>
-      </section>
+  <section class="card table-card">
+    <div class="table-toolbar">
+      <span id="sector-updated" class="muted">—</span>
     </div>
+    <div class="table-wrap sectors-table-wrap">
+      <table class="data-table" id="sector-table">
+        <thead>
+          <tr id="sector-head-row"></tr>
+        </thead>
+        <tbody id="sector-body"></tbody>
+      </table>
+    </div>
+    <div id="sector-empty" class="table-empty hidden">暂无板块数据</div>
+  </section>
 
-    <aside class="card sectors-detail hidden" id="kline-card">
-      <div class="kline-card-head">
-        <span class="muted" id="kline-subtitle">板块 K 线</span>
-        <div class="kline-card-actions">
-          <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-kline-members">成分股</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-close-kline">关闭</button>
-        </div>
-      </div>
-      <div class="kline-card-body">
-        <div id="kline-header"></div>
-        <div id="kline-chart"></div>
-        <div id="kline-empty" class="table-empty hidden">暂无 K 线数据</div>
-      </div>
-    </aside>
-  </div>
+  <section class="card table-card members-card hidden" id="members-card">
+    <div class="members-head">
+      <h2 id="members-title">成分股</h2>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-close-members">关闭</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="members-table">
+        <thead>
+          <tr>
+            <th>代码</th>
+            <th>名称</th>
+            <th>涨幅</th>
+            <th>收盘价</th>
+            <th>成交额</th>
+            <th>换手</th>
+            <th>市盈率</th>
+            <th>资金流入</th>
+            <th>自选</th>
+          </tr>
+        </thead>
+        <tbody id="members-body"></tbody>
+      </table>
+    </div>
+    <div id="members-empty" class="table-empty hidden">暂无成分股</div>
+  </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js"></script>
-<script src="/static/js/dc_kline_chart.js"></script>
+<script src="/static/js/dc_sectors_table.js"></script>
 <script src="/static/js/dc_sectors.js"></script>
 {% endblock %}
