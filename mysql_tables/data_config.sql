@@ -478,12 +478,12 @@ INSERT INTO db_sync_task (
     1, '上市公司简介/主营/经营范围(Tushare stock_company)；每月1号全量刷新，供需求4 AI核心池'
 );
 
--- Tushare fina_mainbz_vip → ods_fina_mainbz_di（按产品 type=P；snapshot=近2季，full=季末回溯）
+-- Tushare fina_mainbz_vip → ods_fina_mainbz_di（按产品 type=P；snapshot=近2季，full=季末回溯；monthly 由月批 --force 执行）
 INSERT INTO db_sync_task (
     proxy_source, source_table, target_database, target_table, target_table_describe,
-    sync_mode, fetch_config, transform_config, status, remark
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
 ) VALUES (
-    'tushare', 'fina_mainbz_vip', 'stock_data', 'ods_fina_mainbz_di', '主营业务构成(按产品)', 'snapshot',
+    'tushare', 'fina_mainbz_vip', 'stock_data', 'ods_fina_mainbz_di', '主营业务构成(按产品)', 'snapshot', 'monthly',
     JSON_OBJECT(
         'token_type', 'tushare',
         'params', JSON_OBJECT(
@@ -505,7 +505,7 @@ INSERT INTO db_sync_task (
             'bz_sales', 'bz_profit', 'bz_cost', 'curr_type', 'update_flag'
         )
     ),
-    1, '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2季全市场(单次约1万行上限，需配合 fina_mainbz 按股补全)'
+    1, '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2季全市场；monthly+月批 --force（单次约1万行上限，需配合 fina_mainbz 按股补全）'
 );
 
 -- Tushare fina_mainbz → ods_fina_mainbz_di（按股循环，补 VIP 截断缺失；missing_only 默认 true）
@@ -773,3 +773,9 @@ INSERT INTO db_sync_task (
     ),
     1, '东财App热榜日快照(Tushare dc_hot, is_new=Y收盘榜；market×hot_type循环；单次最多2000行/组合，需约8000积分，建议22:30后)'
 );
+
+-- 存量库迁移：fina_mainbz_vip 由 daily 改为 monthly（与日批 fina_mainbz 一并由 xxl_monthly_batch.sh 执行）
+UPDATE db_sync_task
+SET schedule_type = 'monthly',
+    remark = '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2季全市场；monthly+月批 --force（单次约1万行上限，需配合 fina_mainbz 按股补全）'
+WHERE source_table = 'fina_mainbz_vip';

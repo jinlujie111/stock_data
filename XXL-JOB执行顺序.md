@@ -104,7 +104,7 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 
 | 步骤 | 任务 | 依赖 | 产品 |
 |------|------|------|------|
-| ① | `run_data_sync` | `daily` / `daily_basic` / `moneyflow` / `dc_*` / `ths_*` / `report_rc` / `fina_indicator_vip` / `limit_list_d` / `index_daily` / `etf_*` 等；`monthly`（`stock_company`、`fina_mainbz`）非 1 号自动跳过 | 全部 |
+| ① | `run_data_sync` | `daily` / `daily_basic` / `moneyflow` / `dc_*` / `ths_*` / `report_rc` / `fina_indicator_vip` / `limit_list_d` / `index_daily` / `etf_*` 等；`monthly`（`stock_company`、`fina_mainbz_vip`、`fina_mainbz`）非 1 号自动跳过 | 全部 |
 | ② | `run_dwm_market_breadth` | `ods_stock_detail_di`、`ods_limit_list_di` | 首页广度 |
 | ③ | `run_dwm_dc_industry_fund_flow` / `run_dwm_ths_industry_fund_flow` | 板块资金流 ODS | 需求1 五维 |
 | ④ | `run_dwm_dc_industry_trend_strength` / `run_dwm_ths_industry_trend_strength` | 板块日线 + `ods_index_daily_di` | 需求1 五维 |
@@ -161,7 +161,7 @@ bash dw-utils/xxl_daily_batch.sh "${1:-$(date +%Y%m%d)}"
 
 ## 四、月批脚本
 
-`stock_company`、`fina_mainbz` 在 `db_sync_task` 中为 `schedule_type=monthly`。日批 `run_data_sync` 在非 1 号会跳过；本 Job 用 `--force` 显式执行。
+`stock_company`、`fina_mainbz_vip`、`fina_mainbz` 在 `db_sync_task` 中为 `schedule_type=monthly`。日批 `run_data_sync` 在非 1 号会跳过；本 Job 用 `--force` 显式执行。
 
 ```bash
 cd /opt/stock_data
@@ -440,7 +440,7 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 |--------------|--------------|------|------|
 | `daily_basic` | `ods_daily_basic_di` | daily | 市值 / 换手率 / PE，需求4 V1 权重 |
 | `stock_company` | `ods_stock_company_di` | monthly | 公司简介 / 主营，需求4 Prompt |
-| `fina_mainbz_vip` | `ods_fina_mainbz_di` | daily | 主营业务构成 VIP（单次约 1 万行上限） |
+| `fina_mainbz_vip` | `ods_fina_mainbz_di` | monthly | 主营业务构成 VIP（近 2 季全市场，月批 `--force`） |
 | `fina_mainbz` | `ods_fina_mainbz_di` | monthly | 按股补全 mainbz 缺失 |
 
 ---
