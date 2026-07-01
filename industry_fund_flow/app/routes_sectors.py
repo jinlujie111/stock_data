@@ -83,7 +83,18 @@ def board_favorites_page(request: Request, user: dict = Depends(require_user)):
 
 @page_router.get("/favorites/stocks", response_class=HTMLResponse)
 def stock_favorites_page(request: Request, user: dict = Depends(require_user)):
-    return _render_favorites_page(request, user, "股票自选", "stock-favorites", "favorites_stock.html", "stock")
+    return _templates.TemplateResponse(
+        request,
+        "favorites_stock.html",
+        {
+            "user": user,
+            "nav_items": NAV_ITEMS,
+            "active_nav": "stock-favorites",
+            "title": "股票自选",
+            "favorites_kind": "stock",
+            "content_types": CONTENT_TYPES,
+        },
+    )
 
 
 @api_router.get("/trade-dates")
