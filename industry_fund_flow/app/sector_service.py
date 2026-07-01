@@ -261,19 +261,36 @@ def lookup_board(trade_date: str | None, keyword: str) -> list[dict]:
 
 
 def lookup_stock(trade_date: str | None, keyword: str) -> list[dict]:
-    """自选/搜索：按名称或代码查个股。"""
+    """自选/搜索：按名称或代码查个股（名称来自东财成分股/涨跌停列表）。"""
     if not keyword or not keyword.strip():
         return []
     td = _resolve_trade_date(trade_date)
     kw = f"%{keyword.strip()}%"
     rows = fetch_all_stock(
         f"""
-        SELECT c.ts_code, c.name AS stock_name, d.pct_chg, d.close, d.amount
-        FROM ods_stock_company_di c
+        SELECT
+            s.ts_code,
+            s.stock_name,
+            d.pct_chg,
+            d.close,
+            d.amount
+        FROM (
+            SELECT ts_code, MAX(stock_name) AS stock_name
+            FROM (
+                SELECT con_code AS ts_code, name AS stock_name
+                FROM ods_dc_member_di
+                WHERE con_code LIKE :kw OR name LIKE :kw
+                UNION ALL
+                SELECT ts_code, name AS stock_name
+                FROM ods_limit_list_di
+                WHERE ts_code LIKE :kw OR name LIKE :kw
+            ) u
+            WHERE ts_code IS NOT NULL AND ts_code != ''
+            GROUP BY ts_code
+        ) s
         LEFT JOIN ods_stock_detail_di d
-            ON d.trade_date = :td AND d.ts_code = c.ts_code
-        WHERE c.ts_code LIKE :kw OR c.name LIKE :kw
-        ORDER BY d.amount IS NULL, d.amount DESC, c.name
+            ON d.trade_date = :td AND d.ts_code = s.ts_code
+        ORDER BY d.amount IS NULL, d.amount DESC, s.stock_name
         LIMIT 20
         """,
         {"td": td, "kw": kw},
