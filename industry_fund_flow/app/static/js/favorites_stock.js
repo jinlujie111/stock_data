@@ -13,6 +13,7 @@
 
   let stockFavCodes = new Set();
   let addSearchTimer = null;
+  let addSearchSeq = 0;
 
   function tdParam() {
     return elDate.value ? toApiTradeDate(elDate.value) : "";
@@ -150,7 +151,8 @@
     });
     elAddSearch.value = "";
     hideDropdown();
-    await loadStocks();
+    stockFavCodes.add(item.ts_code);
+    loadStocks().catch((err) => showError(err.message));
   }
 
   async function removeStockFav(tsCode) {
@@ -166,18 +168,23 @@
     }
     clearTimeout(addSearchTimer);
     addSearchTimer = setTimeout(async () => {
+      const seq = ++addSearchSeq;
+      elAddDropdown.innerHTML = '<div class="board-option board-option--empty">搜索中…</div>';
+      elAddDropdown.classList.remove("hidden");
       try {
         clearError();
         const td = tdParam();
         const params = new URLSearchParams({ keyword: q });
         if (td) params.set("trade_date", td);
         const data = await apiGet(`/api/v1/sectors/lookup/stock?${params}`);
+        if (seq !== addSearchSeq) return;
         const items = (data.items || []).filter((s) => !stockFavCodes.has(s.ts_code));
         renderStockDropdown(items);
       } catch (err) {
+        if (seq !== addSearchSeq) return;
         showError(err.message);
       }
-    }, 250);
+    }, 400);
   }
 
   btnQuery.addEventListener("click", () => loadStocks().catch((err) => showError(err.message)));

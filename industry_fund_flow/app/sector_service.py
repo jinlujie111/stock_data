@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from functools import lru_cache
 from typing import Any
 
 from app.db import fetch_all_stock, fetch_one_stock
@@ -260,45 +261,63 @@ def lookup_board(trade_date: str | None, keyword: str) -> list[dict]:
     return [_serialize_row(r) for r in rows]
 
 
+@lru_cache(maxsize=64)
+def _latest_dc_member_date(trade_date: str) -> str | None:
+    row = fetch_one_stock(
+        """
+        SELECT MAX(trade_date) AS d
+        FROM ods_dc_member_di
+        WHERE trade_date <= :td
+        """,
+        {"td": trade_date},
+    )
+    return _serialize(row["d"]) if row and row.get("d") else None
+
+
 def lookup_stock(trade_date: str | None, keyword: str) -> list[dict]:
-    """自选/搜索：按名称或代码查个股（名称来自东财成分股/涨跌停列表）。"""
+    """自选/搜索：按名称或代码查个股（仅最新成分股快照 + 当日涨跌停，不做行情 JOIN）。"""
     if not keyword or not keyword.strip():
         return []
     td = _resolve_trade_date(trade_date)
-    kw = f"%{keyword.strip()}%"
+    raw = keyword.strip()
+    kw = f"%{raw}%"
+    member_date = _latest_dc_member_date(td)
+    params: dict[str, Any] = {"td": td, "kw": kw}
+    unions: list[str] = []
+
+    if member_date:
+        params["member_date"] = member_date
+        unions.append(
+            """
+            SELECT con_code AS ts_code, name AS stock_name
+            FROM ods_dc_member_di
+            WHERE trade_date = :member_date
+              AND (con_code LIKE :kw OR name LIKE :kw)
+            LIMIT 40
+            """
+        )
+
+    unions.append(
+        """
+        SELECT ts_code, name AS stock_name
+        FROM ods_limit_list_di
+        WHERE trade_date = :td
+          AND (ts_code LIKE :kw OR name LIKE :kw)
+        LIMIT 40
+        """
+    )
+
     rows = fetch_all_stock(
         f"""
-        SELECT
-            s.ts_code,
-            s.stock_name,
-            d.pct_chg,
-            d.close,
-            d.amount
+        SELECT ts_code, MAX(stock_name) AS stock_name
         FROM (
-            SELECT ts_code, MAX(stock_name) AS stock_name
-            FROM (
-                SELECT con_code AS ts_code, name AS stock_name
-                FROM ods_dc_member_di
-                WHERE con_code LIKE :kw OR name LIKE :kw
-                UNION ALL
-                SELECT ts_code, name AS stock_name
-                FROM ods_limit_list_di
-                WHERE ts_code LIKE :kw OR name LIKE :kw
-            ) u
-            WHERE ts_code IS NOT NULL AND ts_code != ''
-            GROUP BY ts_code
-        ) s
-        LEFT JOIN ods_stock_detail_di d
-            ON d.trade_date = :td AND d.ts_code = s.ts_code
-        ORDER BY d.amount IS NULL, d.amount DESC, s.stock_name
+            {" UNION ALL ".join(unions)}
+        ) u
+        WHERE ts_code IS NOT NULL AND ts_code != ''
+        GROUP BY ts_code
+        ORDER BY stock_name
         LIMIT 20
         """,
-        {"td": td, "kw": kw},
+        params,
     )
-    out = []
-    for r in rows:
-        item = _serialize_row(r)
-        amt = item.get("amount")
-        item["amount_yi"] = round(float(amt) / 100000, 2) if amt is not None else None
-        out.append(item)
-    return out
+    return [_serialize_row(r) for r in rows]
