@@ -1,0 +1,211 @@
+(function () {
+  const elDate = document.getElementById("trade-date");
+  const elTypes = document.getElementById("content-types");
+  const elWindow = document.getElementById("window");
+  const elThead = document.getElementById("vp-thead");
+  const elBody = document.getElementById("vp-body");
+  const elEmpty = document.getElementById("vp-empty");
+  const elError = document.getElementById("page-error");
+  const elDetailCard = document.getElementById("detail-card");
+  const elDetailTitle = document.getElementById("detail-title");
+  const elDetailMetrics = document.getElementById("detail-metrics");
+  const elDetailStocks = document.getElementById("detail-stocks");
+  const btnQuery = document.getElementById("btn-query");
+  let activeTab = "rank";
+
+  const STATUS_LABEL = {
+    mainline_burst: "主线爆发",
+    trend_up: "趋势上升",
+    range_bound: "震荡",
+    weak: "弱势",
+    ebbing: "退潮",
+  };
+
+  function fmt(v, d) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return v;
+    return n.toFixed(d == null ? 2 : d);
+  }
+
+  function pct(v) {
+    if (v === null || v === undefined) return "—";
+    return (Number(v) * 100).toFixed(1) + "%";
+  }
+
+  async function apiGet(path) {
+    const res = await fetch(path, { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || "请求失败");
+    return data;
+  }
+
+  function showError(msg) {
+    elError.textContent = msg;
+    elError.classList.remove("hidden");
+  }
+
+  function clearError() {
+    elError.classList.add("hidden");
+  }
+
+  function queryParams() {
+    return {
+      td: elDate.value,
+      types: elTypes.value,
+      w: elWindow.value,
+    };
+  }
+
+  async function loadDates() {
+    const data = await apiGet("/api/v1/vp/trade-dates?limit=60");
+    elDate.innerHTML = "";
+    (data.dates || []).forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      elDate.appendChild(opt);
+    });
+    if (data.latest) elDate.value = data.latest;
+  }
+
+  function renderRank(items) {
+    elThead.innerHTML =
+      "<tr><th>#</th><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th>" +
+      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续放量</th><th>操作</th></tr>";
+    elBody.innerHTML = "";
+    if (!items.length) {
+      elEmpty.classList.remove("hidden");
+      return;
+    }
+    elEmpty.classList.add("hidden");
+    items.forEach((row, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${row.rank_vp || idx + 1}</td>` +
+        `<td>${row.industry_name || row.industry_code}</td>` +
+        `<td>${row.content_type || "—"}</td>` +
+        `<td>${fmt(row.vp_score, 1)}</td>` +
+        `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
+        `<td>${row.signal_type || "—"}</td>` +
+        `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
+        `<td>${pct(row.rising_ratio)}</td>` +
+        `<td>${pct(row.breakout_ratio)}</td>` +
+        `<td>${row.amount_streak_days ?? "—"}</td>` +
+        `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">详情</button></td>`;
+      elBody.appendChild(tr);
+    });
+    elBody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadDetail(btn.dataset.code));
+    });
+  }
+
+  function renderSignals(items) {
+    elThead.innerHTML =
+      "<tr><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th><th>行业量比</th><th>连续放量</th></tr>";
+    elBody.innerHTML = "";
+    if (!items.length) {
+      elEmpty.classList.remove("hidden");
+      return;
+    }
+    elEmpty.classList.add("hidden");
+    items.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${row.industry_name || row.industry_code}</td>` +
+        `<td>${row.content_type || "—"}</td>` +
+        `<td>${fmt(row.vp_score, 1)}</td>` +
+        `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
+        `<td>${row.signal_type || "—"}</td>` +
+        `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
+        `<td>${row.amount_streak_days ?? "—"}</td>`;
+      elBody.appendChild(tr);
+    });
+  }
+
+  async function loadRank() {
+    clearError();
+    const { td, types, w } = queryParams();
+    const data = await apiGet(
+      `/api/v1/vp/industries/rank?trade_date=${encodeURIComponent(td)}` +
+        `&content_types=${encodeURIComponent(types)}&window=${w}&top=50`
+    );
+    renderRank(data.items || []);
+  }
+
+  async function loadSignals() {
+    clearError();
+    const { td, w } = queryParams();
+    const data = await apiGet(
+      `/api/v1/vp/signals?trade_date=${encodeURIComponent(td)}&window=${w}&top=50`
+    );
+    renderSignals(data.items || []);
+  }
+
+  async function loadDetail(code) {
+    clearError();
+    const { td, w } = queryParams();
+    const data = await apiGet(
+      `/api/v1/vp/industries/${encodeURIComponent(code)}?trade_date=${encodeURIComponent(td)}&window=${w}`
+    );
+    const s = data.score || {};
+    elDetailTitle.textContent = `${s.industry_name || code} · VP ${fmt(s.vp_score, 1)}`;
+    elDetailMetrics.innerHTML = [
+      ["VP 综合分", fmt(s.vp_score, 1)],
+      ["状态", STATUS_LABEL[s.vp_status] || s.vp_status],
+      ["行业量比", fmt(s.industry_vol_ratio_20, 2)],
+      ["上涨占比", pct(s.rising_ratio)],
+      ["突破占比", pct(s.breakout_ratio)],
+      ["连续放量", s.amount_streak_days],
+      ["成分数", s.member_cnt],
+    ]
+      .map(
+        ([k, v]) =>
+          `<div class="metric-item"><span class="metric-label">${k}</span><span class="metric-value">${v ?? "—"}</span></div>`
+      )
+      .join("");
+
+    const stocks = await apiGet(
+      `/api/v1/vp/industries/${encodeURIComponent(code)}/stocks?trade_date=${encodeURIComponent(td)}&window=${w}&limit=30`
+    );
+    elDetailStocks.innerHTML = "";
+    (stocks.items || []).forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        `<td>${row.ts_code}</td>` +
+        `<td>${row.stock_name || "—"}</td>` +
+        `<td>${fmt(row.pct_chg, 2)}</td>` +
+        `<td>${fmt(row.vol_ratio_20, 2)}</td>` +
+        `<td>${row.vol_streak_days ?? "—"}</td>` +
+        `<td>${row.is_breakout_60 ? "是" : "—"}</td>` +
+        `<td>${row.vp_pattern || "—"}</td>` +
+        `<td>${fmt(row.vp_pattern_score, 0)}</td>`;
+      elDetailStocks.appendChild(tr);
+    });
+    elDetailCard.classList.remove("hidden");
+  }
+
+  async function refresh() {
+    try {
+      if (activeTab === "signals") await loadSignals();
+      else await loadRank();
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      activeTab = tab.dataset.tab;
+      refresh();
+    });
+  });
+
+  btnQuery.addEventListener("click", refresh);
+
+  loadDates()
+    .then(refresh)
+    .catch((e) => showError(e.message || String(e)));
+})();

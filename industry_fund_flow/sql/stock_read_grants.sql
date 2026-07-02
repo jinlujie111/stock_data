@@ -76,4 +76,15 @@ GRANT SELECT ON stock_data.dwm_industry_stock_ai_score_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.dwm_industry_stock_core_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.dwm_industry_stock_core_di TO 'app_user'@'%';
 
+GRANT SELECT ON stock_data.dwm_vp_config TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_vp_config TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_stock_vp_factor_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_stock_vp_factor_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_industry_vp_agg_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_industry_vp_agg_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_industry_vp_score_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_industry_vp_score_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_stock_basic_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_stock_basic_di TO 'app_user'@'%';
+
 FLUSH PRIVILEGES;

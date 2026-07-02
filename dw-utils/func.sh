@@ -368,6 +368,15 @@ run_ai_core_pool_batch() {
     bash "${runner}" "$@"
 }
 
+run_vp_batch() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_industry_vp_score.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_sector_dragon_batch() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_sector_dragon_score.sh"
     if [[ ! -f "${runner}" ]]; then

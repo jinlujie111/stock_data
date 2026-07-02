@@ -1090,6 +1090,114 @@ CREATE TABLE IF NOT EXISTS dwm_industry_stock_core_di (
     KEY idx_core_pool_industry (trade_date, industry_id, level)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI核心池(剔除后)';
 
+-- -----------------------------------------------------------------------------
+-- 需求5 板块量价关系（VPA）
+-- ETL: dw-dwm/pro_dwm_industry_vp_score.sh → etl.volume_price.batch
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dwm_vp_config (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    config_key          VARCHAR(64)  NOT NULL DEFAULT '__global__',
+    window_default      INT          NOT NULL DEFAULT 20,
+    weight_vol          DECIMAL(5,4) NOT NULL DEFAULT 0.3000,
+    weight_trend        DECIMAL(5,4) NOT NULL DEFAULT 0.2500,
+    weight_continuity   DECIMAL(5,4) NOT NULL DEFAULT 0.1500,
+    weight_breadth      DECIMAL(5,4) NOT NULL DEFAULT 0.1500,
+    weight_breakout     DECIMAL(5,4) NOT NULL DEFAULT 0.1500,
+    vol_ratio_shrink    DECIMAL(6,3) NOT NULL DEFAULT 0.800,
+    vol_ratio_normal    DECIMAL(6,3) NOT NULL DEFAULT 1.200,
+    vol_ratio_expand    DECIMAL(6,3) NOT NULL DEFAULT 2.000,
+    vol_ratio_extreme   DECIMAL(6,3) NOT NULL DEFAULT 3.000,
+    breakout_vol_mult   DECIMAL(6,3) NOT NULL DEFAULT 1.500,
+    breakout_lookback   INT          NOT NULL DEFAULT 60,
+    min_member_cnt      INT          NOT NULL DEFAULT 5,
+    score_status_burst  INT          NOT NULL DEFAULT 80,
+    score_status_up     INT          NOT NULL DEFAULT 60,
+    score_status_range  INT          NOT NULL DEFAULT 40,
+    score_status_weak   INT          NOT NULL DEFAULT 20,
+    exclude_st          TINYINT      NOT NULL DEFAULT 1,
+    content_types       VARCHAR(64)  NOT NULL DEFAULT '行业,概念',
+    effective_date      DATE         NOT NULL,
+    is_active           TINYINT      NOT NULL DEFAULT 1,
+    created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_vp_config (config_key, effective_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块量价参数配置(需求5)';
+
+CREATE TABLE IF NOT EXISTS dwm_stock_vp_factor_di (
+    id               BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date       DATE           NOT NULL COMMENT '交易日期',
+    ts_code          VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    close            DECIMAL(20,6)  NULL COMMENT '收盘价',
+    vol              DECIMAL(20,4)  NULL COMMENT '成交量(手)',
+    amount           DECIMAL(20,4)  NULL COMMENT '成交额(千元)',
+    pct_chg          DECIMAL(20,6)  NULL COMMENT '涨跌幅(%)',
+    turnover_rate    DECIMAL(20,6)  NULL COMMENT '换手率(%)',
+    vol_ma20         DECIMAL(20,4)  NULL COMMENT '20日量均线',
+    vol_ratio_20     DECIMAL(20,6)  NULL COMMENT '量比=vol/vol_ma20',
+    price_ma20       DECIMAL(20,6)  NULL COMMENT '20日均价',
+    price_trend_20   DECIMAL(20,6)  NULL COMMENT '20日涨幅(%)',
+    vol_streak_days  INT            NOT NULL DEFAULT 0 COMMENT '连续放量天数',
+    is_breakout_60   TINYINT        NOT NULL DEFAULT 0 COMMENT '60日新高且放量',
+    vp_pattern       VARCHAR(32)    NULL COMMENT '量价配合分类',
+    vp_pattern_score DECIMAL(10,2)  NULL COMMENT '量价配合分0-100',
+    window           INT            NOT NULL DEFAULT 20 COMMENT '计算窗口',
+    created_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_stock_vp_factor (trade_date, ts_code, window),
+    KEY idx_stock_vp_td (trade_date, window),
+    KEY idx_stock_vp_pattern (trade_date, vp_pattern)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个股量价因子(需求5)';
+
+CREATE TABLE IF NOT EXISTS dwm_industry_vp_agg_di (
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date            DATE           NOT NULL COMMENT '交易日期',
+    industry_code         VARCHAR(32)    NOT NULL COMMENT '东财板块代码',
+    industry_name         VARCHAR(128)   NULL COMMENT '板块名称',
+    content_type          VARCHAR(16)    NULL COMMENT '行业/概念',
+    member_cnt            INT            NOT NULL DEFAULT 0 COMMENT '有效成分数',
+    total_amount          DECIMAL(24,4)  NULL COMMENT '行业总成交额(千元)',
+    avg_pct_chg           DECIMAL(20,6)  NULL COMMENT '市值加权涨跌幅(%)',
+    rising_ratio          DECIMAL(20,6)  NULL COMMENT '上涨家数占比',
+    vol_expand_ratio      DECIMAL(20,6)  NULL COMMENT '放量家数占比',
+    breakout_ratio        DECIMAL(20,6)  NULL COMMENT '突破信号家数占比',
+    industry_vol_ratio_20 DECIMAL(20,6)  NULL COMMENT '行业成交额/20日均',
+    amount_streak_days    INT            NOT NULL DEFAULT 0 COMMENT '成交额连续高于MA20天数',
+    weight_mode           VARCHAR(16)    NOT NULL DEFAULT 'mv_weight' COMMENT 'mv_weight/equal',
+    window                INT            NOT NULL DEFAULT 20,
+    created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_industry_vp_agg (trade_date, industry_code, window),
+    KEY idx_industry_vp_agg_td (trade_date, content_type, window)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块量价聚合(需求5)';
+
+CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    industry_code   VARCHAR(32)    NOT NULL COMMENT '东财板块代码',
+    industry_name   VARCHAR(128)   NULL COMMENT '板块名称',
+    content_type    VARCHAR(16)    NULL COMMENT '行业/概念',
+    window          INT            NOT NULL DEFAULT 20,
+    score_vol       DECIMAL(10,2)  NULL COMMENT '成交量变化子分',
+    score_trend     DECIMAL(10,2)  NULL COMMENT '价格趋势子分',
+    score_continuity DECIMAL(10,2) NULL COMMENT '连续放量子分',
+    score_breadth   DECIMAL(10,2)  NULL COMMENT '上涨占比子分',
+    score_breakout  DECIMAL(10,2)  NULL COMMENT '突破子分',
+    vp_score        DECIMAL(10,2)  NULL COMMENT '综合VP分0-100',
+    vp_status       VARCHAR(32)    NULL COMMENT 'mainline_burst/trend_up/range_bound/weak/ebbing',
+    signal_type     VARCHAR(32)    NULL COMMENT 'main_rise/ebbing/none',
+    rank_vp         INT            NULL COMMENT '同类型内VP排名',
+    member_cnt      INT            NULL COMMENT '有效成分数',
+    industry_vol_ratio_20 DECIMAL(20,6) NULL COMMENT '行业量比',
+    rising_ratio    DECIMAL(20,6)  NULL COMMENT '上涨占比',
+    breakout_ratio  DECIMAL(20,6)  NULL COMMENT '突破占比',
+    amount_streak_days INT         NULL COMMENT '连续放量天数',
+    detail_json     JSON           NULL COMMENT '子指标快照',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_industry_vp_score (trade_date, industry_code, window),
+    KEY idx_industry_vp_score_td (trade_date, content_type, window, vp_score)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块量价评分(需求5)';
+
 -- 已有库升级（按需执行一次）:
 -- ALTER TABLE ai_core_pool_config ADD COLUMN llm_provider VARCHAR(32) NULL
 --   COMMENT '对应 data_config.db_llm_token.provider' AFTER model_name;

@@ -1,0 +1,76 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head">
+  <h1>板块量价</h1>
+  <p class="muted">东财行业/概念 · 量比 · 量价配合 · VP 评分榜</p>
+</div>
+
+<div class="card filters-card">
+  <div class="filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <select id="trade-date"></select>
+    </label>
+    <label class="filter-field">
+      <span>板块类型</span>
+      <select id="content-types">
+        <option value="行业,概念">行业+概念</option>
+        <option value="行业">行业</option>
+        <option value="概念">概念</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>周期</span>
+      <select id="window">
+        <option value="20" selected>20日</option>
+      </select>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+    </div>
+  </div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<div class="card">
+  <div class="tabs">
+    <button type="button" class="tab active" data-tab="rank">VP 评分榜</button>
+    <button type="button" class="tab" data-tab="signals">信号</button>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="vp-table">
+      <thead id="vp-thead"></thead>
+      <tbody id="vp-body"></tbody>
+    </table>
+  </div>
+  <p id="vp-empty" class="muted hidden">暂无数据，请先运行 run_vp_batch</p>
+</div>
+
+<div class="card hidden" id="detail-card">
+  <h2 id="detail-title">板块详情</h2>
+  <div id="detail-metrics" class="metric-grid"></div>
+  <h3>成分股量价 Top</h3>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>代码</th>
+          <th>名称</th>
+          <th>涨跌幅%</th>
+          <th>量比</th>
+          <th>连续放量</th>
+          <th>突破60</th>
+          <th>量价形态</th>
+          <th>形态分</th>
+        </tr>
+      </thead>
+      <tbody id="detail-stocks"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block app_scripts %}
+<script src="/static/js/dc_volume_price.js?v=20260702"></script>
+{% endblock %}
