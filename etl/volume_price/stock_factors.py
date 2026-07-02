@@ -101,7 +101,10 @@ def compute_stock_factors(
         parts.append(g)
 
     all_df = pd.concat(parts, ignore_index=True)
-    today = all_df[all_df["trade_date"] == pd.Timestamp(trade_date)].copy()
+    # MySQL DATE 列经 pd.read_sql 读回为 datetime.date（object dtype）或 datetime64，
+    # 统一转成 datetime64 再与 Timestamp 比较，避免类型不匹配导致筛空。
+    all_df["_td"] = pd.to_datetime(all_df["trade_date"])
+    today = all_df[all_df["_td"] == pd.Timestamp(trade_date)].drop(columns="_td").copy()
     if today.empty:
         raise RuntimeError(f"当日无有效个股行情: {trade_date}")
 
