@@ -105,6 +105,70 @@ CREATE TABLE IF NOT EXISTS ods_limit_list_di (
     UNIQUE KEY uk_limit_list (trade_date, ts_code, `limit`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='涨跌停炸板列表(Tushare limit_list_d)';
 
+CREATE TABLE IF NOT EXISTS ods_stock_basic_di (
+    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code      VARCHAR(16)  NOT NULL COMMENT 'TS代码',
+    symbol       VARCHAR(16)  NULL COMMENT '股票代码',
+    name         VARCHAR(64)  NULL COMMENT '股票名称',
+    area         VARCHAR(32)  NULL COMMENT '地域',
+    industry     VARCHAR(64)  NULL COMMENT '所属行业',
+    fullname     VARCHAR(128) NULL COMMENT '股票全称',
+    enname       VARCHAR(128) NULL COMMENT '英文全称',
+    cnspell      VARCHAR(32)  NULL COMMENT '拼音缩写',
+    market       VARCHAR(32)  NULL COMMENT '市场类型(主板/创业板/科创板/CDR/北交所)',
+    exchange     VARCHAR(16)  NULL COMMENT '交易所 SSE/SZSE/BSE',
+    curr_type    VARCHAR(8)   NULL COMMENT '交易货币',
+    list_status  VARCHAR(4)   NULL COMMENT '上市状态 L上市 D退市 P暂停上市',
+    list_date    DATE         NULL COMMENT '上市日期',
+    delist_date  DATE         NULL COMMENT '退市日期',
+    is_hs        VARCHAR(4)   NULL COMMENT '沪深港通标的 N否 H沪股通 S深股通',
+    UNIQUE KEY uk_stock_basic (ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股基础信息(Tushare stock_basic,全量)';
+
+CREATE TABLE IF NOT EXISTS ods_top_list_di (
+    id             BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date     DATE           NOT NULL COMMENT '交易日期',
+    ts_code        VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    name           VARCHAR(64)    NULL COMMENT '名称',
+    close          DECIMAL(20, 6) NULL COMMENT '收盘价',
+    pct_change     DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    turnover_rate  DECIMAL(20, 6) NULL COMMENT '换手率(%)',
+    amount         DECIMAL(20, 4) NULL COMMENT '总成交额',
+    l_sell         DECIMAL(20, 4) NULL COMMENT '龙虎榜卖出额',
+    l_buy          DECIMAL(20, 4) NULL COMMENT '龙虎榜买入额',
+    l_amount       DECIMAL(20, 4) NULL COMMENT '龙虎榜成交额',
+    net_amount     DECIMAL(20, 4) NULL COMMENT '龙虎榜净买入额',
+    net_rate       DECIMAL(20, 6) NULL COMMENT '龙虎榜净买额占比',
+    amount_rate    DECIMAL(20, 6) NULL COMMENT '龙虎榜成交额占比',
+    float_values   DECIMAL(20, 4) NULL COMMENT '当日流通市值',
+    reason         VARCHAR(256)   NULL COMMENT '上榜理由',
+    UNIQUE KEY uk_top_list (trade_date, ts_code, reason(128))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='龙虎榜每日明细(Tushare top_list)';
+
+CREATE TABLE IF NOT EXISTS ods_moneyflow_hsgt_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    ggt_ss      DECIMAL(20, 4) NULL COMMENT '港股通(上海,百万元)',
+    ggt_sz      DECIMAL(20, 4) NULL COMMENT '港股通(深圳,百万元)',
+    hgt         DECIMAL(20, 4) NULL COMMENT '沪股通(百万元)',
+    sgt         DECIMAL(20, 4) NULL COMMENT '深股通(百万元)',
+    north_money DECIMAL(20, 4) NULL COMMENT '北向资金(百万元)',
+    south_money DECIMAL(20, 4) NULL COMMENT '南向资金(百万元)',
+    UNIQUE KEY uk_moneyflow_hsgt (trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='沪深港通资金流向(Tushare moneyflow_hsgt)';
+
+CREATE TABLE IF NOT EXISTS ods_hk_hold_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE         NOT NULL COMMENT '交易日期',
+    code        VARCHAR(16)  NULL COMMENT '原始代码',
+    ts_code     VARCHAR(16)  NOT NULL COMMENT 'TS代码',
+    name        VARCHAR(64)  NULL COMMENT '股票名称',
+    vol         BIGINT       NULL COMMENT '持股数量(股)',
+    ratio       DECIMAL(20, 6) NULL COMMENT '持股占比(%)',
+    exchange    VARCHAR(8)   NOT NULL COMMENT 'SH沪股通 SZ深股通 HK港股通',
+    UNIQUE KEY uk_hk_hold (trade_date, ts_code, exchange)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='沪深港股通持股明细(Tushare hk_hold)';
+
 -- ============================================================================
 -- 股票财务数据
 -- ============================================================================

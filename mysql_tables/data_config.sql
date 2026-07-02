@@ -774,6 +774,107 @@ INSERT INTO db_sync_task (
     1, '东财App热榜日快照(Tushare dc_hot, is_new=Y收盘榜；market×hot_type循环；单次最多2000行/组合，需约8000积分，建议22:30后)'
 );
 
+-- Tushare stock_basic → ods_stock_basic_di（full，按交易所全量刷新上市股票）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'stock_basic', 'stock_data', 'ods_stock_basic_di', 'A股基础信息', 'full',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'exchange_list', JSON_ARRAY('SSE', 'SZSE', 'BSE'),
+        'params', JSON_OBJECT('list_status', 'L'),
+        'inject_date_range', FALSE,
+        'sleep_seconds', 0.2
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('list_date', '%Y%m%d', 'delist_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code'),
+        'dropna', JSON_ARRAY('ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'symbol', 'name', 'area', 'industry', 'fullname', 'enname', 'cnspell',
+            'market', 'exchange', 'curr_type', 'list_status', 'list_date', 'delist_date', 'is_hs'
+        )
+    ),
+    1, '全量更新A股基础信息(Tushare stock_basic, list_status=L, SSE+SZSE+BSE；供股票搜索/VPA)'
+);
+
+-- Tushare top_list → ods_top_list_di（按日 snapshot，龙虎榜每日明细）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'top_list', 'stock_data', 'ods_top_list_di', '龙虎榜每日明细', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'reason'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'name', 'close', 'pct_change', 'turnover_rate',
+            'amount', 'l_sell', 'l_buy', 'l_amount', 'net_amount', 'net_rate',
+            'amount_rate', 'float_values', 'reason'
+        )
+    ),
+    1, '龙虎榜日快照(Tushare top_list, trade_date=$trade_date；单次最多1万行，约2000积分，建议20点后)'
+);
+
+-- Tushare moneyflow_hsgt → ods_moneyflow_hsgt_di（按日 snapshot，沪深港通通道资金流向）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'moneyflow_hsgt', 'stock_data', 'ods_moneyflow_hsgt_di', '沪深港通资金流向', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date'),
+        'dropna', JSON_ARRAY('trade_date'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ggt_ss', 'ggt_sz', 'hgt', 'sgt', 'north_money', 'south_money'
+        )
+    ),
+    1, '沪深港通资金流向日快照(Tushare moneyflow_hsgt；含北向/南向汇总，约2000积分)'
+);
+
+-- Tushare hk_hold → ods_hk_hold_di（按日 snapshot，沪股通+深股通分两次拉取避免3800行截断）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'hk_hold', 'stock_data', 'ods_hk_hold_di', '沪深港股通持股明细', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'calls', JSON_ARRAY(
+            JSON_OBJECT('params', JSON_OBJECT('exchange', 'SH')),
+            JSON_OBJECT('params', JSON_OBJECT('exchange', 'SZ'))
+        ),
+        'sleep_seconds', 0.2,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'exchange'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code', 'exchange'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'code', 'ts_code', 'name', 'vol', 'ratio', 'exchange'
+        )
+    ),
+    1, '沪深港股通持股日快照(Tushare hk_hold, SH+SZ北向；单次最多3800行/通道，约2000积分，T+1更新)'
+);
+
 -- 存量库迁移：fina_mainbz_vip 由 daily 改为 monthly（与日批 fina_mainbz 一并由 xxl_monthly_batch.sh 执行）
 UPDATE db_sync_task
 SET schedule_type = 'monthly',
