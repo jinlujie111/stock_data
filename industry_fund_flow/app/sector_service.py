@@ -279,45 +279,40 @@ def lookup_stock(trade_date: str | None, keyword: str) -> list[dict]:
     if not keyword or not keyword.strip():
         return []
     td = _resolve_trade_date(trade_date)
-    raw = keyword.strip()
-    kw = f"%{raw}%"
+    kw = f"%{keyword.strip()}%"
     member_date = _latest_dc_member_date(td)
-    params: dict[str, Any] = {"td": td, "kw": kw}
-    unions: list[str] = []
+    merged: dict[str, str | None] = {}
 
     if member_date:
-        params["member_date"] = member_date
-        unions.append(
+        member_rows = fetch_all_stock(
             """
             SELECT con_code AS ts_code, name AS stock_name
             FROM ods_dc_member_di
             WHERE trade_date = :member_date
               AND (con_code LIKE :kw OR name LIKE :kw)
             LIMIT 40
-            """
+            """,
+            {"member_date": member_date, "kw": kw},
         )
+        for r in member_rows:
+            code = _serialize(r.get("ts_code"))
+            if code and code not in merged:
+                merged[code] = _serialize(r.get("stock_name"))
 
-    unions.append(
+    limit_rows = fetch_all_stock(
         """
         SELECT ts_code, name AS stock_name
         FROM ods_limit_list_di
         WHERE trade_date = :td
           AND (ts_code LIKE :kw OR name LIKE :kw)
         LIMIT 40
-        """
-    )
-
-    rows = fetch_all_stock(
-        f"""
-        SELECT ts_code, MAX(stock_name) AS stock_name
-        FROM (
-            {" UNION ALL ".join(unions)}
-        ) u
-        WHERE ts_code IS NOT NULL AND ts_code != ''
-        GROUP BY ts_code
-        ORDER BY stock_name
-        LIMIT 20
         """,
-        params,
+        {"td": td, "kw": kw},
     )
-    return [_serialize_row(r) for r in rows]
+    for r in limit_rows:
+        code = _serialize(r.get("ts_code"))
+        if code and code not in merged:
+            merged[code] = _serialize(r.get("stock_name"))
+
+    items = sorted(merged.items(), key=lambda x: (x[1] or x[0]))
+    return [{"ts_code": code, "stock_name": name} for code, name in items[:20]]
