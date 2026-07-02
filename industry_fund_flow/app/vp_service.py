@@ -26,6 +26,8 @@ def _serialize(value: Any) -> Any:
 
 def _serialize_row(row: dict) -> dict:
     out = {k: _serialize(v) for k, v in row.items()}
+    if "vp_window" in out and "window" not in out:
+        out["window"] = out["vp_window"]
     if isinstance(out.get("detail_json"), str):
         try:
             out["detail_json"] = json.loads(out["detail_json"])
@@ -95,7 +97,7 @@ def rank_industries(
             amount_streak_days, rank_vp, member_cnt,
             score_vol, score_trend, score_continuity, score_breadth, score_breakout
         FROM {SCORE_TABLE}
-        WHERE trade_date = :td AND window = :w
+        WHERE trade_date = :td AND vp_window = :w
           AND content_type IN ({placeholders})
         ORDER BY {sort_key} DESC, rank_vp ASC
         LIMIT :lim
@@ -121,7 +123,7 @@ def get_industry_detail(
         f"""
         SELECT *
         FROM {SCORE_TABLE}
-        WHERE trade_date = :td AND industry_code = :ic AND window = :w
+        WHERE trade_date = :td AND industry_code = :ic AND vp_window = :w
         LIMIT 1
         """,
         {"td": td, "ic": industry_code, "w": window},
@@ -132,7 +134,7 @@ def get_industry_detail(
         f"""
         SELECT *
         FROM {AGG_TABLE}
-        WHERE trade_date = :td AND industry_code = :ic AND window = :w
+        WHERE trade_date = :td AND industry_code = :ic AND vp_window = :w
         LIMIT 1
         """,
         {"td": td, "ic": industry_code, "w": window},
@@ -141,7 +143,7 @@ def get_industry_detail(
         f"""
         SELECT trade_date, vp_score, vp_status, industry_vol_ratio_20, rising_ratio
         FROM {SCORE_TABLE}
-        WHERE industry_code = :ic AND window = :w AND trade_date <= :td
+        WHERE industry_code = :ic AND vp_window = :w AND trade_date <= :td
         ORDER BY trade_date DESC
         LIMIT 20
         """,
@@ -216,7 +218,7 @@ def list_industry_stocks(
                vol_ratio_20, vol_streak_days, is_breakout_60,
                vp_pattern, vp_pattern_score
         FROM {FACTOR_TABLE}
-        WHERE trade_date = :td AND window = :w
+        WHERE trade_date = :td AND vp_window = :w
           AND ts_code IN ({placeholders})
         ORDER BY {sort_key} DESC
         LIMIT :lim
@@ -259,7 +261,7 @@ def list_signals(
                signal_type, industry_vol_ratio_20, rising_ratio, breakout_ratio,
                amount_streak_days, rank_vp
         FROM {SCORE_TABLE}
-        WHERE trade_date = :td AND window = :w
+        WHERE trade_date = :td AND vp_window = :w
           AND signal_type IS NOT NULL AND signal_type <> 'none'
           {sig_sql}
         ORDER BY vp_score DESC

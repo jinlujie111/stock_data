@@ -131,7 +131,7 @@ def compute_stock_factors(
                 "is_breakout_60": int(r["is_breakout_60"] or 0),
                 "vp_pattern": pattern,
                 "vp_pattern_score": pattern_score,
-                "window": window,
+                "vp_window": window,
             }
         )
     logger.info("stock_factors trade_date=%s rows=%d", trade_date, len(rows))

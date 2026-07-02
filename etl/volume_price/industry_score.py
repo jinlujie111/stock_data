@@ -81,7 +81,7 @@ def score_industries(agg_rows: list[dict[str, Any]], cfg: VpConfig) -> list[dict
                     "industry_code": r["industry_code"],
                     "industry_name": r.get("industry_name"),
                     "content_type": ct,
-                    "window": int(r["window"]),
+                    "vp_window": int(r["vp_window"]),
                     "score_vol": float(r["score_vol"]),
                     "score_trend": float(r["score_trend"]),
                     "score_continuity": float(r["score_continuity"]),

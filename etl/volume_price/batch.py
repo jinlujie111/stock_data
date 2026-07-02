@@ -34,11 +34,11 @@ STOCK_UPSERT = """
 INSERT INTO dwm_stock_vp_factor_di (
     trade_date, ts_code, close, vol, amount, pct_chg, turnover_rate,
     vol_ma20, vol_ratio_20, price_ma20, price_trend_20, vol_streak_days,
-    is_breakout_60, vp_pattern, vp_pattern_score, window
+    is_breakout_60, vp_pattern, vp_pattern_score, vp_window
 ) VALUES (
     :trade_date, :ts_code, :close, :vol, :amount, :pct_chg, :turnover_rate,
     :vol_ma20, :vol_ratio_20, :price_ma20, :price_trend_20, :vol_streak_days,
-    :is_breakout_60, :vp_pattern, :vp_pattern_score, :window
+    :is_breakout_60, :vp_pattern, :vp_pattern_score, :vp_window
 )
 ON DUPLICATE KEY UPDATE
     close=VALUES(close), vol=VALUES(vol), amount=VALUES(amount),
@@ -54,11 +54,11 @@ AGG_UPSERT = """
 INSERT INTO dwm_industry_vp_agg_di (
     trade_date, industry_code, industry_name, content_type, member_cnt,
     total_amount, avg_pct_chg, rising_ratio, vol_expand_ratio, breakout_ratio,
-    industry_vol_ratio_20, amount_streak_days, weight_mode, window
+    industry_vol_ratio_20, amount_streak_days, weight_mode, vp_window
 ) VALUES (
     :trade_date, :industry_code, :industry_name, :content_type, :member_cnt,
     :total_amount, :avg_pct_chg, :rising_ratio, :vol_expand_ratio, :breakout_ratio,
-    :industry_vol_ratio_20, :amount_streak_days, :weight_mode, :window
+    :industry_vol_ratio_20, :amount_streak_days, :weight_mode, :vp_window
 )
 ON DUPLICATE KEY UPDATE
     industry_name=VALUES(industry_name), content_type=VALUES(content_type),
@@ -72,13 +72,13 @@ ON DUPLICATE KEY UPDATE
 
 SCORE_UPSERT = """
 INSERT INTO dwm_industry_vp_score_di (
-    trade_date, industry_code, industry_name, content_type, window,
+    trade_date, industry_code, industry_name, content_type, vp_window,
     score_vol, score_trend, score_continuity, score_breadth, score_breakout,
     vp_score, vp_status, signal_type, rank_vp, member_cnt,
     industry_vol_ratio_20, rising_ratio, breakout_ratio, amount_streak_days,
     detail_json
 ) VALUES (
-    :trade_date, :industry_code, :industry_name, :content_type, :window,
+    :trade_date, :industry_code, :industry_name, :content_type, :vp_window,
     :score_vol, :score_trend, :score_continuity, :score_breadth, :score_breakout,
     :vp_score, :vp_status, :signal_type, :rank_vp, :member_cnt,
     :industry_vol_ratio_20, :rising_ratio, :breakout_ratio, :amount_streak_days,
@@ -141,7 +141,7 @@ def run_batch(
 
     with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM dwm_stock_vp_factor_di WHERE trade_date = :td AND window = :w"),
+            text("DELETE FROM dwm_stock_vp_factor_di WHERE trade_date = :td AND vp_window = :w"),
             {"td": trade_date, "w": window},
         )
         _chunk_insert(conn, STOCK_UPSERT, factors)
@@ -154,11 +154,11 @@ def run_batch(
 
     with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM dwm_industry_vp_agg_di WHERE trade_date = :td AND window = :w"),
+            text("DELETE FROM dwm_industry_vp_agg_di WHERE trade_date = :td AND vp_window = :w"),
             {"td": trade_date, "w": window},
         )
         conn.execute(
-            text("DELETE FROM dwm_industry_vp_score_di WHERE trade_date = :td AND window = :w"),
+            text("DELETE FROM dwm_industry_vp_score_di WHERE trade_date = :td AND vp_window = :w"),
             {"td": trade_date, "w": window},
         )
         _chunk_insert(conn, AGG_UPSERT, agg_rows)

@@ -34,7 +34,7 @@ def _amount_metrics(
                 FROM dwm_industry_vp_agg_di
                 WHERE industry_code = :ic
                   AND trade_date BETWEEN :start AND :end
-                  AND window = :w
+                  AND vp_window = :w
                 ORDER BY trade_date
                 """
             ),
@@ -131,7 +131,7 @@ def aggregate_board(
         "industry_vol_ratio_20": round(vol_ratio, 6) if vol_ratio is not None else None,
         "amount_streak_days": streak,
         "weight_mode": weight_mode,
-        "window": cfg.window_default,
+        "vp_window": cfg.window_default,
     }
 
 

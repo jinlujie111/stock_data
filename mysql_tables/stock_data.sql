@@ -1140,11 +1140,11 @@ CREATE TABLE IF NOT EXISTS dwm_stock_vp_factor_di (
     is_breakout_60   TINYINT        NOT NULL DEFAULT 0 COMMENT '60日新高且放量',
     vp_pattern       VARCHAR(32)    NULL COMMENT '量价配合分类',
     vp_pattern_score DECIMAL(10,2)  NULL COMMENT '量价配合分0-100',
-    window           INT            NOT NULL DEFAULT 20 COMMENT '计算窗口',
+    vp_window        INT            NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)',
     created_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_stock_vp_factor (trade_date, ts_code, window),
-    KEY idx_stock_vp_td (trade_date, window),
+    UNIQUE KEY uk_stock_vp_factor (trade_date, ts_code, vp_window),
+    KEY idx_stock_vp_td (trade_date, vp_window),
     KEY idx_stock_vp_pattern (trade_date, vp_pattern)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个股量价因子(需求5)';
 
@@ -1163,11 +1163,11 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_agg_di (
     industry_vol_ratio_20 DECIMAL(20,6)  NULL COMMENT '行业成交额/20日均',
     amount_streak_days    INT            NOT NULL DEFAULT 0 COMMENT '成交额连续高于MA20天数',
     weight_mode           VARCHAR(16)    NOT NULL DEFAULT 'mv_weight' COMMENT 'mv_weight/equal',
-    window                INT            NOT NULL DEFAULT 20,
+    vp_window             INT            NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)',
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_industry_vp_agg (trade_date, industry_code, window),
-    KEY idx_industry_vp_agg_td (trade_date, content_type, window)
+    UNIQUE KEY uk_industry_vp_agg (trade_date, industry_code, vp_window),
+    KEY idx_industry_vp_agg_td (trade_date, content_type, vp_window)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块量价聚合(需求5)';
 
 CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
@@ -1176,7 +1176,7 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
     industry_code   VARCHAR(32)    NOT NULL COMMENT '东财板块代码',
     industry_name   VARCHAR(128)   NULL COMMENT '板块名称',
     content_type    VARCHAR(16)    NULL COMMENT '行业/概念',
-    window          INT            NOT NULL DEFAULT 20,
+    vp_window       INT            NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)',
     score_vol       DECIMAL(10,2)  NULL COMMENT '成交量变化子分',
     score_trend     DECIMAL(10,2)  NULL COMMENT '价格趋势子分',
     score_continuity DECIMAL(10,2) NULL COMMENT '连续放量子分',
@@ -1194,9 +1194,16 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
     detail_json     JSON           NULL COMMENT '子指标快照',
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_industry_vp_score (trade_date, industry_code, window),
-    KEY idx_industry_vp_score_td (trade_date, content_type, window, vp_score)
+    UNIQUE KEY uk_industry_vp_score (trade_date, industry_code, vp_window),
+    KEY idx_industry_vp_score_td (trade_date, content_type, vp_window, vp_score)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块量价评分(需求5)';
+
+
+-- 已有库升级（按需执行一次，window 为 MySQL 保留字，列已重命名为 vp_window）:
+-- ALTER TABLE dwm_stock_vp_factor_di CHANGE COLUMN `window` vp_window INT NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)';
+-- ALTER TABLE dwm_industry_vp_agg_di CHANGE COLUMN `window` vp_window INT NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)';
+-- ALTER TABLE dwm_industry_vp_score_di CHANGE COLUMN `window` vp_window INT NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)';
+
 
 -- 已有库升级（按需执行一次）:
 -- ALTER TABLE ai_core_pool_config ADD COLUMN llm_provider VARCHAR(32) NULL
