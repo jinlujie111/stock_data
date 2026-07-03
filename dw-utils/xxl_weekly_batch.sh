@@ -27,8 +27,4 @@ run_data_sync "${n_date}" --source-table etf_basic --force
 run_data_sync "${n_date}" --source-table etf_share_size --force
 run_dim_industry_etf_map "${n_date}"
 
-# 需求4：周度全量复核 AI 核心池（日批为 delta）
-run_dim_industry_track "${n_date}"
-run_ai_core_pool_batch "${n_date}" --mode full --force
-
 echo "======== 周批完成 ${n_date} ========"

@@ -65,14 +65,7 @@ run_dws_dc_industry_mainline_monitor "${n_date}"
 run_dws_ths_industry_mainline_monitor "${n_date}"
 run_dws_sw_industry_mainline_monitor "${n_date}"
 
-# --- 9) DIM：东财热度赛道 + 成分（需求4）---
-# 环境变量可选：AI_CORE_TRACK_TOP_N=50  AI_CORE_TRACK_CONTENT_TYPES=概念,行业
-run_dim_industry_track "${n_date}"
-
-# --- 9b) AI 核心池（需求4；无 LLM Key 时自动走规则引擎）---
-run_ai_core_pool_batch "${n_date}"
-
-# --- 9c) 板块量价 VP（需求5；依赖 daily/daily_basic/dc_member + 120日历史）---
+# --- 9) 板块量价 VP（需求5；依赖 daily/daily_basic/dc_member + 120日历史）---
 run_vp_batch "${n_date}"
 
 # --- 10) 板块龙头 MVP（需求2）---

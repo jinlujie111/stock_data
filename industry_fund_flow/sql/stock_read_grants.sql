@@ -65,16 +65,6 @@ GRANT SELECT ON stock_data.ods_stock_company_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_stock_company_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_fina_mainbz_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_fina_mainbz_di TO 'app_user'@'%';
-GRANT SELECT ON stock_data.dim_industry_track TO 'app_user'@'localhost';
-GRANT SELECT ON stock_data.dim_industry_track TO 'app_user'@'%';
-GRANT SELECT ON stock_data.dim_industry_track_stock TO 'app_user'@'localhost';
-GRANT SELECT ON stock_data.dim_industry_track_stock TO 'app_user'@'%';
-GRANT SELECT ON stock_data.ai_core_pool_config TO 'app_user'@'localhost';
-GRANT SELECT ON stock_data.ai_core_pool_config TO 'app_user'@'%';
-GRANT SELECT ON stock_data.dwm_industry_stock_ai_score_di TO 'app_user'@'localhost';
-GRANT SELECT ON stock_data.dwm_industry_stock_ai_score_di TO 'app_user'@'%';
-GRANT SELECT ON stock_data.dwm_industry_stock_core_di TO 'app_user'@'localhost';
-GRANT SELECT ON stock_data.dwm_industry_stock_core_di TO 'app_user'@'%';
 
 GRANT SELECT ON stock_data.dwm_vp_config TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.dwm_vp_config TO 'app_user'@'%';

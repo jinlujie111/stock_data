@@ -142,7 +142,6 @@ _NAV_RAW: list[dict[str, str]] = [
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "主线决策"},
     {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline", "section": "主线决策"},
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "主线决策"},
-    {"slug": "ai-core", "label": "AI 核心池", "href": "/dc/ai-core", "section": "主线决策"},
     # 板块分析
     {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "板块分析"},
     {"slug": "volume-price", "label": "板块量价", "href": "/dc/volume-price", "section": "板块分析"},
