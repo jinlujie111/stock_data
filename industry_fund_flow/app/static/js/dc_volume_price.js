@@ -21,6 +21,31 @@
     ebbing: "退潮",
   };
 
+  const SIGNAL_LABEL = {
+    main_rise: "主升",
+    ebbing: "退潮",
+    none: "无",
+    launch: "启动",
+    distribution: "派发",
+  };
+
+  const PATTERN_LABEL = {
+    trend_confirm: "趋势确认",
+    weak_rise: "缩量上涨",
+    distribution: "出货信号",
+    consolidation: "低迷筑底",
+  };
+
+  function labelSignal(v) {
+    if (!v || v === "none") return "—";
+    return SIGNAL_LABEL[v] || v;
+  }
+
+  function labelPattern(v) {
+    if (!v) return "—";
+    return PATTERN_LABEL[v] || v;
+  }
+
   function fmt(v, d) {
     if (v === null || v === undefined || v === "") return "—";
     const n = Number(v);
@@ -97,7 +122,7 @@
         `<td>${row.content_type || "—"}</td>` +
         `<td>${fmt(row.vp_score, 1)}</td>` +
         `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
-        `<td>${row.signal_type || "—"}</td>` +
+        `<td>${labelSignal(row.signal_type)}</td>` +
         `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
         `<td>${pct(row.rising_ratio)}</td>` +
         `<td>${pct(row.breakout_ratio)}</td>` +
@@ -126,7 +151,7 @@
         `<td>${row.content_type || "—"}</td>` +
         `<td>${fmt(row.vp_score, 1)}</td>` +
         `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
-        `<td>${row.signal_type || "—"}</td>` +
+        `<td>${labelSignal(row.signal_type)}</td>` +
         `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
         `<td>${row.amount_streak_days ?? "—"}</td>`;
       elBody.appendChild(tr);
@@ -163,6 +188,7 @@
     elDetailMetrics.innerHTML = [
       ["VP 综合分", fmt(s.vp_score, 1)],
       ["状态", STATUS_LABEL[s.vp_status] || s.vp_status],
+      ["信号", labelSignal(s.signal_type)],
       ["行业量比", fmt(s.industry_vol_ratio_20, 2)],
       ["上涨占比", pct(s.rising_ratio)],
       ["突破占比", pct(s.breakout_ratio)],
@@ -188,7 +214,7 @@
         `<td>${fmt(row.vol_ratio_20, 2)}</td>` +
         `<td>${row.vol_streak_days ?? "—"}</td>` +
         `<td>${row.is_breakout_60 ? "是" : "—"}</td>` +
-        `<td>${row.vp_pattern || "—"}</td>` +
+        `<td>${labelPattern(row.vp_pattern)}</td>` +
         `<td>${fmt(row.vp_pattern_score, 0)}</td>`;
       elDetailStocks.appendChild(tr);
     });
