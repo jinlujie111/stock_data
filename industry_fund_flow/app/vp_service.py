@@ -51,6 +51,18 @@ def list_trade_dates(limit: int = 60) -> list[str]:
         LIMIT {limit}
         """
     )
+    dates = [_serialize(r["d"]) for r in rows]
+    if dates:
+        return dates
+    # VP 表尚无数据（批次未跑），fallback 到 ODS 获取可用交易日
+    rows = fetch_all_stock(
+        f"""
+        SELECT DISTINCT trade_date AS d
+        FROM ods_stock_detail_di
+        ORDER BY d DESC
+        LIMIT {limit}
+        """
+    )
     return [_serialize(r["d"]) for r in rows]
 
 

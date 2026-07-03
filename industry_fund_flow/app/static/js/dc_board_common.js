@@ -11,7 +11,7 @@
     if (v === null || v === undefined || v === "") return "—";
     const n = Number(v);
     if (Number.isNaN(n)) return v;
-    return (n * (Math.abs(n) <= 1 ? 100 : 1)).toFixed(2) + "%";
+    return n.toFixed(2) + "%";
   }
 
   async function apiGet(path) {

@@ -60,7 +60,17 @@
   async function loadDates() {
     const data = await apiGet("/api/v1/vp/trade-dates?limit=60");
     elDate.innerHTML = "";
-    (data.dates || []).forEach((d) => {
+    const dates = data.dates || [];
+    if (!dates.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "暂无数据";
+      opt.disabled = true;
+      elDate.appendChild(opt);
+      showError("VP 评分表暂无数据，请先在服务器执行 run_vp_batch");
+      return;
+    }
+    dates.forEach((d) => {
       const opt = document.createElement("option");
       opt.value = d;
       opt.textContent = d;

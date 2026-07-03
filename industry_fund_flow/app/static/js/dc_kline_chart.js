@@ -23,8 +23,7 @@
     if (v === null || v === undefined || v === "") return "—";
     const n = Number(v);
     if (Number.isNaN(n)) return v;
-    const pct = Math.abs(n) <= 1 && Math.abs(n) !== 0 ? n * 100 : n;
-    return (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+    return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
   }
 
   function cellCls(v) {
