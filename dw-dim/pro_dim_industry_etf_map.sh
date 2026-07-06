@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # target_table: dim_industry_etf_map
 # source_table: ods_etf_basic_di, ods_industry_classify
@@ -28,7 +28,7 @@ SW_SRC="${SW_SRC:-SW2021}"
 n_date="$(get_date "${1:-}")"
 v_date="$(format_date "${n_date}")"
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 exec 1>>"${LOG_PATH}/pro_dim_industry_etf_map_${n_date}.log"
 exec 2>>"${LOG_PATH}/pro_dim_industry_etf_map_${n_date}.log"

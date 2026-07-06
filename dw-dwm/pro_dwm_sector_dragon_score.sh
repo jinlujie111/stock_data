@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # target_table: dwm_sector_stock_dragon_score_di, dwm_sector_dragon_summary_di
 # 板块成分股龙头 MVP 评分（需求2：行业+概念全量批处理）
@@ -24,7 +24,7 @@ n_date="$(get_date "${1:-}")"
 content_types="${2:-行业,概念}"
 workers="${SECTOR_DRAGON_WORKERS:-8}"
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 exec 1>>"${LOG_PATH}/pro_dwm_sector_dragon_score_${n_date}.log"
 exec 2>>"${LOG_PATH}/pro_dwm_sector_dragon_score_${n_date}.log"

@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # 需求4：AI 板块成分股识别 — 核心池批处理
 #
@@ -41,7 +41,7 @@ for arg in "$@"; do
   esac
 done
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 LOG_FILE="${LOG_PATH}/pro_dwm_ai_core_pool_${n_date}.log"
 

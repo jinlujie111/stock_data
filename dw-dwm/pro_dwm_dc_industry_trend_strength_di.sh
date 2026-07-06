@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # target_table: dwm_dc_industry_trend_strength_di
 # source_table: ods_dc_daily_di, ods_dc_index_di, ods_index_daily_di
@@ -37,7 +37,7 @@ n_date_s="$(get_date "${1:-}")"
 n_date_e="$(get_date "${2:-${1:-}}")"
 n_date="${n_date_e}"
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 exec 1>>"${LOG_PATH}/pro_dwm_dc_industry_trend_strength_di_${n_date}.log"
 exec 2>>"${LOG_PATH}/pro_dwm_dc_industry_trend_strength_di_${n_date}.log"

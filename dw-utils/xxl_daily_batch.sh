@@ -6,8 +6,12 @@
 #   bash dw-utils/xxl_daily_batch.sh              # 默认今天
 #   bash dw-utils/xxl_daily_batch.sh 20260616     # 指定业务日 YYYYMMDD
 #
-# XXL-JOB GLUE Shell: 将本文件内容粘贴，或:
-#   cd /opt/stock_data && bash dw-utils/xxl_daily_batch.sh ${n_date}
+# XXL-JOB GLUE Shell（推荐，勿把整份 xxl_daily_batch 粘贴到 gluesource）:
+#   cd /opt/stock_data && bash dw-utils/xxl_daily_batch.sh
+# 或带业务日:
+#   cd /opt/stock_data && bash dw-utils/xxl_daily_batch.sh ${executorParams}
+# 注意: 执行器用户需能写 /opt/stock_data/log；各 pro_*.sh 默认写 /root/log，
+#       若 XXL 非 root，请在 func.sh 或 crontab 中 export STOCK_LOG_DIR=/opt/stock_data/log/stock_log
 # =============================================================================
 if [ -z "${BASH_VERSION:-}" ]; then
   exec bash "$0" "$@"
@@ -27,13 +31,32 @@ if [[ "$(trade_day_flag "${n_date}")" != "1" ]]; then
   exit 0
 fi
 
-LOG_PATH="/root/log/stock_log/${n_date}"
-mkdir -p "${LOG_PATH}"
+# 日志目录：默认 ${DW_ROOT}/log（XXL 非 root 用户无法写 /root/log）
+STOCK_LOG_DIR="${STOCK_LOG_DIR:-${DW_ROOT}/log/stock_log}"
+LOG_PATH="${STOCK_LOG_DIR}/${n_date}"
+mkdir -p "${LOG_PATH}" || {
+  echo "ERROR: 无法创建日志目录 ${LOG_PATH}（请检查 STOCK_LOG_DIR 权限）" >&2
+  exit 1
+}
 LOG_FILE="${LOG_PATH}/xxl_daily_batch_${n_date}.log"
-exec >>"${LOG_FILE}" 2>&1
+
+_on_err() {
+  local rc=$?
+  echo "FATAL: line ${1}, cmd=${2}, exit=${rc}" >&2
+  echo "详细日志: ${LOG_FILE}" >&2
+  exit "${rc}"
+}
+trap '_on_err ${LINENO} ${BASH_COMMAND}' ERR
+
+echo "======== stock_data 日批开始 ${n_date} $(date '+%F %T') ========" >&2
+echo "USER=$(id) DW_ROOT=${DW_ROOT} LOG=${LOG_FILE}" >&2
+
+# tee：同时写文件 + 打到 XXL 控制台（避免 exec>> 后控制台无输出像「秒退」）
+exec > >(tee -a "${LOG_FILE}") 2>&1
 
 echo "======== stock_data 日批开始 ${n_date} $(date '+%F %T') ========"
 echo "日志文件: ${LOG_FILE}"
+echo "USER=$(id) DW_ROOT=${DW_ROOT} STOCK_LOG_DIR=${STOCK_LOG_DIR}"
 
 _run_step() {
   local name="$1"

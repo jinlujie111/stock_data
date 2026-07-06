@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # 需求5：板块量价关系（VPA）日批
 #
@@ -22,7 +22,7 @@ source "${DW_ROOT}/dw-utils/func.sh"
 n_date="$(get_date "${1:-}")"
 shift || true
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 LOG_FILE="${LOG_PATH}/pro_dwm_industry_vp_score_${n_date}.log"
 

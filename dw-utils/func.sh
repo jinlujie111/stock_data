@@ -59,6 +59,9 @@ TUSHARE_FETCH_RETRY_SLEEP="${TUSHARE_FETCH_RETRY_SLEEP:-5}"
 # --- stock_data Python 项目根 ---
 STOCK_DATA_ROOT="${STOCK_DATA_ROOT:-${DW_ROOT}}"
 
+# --- ETL 日志目录（XXL 非 root 时请 export 为 ${DW_ROOT}/log/stock_log）---
+STOCK_LOG_DIR="${STOCK_LOG_DIR:-/root/log/stock_log}"
+
 # --- Python 解释器 ---
 if [[ -z "${PYTHON_BIN:-}" ]]; then
     if [[ -x /usr/local/bin/python3.11 ]]; then
@@ -82,6 +85,7 @@ export TUSHARE_HTTP_URL TUSHARE_API_FALLBACK_IP TUSHARE_USE_FALLBACK_IP TUSHARE_
 export TUSHARE_TRADE_CAL_START_DATE TUSHARE_TRADE_CAL_END_DATE
 export TUSHARE_HTTP_TIMEOUT TUSHARE_FETCH_RETRIES TUSHARE_FETCH_RETRY_SLEEP
 export STOCK_DATA_ROOT
+export STOCK_LOG_DIR
 export PYTHON_BIN
 export MYSQL_HOST="${STOCK_MYSQL_HOST}"
 export MYSQL_PORT="${STOCK_MYSQL_PORT}"

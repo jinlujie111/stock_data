@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # ODS 层数据完整度监控（全量维表 + 日快照 + 报告期覆盖 + 交易日连续性）
 #
@@ -38,7 +38,7 @@ done
 n_date="$(get_date "${ARGS[0]:-}")"
 v_date="$(format_date "${n_date}")"
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 LOG_FILE="${LOG_PATH}/pro_ods_completeness_${n_date}.log"
 ALERT_FILE="${LOG_PATH}/pro_ods_completeness_${n_date}.alert"

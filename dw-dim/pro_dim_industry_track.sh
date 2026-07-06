@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # target_table: dim_industry_track, dim_industry_track_stock
 # source_table: dwm_dc_industry_market_heat_di, ods_dc_member_di
@@ -44,7 +44,7 @@ AI_CORE_TRACK_CONTENT_TYPES="${AI_CORE_TRACK_CONTENT_TYPES:-概念,行业}"
 n_date="$(get_date "${1:-}")"
 v_date="$(format_date "${n_date}")"
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 exec 1>>"${LOG_PATH}/pro_dim_industry_track_${n_date}.log"
 exec 2>>"${LOG_PATH}/pro_dim_industry_track_${n_date}.log"

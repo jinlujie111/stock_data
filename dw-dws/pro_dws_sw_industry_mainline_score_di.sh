@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # target_table: dws_sw_industry_mainline_score_di
 # 申万行业主线评分（L1/L2/L3）：趋势/热度来自 ods_industry_daily_di，景气/扩散来自 DWM
@@ -23,7 +23,7 @@ n_date_s="$(get_date "${1:-}")"
 n_date_e="$(get_date "${2:-${1:-}}")"
 n_date="${n_date_e}"
 
-LOG_PATH="/root/log/stock_log/${n_date}"
+LOG_PATH="${STOCK_LOG_DIR:-/root/log/stock_log}/${n_date}"
 mkdir -p "${LOG_PATH}"
 exec 1>>"${LOG_PATH}/pro_dws_sw_industry_mainline_score_di_${n_date}.log"
 exec 2>>"${LOG_PATH}/pro_dws_sw_industry_mainline_score_di_${n_date}.log"
