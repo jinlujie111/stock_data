@@ -27,54 +27,73 @@ if [[ "$(trade_day_flag "${n_date}")" != "1" ]]; then
   exit 0
 fi
 
+LOG_PATH="/root/log/stock_log/${n_date}"
+mkdir -p "${LOG_PATH}"
+LOG_FILE="${LOG_PATH}/xxl_daily_batch_${n_date}.log"
+exec >>"${LOG_FILE}" 2>&1
+
 echo "======== stock_data 日批开始 ${n_date} $(date '+%F %T') ========"
+echo "日志文件: ${LOG_FILE}"
+
+_run_step() {
+  local name="$1"
+  shift
+  echo "-------- STEP ${name} $(date '+%F %T') --------"
+  if "$@"; then
+    echo "-------- OK ${name} --------"
+    return 0
+  fi
+  local rc=$?
+  echo "-------- FAIL ${name} exit=${rc} $(date '+%F %T') --------"
+  return "${rc}"
+}
 
 # --- 1) ODS ---
-run_data_sync "${n_date}"
+_run_step "run_data_sync" run_data_sync "${n_date}"
 
 # --- 2) DWM：广度 ---
-run_dwm_market_breadth "${n_date}"
+_run_step "run_dwm_market_breadth" run_dwm_market_breadth "${n_date}"
 
 # --- 3) DWM：资金强度 ---
-run_dwm_dc_industry_fund_flow "${n_date}"
-run_dwm_ths_industry_fund_flow "${n_date}"
+_run_step "run_dwm_dc_industry_fund_flow" run_dwm_dc_industry_fund_flow "${n_date}"
+_run_step "run_dwm_ths_industry_fund_flow" run_dwm_ths_industry_fund_flow "${n_date}"
 
 # --- 4) DWM：趋势强度 ---
-run_dwm_dc_industry_trend_strength "${n_date}"
-run_dwm_ths_industry_trend_strength "${n_date}"
+_run_step "run_dwm_dc_industry_trend_strength" run_dwm_dc_industry_trend_strength "${n_date}"
+_run_step "run_dwm_ths_industry_trend_strength" run_dwm_ths_industry_trend_strength "${n_date}"
 
-# --- 5) DWM：市场热度（需求4 DIM 前置）---
-run_dwm_dc_industry_market_heat "${n_date}"
-run_dwm_ths_industry_market_heat "${n_date}"
+# --- 5) DWM：市场热度 ---
+_run_step "run_dwm_dc_industry_market_heat" run_dwm_dc_industry_market_heat "${n_date}"
+_run_step "run_dwm_ths_industry_market_heat" run_dwm_ths_industry_market_heat "${n_date}"
 
 # --- 6) DWM：扩散效应 ---
-run_dwm_dc_industry_diffusion "${n_date}"
-run_dwm_ths_industry_diffusion "${n_date}"
-run_dwm_sw_industry_diffusion "${n_date}"
+_run_step "run_dwm_dc_industry_diffusion" run_dwm_dc_industry_diffusion "${n_date}"
+_run_step "run_dwm_ths_industry_diffusion" run_dwm_ths_industry_diffusion "${n_date}"
+_run_step "run_dwm_sw_industry_diffusion" run_dwm_sw_industry_diffusion "${n_date}"
 
 # --- 7) DWM：产业景气 ---
-run_dwm_dc_industry_prosperity "${n_date}"
-run_dwm_ths_industry_prosperity "${n_date}"
-run_dwm_sw_industry_prosperity "${n_date}"
+_run_step "run_dwm_dc_industry_prosperity" run_dwm_dc_industry_prosperity "${n_date}"
+_run_step "run_dwm_ths_industry_prosperity" run_dwm_ths_industry_prosperity "${n_date}"
+_run_step "run_dwm_sw_industry_prosperity" run_dwm_sw_industry_prosperity "${n_date}"
 
 # --- 8) DWS：主线评分 + 监控（需求1）---
-run_dws_dc_industry_mainline_score "${n_date}"
-run_dws_ths_industry_mainline_score "${n_date}"
-run_dws_sw_industry_mainline_score "${n_date}"
-run_dws_dc_industry_mainline_monitor "${n_date}"
-run_dws_ths_industry_mainline_monitor "${n_date}"
-run_dws_sw_industry_mainline_monitor "${n_date}"
+_run_step "run_dws_dc_industry_mainline_score" run_dws_dc_industry_mainline_score "${n_date}"
+_run_step "run_dws_ths_industry_mainline_score" run_dws_ths_industry_mainline_score "${n_date}"
+_run_step "run_dws_sw_industry_mainline_score" run_dws_sw_industry_mainline_score "${n_date}"
+_run_step "run_dws_dc_industry_mainline_monitor" run_dws_dc_industry_mainline_monitor "${n_date}"
+_run_step "run_dws_ths_industry_mainline_monitor" run_dws_ths_industry_mainline_monitor "${n_date}"
+_run_step "run_dws_sw_industry_mainline_monitor" run_dws_sw_industry_mainline_monitor "${n_date}"
 
-# --- 9) 板块量价 VP（需求5；依赖 daily/daily_basic/dc_member + 120日历史）---
-run_vp_batch "${n_date}"
+# --- 9) 板块量价 VP（需求5）---
+_run_step "run_vp_batch" run_vp_batch "${n_date}"
 
 # --- 10) 板块龙头 MVP（需求2）---
-run_sector_dragon_batch "${n_date}"
+_run_step "run_sector_dragon_batch" run_sector_dragon_batch "${n_date}"
 
-# --- 11) 量化主线 FTELP（需求3，东财行业口径）---
-run_dws_dc_industry_quant_mainline "${n_date}"
+# --- 11) 量化主线 FTELP（需求3）---
+_run_step "run_dws_dc_industry_quant_mainline" run_dws_dc_industry_quant_mainline "${n_date}"
 
-# --- 12) ODS 完整度监控（有 ALERT 则 exit 1，便于 XXL-JOB 告警）---
-run_ods_completeness_monitor "${n_date}"
+# --- 12) ODS 完整度监控（有 ALERT 则 exit 1）---
+_run_step "run_ods_completeness_monitor" run_ods_completeness_monitor "${n_date}"
 
 echo "======== stock_data 日批完成 ${n_date} $(date '+%F %T') ========"
