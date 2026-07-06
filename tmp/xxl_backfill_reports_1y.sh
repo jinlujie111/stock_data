@@ -28,6 +28,7 @@
 # 说明:
 #   - 按交易日升序逐日跑，保证资金连续天数/主线 MA 等窗口正确
 #   - 不修改 dw-utils/xxl_daily_batch.sh 及任何 pro_*.sh
+#   - pro_*.sh 若含 UTF-8 BOM，本脚本调用时自动剥离（避免 ﻿#!/bin/bash 报错）
 #   - 全量约 240+ 交易日 × (VP+龙头较慢)，可分批 BACKFILL_STEPS
 # =============================================================================
 if [ -z "${BASH_VERSION:-}" ]; then
@@ -97,6 +98,39 @@ _day_already_done() {
   [[ -n "${cnt}" && "${cnt}" -gt 0 ]]
 }
 
+# pro_*.sh 若被 Windows 编辑器保存为 UTF-8 BOM，直接 bash 会报：
+#   line 1: ﻿#!/bin/bash: No such file or directory
+# 临时去 BOM 副本放在同目录，保证脚本内 DW_ROOT 相对路径仍正确。
+_bash_pro_sh() {
+  local runner="$1"
+  shift
+  if [[ ! -f "${runner}" ]]; then
+    echo "ERROR: 未找到 ${runner}" >&2
+    return 1
+  fi
+  local hdr
+  hdr="$(head -c 3 "${runner}" 2>/dev/null || true)"
+  if [[ "${hdr}" == $'\xef\xbb\xbf' ]]; then
+    local tmp="${runner%.sh}._bf$$.sh"
+    tail -c +4 "${runner}" > "${tmp}"
+    chmod +x "${tmp}"
+    set +e
+    bash "${tmp}" "$@"
+    local rc=$?
+    set -e
+    rm -f "${tmp}"
+    return "${rc}"
+  fi
+  bash "${runner}" "$@"
+}
+
+_soft_run_pro() {
+  local label="$1"
+  local runner="$2"
+  shift 2
+  _soft_run "${label}" _bash_pro_sh "${runner}" "$@"
+}
+
 _soft_run() {
   local label="$1"
   shift
@@ -126,28 +160,28 @@ _run_day() {
   fi
 
   if _step_enabled dwm; then
-    _soft_run "dwm_dc_fund_flow" run_dwm_dc_industry_fund_flow "${n_date}"
-    _soft_run "dwm_dc_trend" run_dwm_dc_industry_trend_strength "${n_date}"
-    _soft_run "dwm_dc_heat" run_dwm_dc_industry_market_heat "${n_date}"
-    _soft_run "dwm_dc_diffusion" run_dwm_dc_industry_diffusion "${n_date}"
-    _soft_run "dwm_dc_prosperity" run_dwm_dc_industry_prosperity "${n_date}"
+    _soft_run_pro "dwm_dc_fund_flow" "${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh" "${n_date}"
+    _soft_run_pro "dwm_dc_trend" "${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_trend_strength_di.sh" "${n_date}"
+    _soft_run_pro "dwm_dc_heat" "${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_market_heat_di.sh" "${n_date}"
+    _soft_run_pro "dwm_dc_diffusion" "${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_diffusion_di.sh" "${n_date}"
+    _soft_run_pro "dwm_dc_prosperity" "${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_prosperity_di.sh" "${n_date}"
   fi
 
   if _step_enabled dws; then
-    _soft_run "dws_mainline_score" run_dws_dc_industry_mainline_score "${n_date}"
-    _soft_run "dws_mainline_monitor" run_dws_dc_industry_mainline_monitor "${n_date}"
+    _soft_run_pro "dws_mainline_score" "${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_score_di.sh" "${n_date}"
+    _soft_run_pro "dws_mainline_monitor" "${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_monitor_di.sh" "${n_date}"
   fi
 
   if _step_enabled vp; then
-    _soft_run "vp_batch" run_vp_batch "${n_date}"
+    _soft_run_pro "vp_batch" "${DW_ROOT}/dw-dwm/pro_dwm_industry_vp_score.sh" "${n_date}"
   fi
 
   if _step_enabled dragon; then
-    _soft_run "sector_dragon" run_sector_dragon_batch "${n_date}"
+    _soft_run_pro "sector_dragon" "${DW_ROOT}/dw-dwm/pro_dwm_sector_dragon_score.sh" "${n_date}"
   fi
 
   if _step_enabled quant; then
-    _soft_run "quant_mainline" run_dws_dc_industry_quant_mainline "${n_date}"
+    _soft_run_pro "quant_mainline" "${DW_ROOT}/dw-dws/pro_dws_dc_industry_quant_mainline_di.sh" "${n_date}"
   fi
 }
 
