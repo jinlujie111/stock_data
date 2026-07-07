@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
-from app import auth_service, routes_dc, routes_dragon, routes_hot_stocks, routes_limit_up, routes_mainline, routes_quant_mainline, routes_sectors, routes_vp
+from app import auth_service, routes_dc, routes_dragon, routes_hot_stocks, routes_limit_up, routes_mainline, routes_quant_mainline, routes_sectors, routes_volatility, routes_vp
 from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
 from app.deps import current_user, require_user
@@ -34,6 +34,7 @@ routes_sectors.init_sectors_routes(_TEMPLATES)
 routes_hot_stocks.init_hot_stocks_routes(_TEMPLATES)
 routes_limit_up.init_limit_up_routes(_TEMPLATES)
 routes_vp.init_vp_routes(_TEMPLATES)
+routes_volatility.init_volatility_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_quant_mainline.page_router)
@@ -49,6 +50,8 @@ app.include_router(routes_dragon.page_router)
 app.include_router(routes_dragon.api_router)
 app.include_router(routes_vp.page_router)
 app.include_router(routes_vp.api_router)
+app.include_router(routes_volatility.page_router)
+app.include_router(routes_volatility.api_router)
 app.include_router(routes_dc.page_router)
 app.include_router(routes_dc.api_router)
 

@@ -77,29 +77,33 @@ _run_step "run_data_sync" run_data_sync "${n_date}"
 # --- 2) DWM：广度 ---
 _run_step "run_dwm_market_breadth" run_dwm_market_breadth "${n_date}"
 
-# --- 3) DWM：资金强度 ---
+# --- 3) DWM：波动率 ---
+_run_step "run_dwm_market_volatility" run_dwm_market_volatility "${n_date}"
+_run_step "run_dwm_dc_industry_volatility" run_dwm_dc_industry_volatility "${n_date}"
+
+# --- 4) DWM：资金强度 ---
 _run_step "run_dwm_dc_industry_fund_flow" run_dwm_dc_industry_fund_flow "${n_date}"
 _run_step "run_dwm_ths_industry_fund_flow" run_dwm_ths_industry_fund_flow "${n_date}"
 
-# --- 4) DWM：趋势强度 ---
+# --- 5) DWM：趋势强度 ---
 _run_step "run_dwm_dc_industry_trend_strength" run_dwm_dc_industry_trend_strength "${n_date}"
 _run_step "run_dwm_ths_industry_trend_strength" run_dwm_ths_industry_trend_strength "${n_date}"
 
-# --- 5) DWM：市场热度 ---
+# --- 6) DWM：市场热度 ---
 _run_step "run_dwm_dc_industry_market_heat" run_dwm_dc_industry_market_heat "${n_date}"
 _run_step "run_dwm_ths_industry_market_heat" run_dwm_ths_industry_market_heat "${n_date}"
 
-# --- 6) DWM：扩散效应 ---
+# --- 7) DWM：扩散效应 ---
 _run_step "run_dwm_dc_industry_diffusion" run_dwm_dc_industry_diffusion "${n_date}"
 _run_step "run_dwm_ths_industry_diffusion" run_dwm_ths_industry_diffusion "${n_date}"
 _run_step "run_dwm_sw_industry_diffusion" run_dwm_sw_industry_diffusion "${n_date}"
 
-# --- 7) DWM：产业景气 ---
+# --- 8) DWM：产业景气 ---
 _run_step "run_dwm_dc_industry_prosperity" run_dwm_dc_industry_prosperity "${n_date}"
 _run_step "run_dwm_ths_industry_prosperity" run_dwm_ths_industry_prosperity "${n_date}"
 _run_step "run_dwm_sw_industry_prosperity" run_dwm_sw_industry_prosperity "${n_date}"
 
-# --- 8) DWS：主线评分 + 监控（需求1）---
+# --- 9) DWS：主线评分 + 监控（需求1）---
 _run_step "run_dws_dc_industry_mainline_score" run_dws_dc_industry_mainline_score "${n_date}"
 _run_step "run_dws_ths_industry_mainline_score" run_dws_ths_industry_mainline_score "${n_date}"
 _run_step "run_dws_sw_industry_mainline_score" run_dws_sw_industry_mainline_score "${n_date}"
@@ -107,16 +111,16 @@ _run_step "run_dws_dc_industry_mainline_monitor" run_dws_dc_industry_mainline_mo
 _run_step "run_dws_ths_industry_mainline_monitor" run_dws_ths_industry_mainline_monitor "${n_date}"
 _run_step "run_dws_sw_industry_mainline_monitor" run_dws_sw_industry_mainline_monitor "${n_date}"
 
-# --- 9) 板块量价 VP（需求5）---
+# --- 10) 板块量价 VP（需求5）---
 _run_step "run_vp_batch" run_vp_batch "${n_date}"
 
-# --- 10) 板块龙头 MVP（需求2）---
+# --- 11) 板块龙头 MVP（需求2）---
 _run_step "run_sector_dragon_batch" run_sector_dragon_batch "${n_date}"
 
-# --- 11) 量化主线 FTELP（需求3）---
+# --- 12) 量化主线 FTELP（需求3）---
 _run_step "run_dws_dc_industry_quant_mainline" run_dws_dc_industry_quant_mainline "${n_date}"
 
-# --- 12) ODS 完整度监控（有 ALERT 则 exit 1）---
+# --- 13) ODS 完整度监控（有 ALERT 则 exit 1）---
 _run_step "run_ods_completeness_monitor" run_ods_completeness_monitor "${n_date}"
 
 echo "======== stock_data 日批完成 ${n_date} $(date '+%F %T') ========"

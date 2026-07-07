@@ -1208,3 +1208,38 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
 -- 已有库升级（按需执行一次）:
 -- ALTER TABLE ai_core_pool_config ADD COLUMN llm_provider VARCHAR(32) NULL
 --   COMMENT '对应 data_config.db_llm_token.provider' AFTER model_name;
+
+
+-- ============================================================================
+-- DWM: 波动率
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS dwm_market_volatility_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    index_code      VARCHAR(16)    NOT NULL COMMENT '指数代码',
+    index_name      VARCHAR(64)    NOT NULL COMMENT '指数名称',
+    close           DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    pct_chg         DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    annual_vol_20d  DECIMAL(20, 6) NULL COMMENT '20日年化波动率(%)',
+    annual_vol_60d  DECIMAL(20, 6) NULL COMMENT '60日年化波动率(%)',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_market_volatility (trade_date, index_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='大盘指数年化波动率(DWM)';
+
+CREATE TABLE IF NOT EXISTS dwm_dc_industry_volatility_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date      DATE           NOT NULL COMMENT '交易日期',
+    content_type    VARCHAR(32)    NULL COMMENT '板块类型(行业/概念/地域)',
+    industry_code   VARCHAR(32)    NOT NULL COMMENT '东财板块代码',
+    industry_name   VARCHAR(128)   NULL COMMENT '东财板块名称',
+    close           DECIMAL(20, 6) NULL COMMENT '收盘点位',
+    pct_change      DECIMAL(20, 6) NULL COMMENT '涨跌幅(%)',
+    annual_vol_20d  DECIMAL(20, 6) NULL COMMENT '20日年化波动率(%)',
+    annual_vol_60d  DECIMAL(20, 6) NULL COMMENT '60日年化波动率(%)',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_dwm_dc_industry_volatility (trade_date, industry_code),
+    KEY idx_dwm_dc_industry_volatility_td (trade_date, content_type, annual_vol_20d, annual_vol_60d)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东财板块年化波动率(DWM)';

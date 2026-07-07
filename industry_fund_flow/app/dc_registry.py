@@ -146,6 +146,7 @@ _NAV_RAW: list[dict[str, str]] = [
     {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "板块分析"},
     {"slug": "volume-price", "label": "板块量价", "href": "/dc/volume-price", "section": "板块分析"},
     {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow", "section": "板块分析"},
+    {"slug": "volatility", "label": "波动率", "href": "/dc/volatility", "section": "板块分析"},
     # 短线雷达
     {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks", "section": "短线雷达"},
     {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up", "section": "短线雷达"},
