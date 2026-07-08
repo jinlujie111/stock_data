@@ -237,16 +237,6 @@
       "label": "业绩快报 express_vip"
     },
     {
-      "table": "ods_fund_hold_di",
-      "type": "period",
-      "date_column": "end_date",
-      "period_count": 2,
-      "min_distinct": 1000,
-      "distinct_column": "symbol",
-      "min_rows_per_period": 5000,
-      "label": "公募持仓 fund_portfolio"
-    },
-    {
       "table": "ods_adj_factor_di",
       "type": "snapshot",
       "date_column": "trade_date",

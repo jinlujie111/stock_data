@@ -975,14 +975,6 @@ def sync_express_vip(task: TaskDict, trade_date: date | None, dry_run: bool) -> 
     return _sync_vip_by_period(task, trade_date, dry_run)
 
 
-@register("tushare", "fund_portfolio")
-def sync_fund_portfolio(
-    task: TaskDict, trade_date: date | None, dry_run: bool
-) -> SyncResult:
-    """公募基金持仓：按报告期 period 拉取（与 VIP 报表同调度模式）。"""
-    return _sync_vip_by_period(task, trade_date, dry_run)
-
-
 @register("tushare", "dc_index")
 def sync_dc_index(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
     """dc_index 按 idx_type 分三次拉取；全空时标失败并提示排查。"""

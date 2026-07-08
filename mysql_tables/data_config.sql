@@ -882,7 +882,7 @@ SET schedule_type = 'monthly',
 WHERE source_table = 'fina_mainbz_vip';
 
 -- ============================================================================
--- P0：财务报表 / 业绩预告快报 / 公募持仓
+-- P0：财务报表 / 业绩预告快报
 -- ============================================================================
 
 -- Tushare income_vip → ods_income_di（利润表；monthly 近2季）
@@ -1036,34 +1036,6 @@ INSERT INTO db_sync_task (
         )
     ),
     1, '业绩快报VIP(Tushare express_vip)；snapshot=近2季；约5000积分；月批 --force'
-);
-
--- Tushare fund_portfolio → ods_fund_hold_di（公募持仓；按报告期全市场）
-INSERT INTO db_sync_task (
-    proxy_source, source_table, target_database, target_table, target_table_describe,
-    sync_mode, schedule_type, fetch_config, transform_config, status, remark
-) VALUES (
-    'tushare', 'fund_portfolio', 'stock_data', 'ods_fund_hold_di', '公募基金持仓', 'snapshot', 'monthly',
-    JSON_OBJECT(
-        'token_type', 'tushare',
-        'params', JSON_OBJECT(
-            'fields', 'ts_code,ann_date,end_date,symbol,mkv,amount,stk_mkv_ratio,stk_float_ratio'
-        ),
-        'full_start', '20180101',
-        'snapshot_periods', 2,
-        'sleep_seconds', 0.5,
-        'inject_date_range', FALSE
-    ),
-    JSON_OBJECT(
-        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
-        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'symbol'),
-        'dropna', JSON_ARRAY('ts_code', 'end_date', 'symbol'),
-        'keep_columns', JSON_ARRAY(
-            'ts_code', 'ann_date', 'end_date', 'symbol',
-            'mkv', 'amount', 'stk_mkv_ratio', 'stk_float_ratio'
-        )
-    ),
-    1, '公募基金持仓(Tushare fund_portfolio)；按period拉取近2季；约2000积分；月批 --force；需求2机构龙头'
 );
 
 -- ============================================================================
@@ -1231,3 +1203,7 @@ INSERT INTO db_sync_task (
     ),
     1, '每日涨跌停价格日快照(Tushare stk_limit；约2000积分，盘前更新)'
 );
+
+-- 存量清理：取消 fund_portfolio 同步（不再维护 ods_fund_hold_di）
+DELETE FROM db_sync_task WHERE source_table = 'fund_portfolio';
+-- 若表已创建，可在 stock_data 库执行：DROP TABLE IF EXISTS ods_fund_hold_di;

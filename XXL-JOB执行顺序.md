@@ -104,7 +104,7 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 
 | 步骤 | 任务 | 依赖 | 产品 |
 |------|------|------|------|
-| ① | `run_data_sync` | `daily` / `daily_basic` / `moneyflow` / `dc_*` / `ths_*` / `report_rc` / `fina_indicator_vip` / `limit_list_d` / `index_daily` / `etf_*` / `top_inst` / `margin*` / `adj_factor` / `stk_limit` / `stk_holder*` 等；`monthly`（`stock_company`、`fina_mainbz_*`、`income_vip`、`cashflow_vip`、`balancesheet_vip`、`forecast_vip`、`express_vip`、`fund_portfolio`）非 1 号自动跳过 | 全部 |
+| ① | `run_data_sync` | `daily` / `daily_basic` / `moneyflow` / `dc_*` / `ths_*` / `report_rc` / `fina_indicator_vip` / `limit_list_d` / `index_daily` / `etf_*` / `top_inst` / `margin*` / `adj_factor` / `stk_limit` / `stk_holder*` 等；`monthly`（`stock_company`、`fina_mainbz_*`、`income_vip`、`cashflow_vip`、`balancesheet_vip`、`forecast_vip`、`express_vip`）非 1 号自动跳过 | 全部 |
 | ② | `run_dwm_market_breadth` | `ods_stock_detail_di`、`ods_limit_list_di` | 首页广度 |
 | ③ | `run_dwm_dc_industry_fund_flow` / `run_dwm_ths_industry_fund_flow` | 板块资金流 ODS | 需求1 五维 |
 | ④ | `run_dwm_dc_industry_trend_strength` / `run_dwm_ths_industry_trend_strength` | 板块日线 + `ods_index_daily_di` | 需求1 五维 |
@@ -161,7 +161,7 @@ bash dw-utils/xxl_daily_batch.sh "${1:-$(date +%Y%m%d)}"
 
 ## 四、月批脚本
 
-`stock_company`、`fina_mainbz_vip`、`fina_mainbz`、`income_vip`、`cashflow_vip`、`balancesheet_vip`、`forecast_vip`、`express_vip`、`fund_portfolio` 在 `db_sync_task` 中为 `schedule_type=monthly`。日批 `run_data_sync` 在非 1 号会跳过；本 Job 用 `--force` 显式执行。
+`stock_company`、`fina_mainbz_vip`、`fina_mainbz`、`income_vip`、`cashflow_vip`、`balancesheet_vip`、`forecast_vip`、`express_vip` 在 `db_sync_task` 中为 `schedule_type=monthly`。日批 `run_data_sync` 在非 1 号会跳过；本 Job 用 `--force` 显式执行。
 
 ```bash
 cd /opt/stock_data
@@ -447,7 +447,6 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | `balancesheet_vip` | `ods_balancesheet_di` | monthly | 资产负债表（P0） |
 | `forecast_vip` | `ods_forecast_di` | monthly | 业绩预告（P0） |
 | `express_vip` | `ods_express_di` | monthly | 业绩快报（P0） |
-| `fund_portfolio` | `ods_fund_hold_di` | monthly | 公募持仓，需求2 机构龙头（P0） |
 | `top_inst` | `ods_top_inst_di` | daily | 龙虎榜机构席位（P1） |
 | `margin` / `margin_detail` | `ods_margin_di` / `ods_margin_detail_di` | daily | 融资融券（P1） |
 | `stk_holdertrade` | `ods_stk_holdertrade_di` | daily | 股东增减持（P1） |

@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS ods_fina_mainbz_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主营业务构成(Tushare fina_mainbz_vip,按产品)';
 
 -- ============================================================================
--- P0：三张报表 + 业绩预告/快报 + 公募持仓
+-- P0：三张报表 + 业绩预告/快报
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ods_income_di (
@@ -384,23 +384,6 @@ CREATE TABLE IF NOT EXISTS ods_express_di (
     KEY idx_express_ann (ann_date),
     KEY idx_express_end (end_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业绩快报(Tushare express_vip)';
-
-CREATE TABLE IF NOT EXISTS ods_fund_hold_di (
-    id               BIGINT PRIMARY KEY AUTO_INCREMENT,
-    ts_code          VARCHAR(24)    NOT NULL COMMENT '基金TS代码',
-    ann_date         DATE           NULL COMMENT '公告日期',
-    end_date         DATE           NOT NULL COMMENT '报告期',
-    symbol           VARCHAR(16)    NOT NULL COMMENT '股票代码',
-    mkv              DECIMAL(24, 4) NULL COMMENT '持仓市值(元)',
-    amount           DECIMAL(24, 4) NULL COMMENT '持仓数量(股)',
-    stk_mkv_ratio    DECIMAL(20, 6) NULL COMMENT '占股票市值比(%)',
-    stk_float_ratio  DECIMAL(20, 6) NULL COMMENT '占流通股本比(%)',
-    created_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_fund_hold (ts_code, end_date, symbol),
-    KEY idx_fund_hold_symbol_end (symbol, end_date),
-    KEY idx_fund_hold_end (end_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公募基金持仓(Tushare fund_portfolio)';
 
 -- ============================================================================
 -- P1：龙虎榜席位 / 融资融券 / 股东 / 复权 / 涨跌停价
