@@ -192,6 +192,102 @@
       "where": "bz_type = 'P'",
       "min_rows_per_period": 5000,
       "label": "主营业务构成 fina_mainbz"
+    },
+    {
+      "table": "ods_income_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_distinct": 3000,
+      "distinct_column": "ts_code",
+      "label": "利润表 income_vip"
+    },
+    {
+      "table": "ods_cashflow_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_distinct": 3000,
+      "distinct_column": "ts_code",
+      "label": "现金流量表 cashflow_vip"
+    },
+    {
+      "table": "ods_balancesheet_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_distinct": 3000,
+      "distinct_column": "ts_code",
+      "label": "资产负债表 balancesheet_vip"
+    },
+    {
+      "table": "ods_forecast_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_rows_per_period": 100,
+      "label": "业绩预告 forecast_vip"
+    },
+    {
+      "table": "ods_express_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_rows_per_period": 50,
+      "label": "业绩快报 express_vip"
+    },
+    {
+      "table": "ods_fund_hold_di",
+      "type": "period",
+      "date_column": "end_date",
+      "period_count": 2,
+      "min_distinct": 1000,
+      "distinct_column": "symbol",
+      "min_rows_per_period": 5000,
+      "label": "公募持仓 fund_portfolio"
+    },
+    {
+      "table": "ods_adj_factor_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 4000,
+      "min_distinct": 4000,
+      "distinct_column": "ts_code",
+      "continuity": true,
+      "label": "复权因子 adj_factor"
+    },
+    {
+      "table": "ods_stk_limit_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 4000,
+      "min_distinct": 4000,
+      "distinct_column": "ts_code",
+      "continuity": true,
+      "label": "涨跌停价 stk_limit"
+    },
+    {
+      "table": "ods_margin_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 2,
+      "continuity": true,
+      "label": "融资融券汇总 margin"
+    },
+    {
+      "table": "ods_margin_detail_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 1000,
+      "continuity": true,
+      "label": "融资融券明细 margin_detail"
+    },
+    {
+      "table": "ods_top_inst_di",
+      "type": "snapshot",
+      "date_column": "trade_date",
+      "min_rows": 1,
+      "label": "龙虎榜机构 top_inst"
     }
   ]
 }

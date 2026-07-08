@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# stock_data 月批：公司信息 / 主营业务构成（VIP 近2季 + 按股补全）
+# stock_data 月批：公司信息 / 主营业务构成 / P0 财务报表与机构持仓
 #
 # 用法:
 #   bash dw-utils/xxl_monthly_batch.sh
@@ -28,5 +28,13 @@ run_data_sync "${n_date}" --source-table stock_company --force
 run_data_sync "${n_date}" --source-table fina_mainbz_vip --force
 # fina_mainbz 按股补 VIP 截断缺失，耗时长，建议单独夜间跑
 run_data_sync "${n_date}" --source-table fina_mainbz --force
+
+# P0：三张报表 + 业绩预告/快报 + 公募持仓（近2季 VIP/季频）
+run_data_sync "${n_date}" --source-table income_vip --force
+run_data_sync "${n_date}" --source-table cashflow_vip --force
+run_data_sync "${n_date}" --source-table balancesheet_vip --force
+run_data_sync "${n_date}" --source-table forecast_vip --force
+run_data_sync "${n_date}" --source-table express_vip --force
+run_data_sync "${n_date}" --source-table fund_portfolio --force
 
 echo "======== 月批完成 ${n_date} ========"

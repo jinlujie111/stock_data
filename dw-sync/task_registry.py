@@ -747,6 +747,113 @@ def sync_fina_mainbz(task: TaskDict, trade_date: date | None, dry_run: bool) -> 
     )
 
 
+def _sync_vip_by_period(
+    task: TaskDict,
+    trade_date: date | None,
+    dry_run: bool,
+    *,
+    api_name: str | None = None,
+    delete_column: str = "end_date",
+) -> SyncResult:
+    """按报告期 period 循环拉全市场 VIP/季频接口；snapshot 默认近 N 季，full 季末回溯。
+
+    删除策略：snapshot 按 delete_column（默认 end_date）覆盖写入；full 先 TRUNCATE。
+    """
+    from sync_writer import write_dataframe
+
+    source = api_name or str(task["source_table"])
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sync_mode = (task.get("sync_mode") or "snapshot").lower()
+    td = trade_date or date.today()
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.5)
+    base_params = dict(fetch_cfg.get("params") or {})
+    # period 由本函数注入，避免配置里残留占位符
+    base_params.pop("period", None)
+    fields = base_params.pop("fields", None)
+    frames: list[pd.DataFrame] = []
+
+    if sync_mode == "full":
+        from_yyyymmdd = str(fetch_cfg.get("full_start") or "20180101")
+        periods = _quarter_period_ends(from_yyyymmdd, td)
+    else:
+        snap_n = int(fetch_cfg.get("snapshot_periods") or 2)
+        periods = _snapshot_quarter_periods(td, count=snap_n)
+
+    for i, period in enumerate(periods):
+        logger.info("%s 进度 %s/%s period=%s mode=%s", source, i + 1, len(periods), period, sync_mode)
+        try:
+            kwargs: dict[str, Any] = {**base_params, "period": period}
+            if fields:
+                kwargs["fields"] = fields
+            part = fetch_tushare(source, token_type=token_type, **kwargs)
+        except Exception as exc:
+            logger.warning("%s period=%s 失败: %s", source, period, exc)
+            continue
+        if not part.empty:
+            frames.append(part)
+        if sleep_s > 0 and i + 1 < len(periods):
+            time.sleep(sleep_s)
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    out = apply_transform(df, task)
+
+    logger.info(
+        "%s id=%s 原始=%s 映射后=%s mode=%s periods=%s",
+        source,
+        task["id"],
+        len(df),
+        len(out),
+        sync_mode,
+        len(periods),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if sync_mode == "full" and not out.empty:
+        from mysql_config import get_target_engine
+
+        engine = get_target_engine(task["target_database"])
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE TABLE `{task['target_table']}`"))
+    elif sync_mode == "snapshot" and not out.empty and delete_column in out.columns:
+        end_dates: list[date] = []
+        for raw in out[delete_column].dropna().unique():
+            if isinstance(raw, date):
+                end_dates.append(raw)
+            else:
+                end_dates.append(pd.Timestamp(raw).date())
+        _delete_by_date_values(
+            task["target_database"],
+            task["target_table"],
+            delete_column,
+            sorted(set(end_dates)),
+        )
+
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode="append",
+        trade_date=None,
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 @register("tushare", "fina_indicator_vip")
 def sync_fina_indicator_vip(
     task: TaskDict, trade_date: date | None, dry_run: bool
@@ -834,6 +941,46 @@ def sync_fina_indicator_vip(
         rows_affected=rows,
         ok=True,
     )
+
+
+@register("tushare", "income_vip")
+def sync_income_vip(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """利润表 VIP：按报告期全市场拉取。"""
+    return _sync_vip_by_period(task, trade_date, dry_run)
+
+
+@register("tushare", "cashflow_vip")
+def sync_cashflow_vip(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """现金流量表 VIP：按报告期全市场拉取（含 CapEx）。"""
+    return _sync_vip_by_period(task, trade_date, dry_run)
+
+
+@register("tushare", "balancesheet_vip")
+def sync_balancesheet_vip(
+    task: TaskDict, trade_date: date | None, dry_run: bool
+) -> SyncResult:
+    """资产负债表 VIP：按报告期全市场拉取。"""
+    return _sync_vip_by_period(task, trade_date, dry_run)
+
+
+@register("tushare", "forecast_vip")
+def sync_forecast_vip(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """业绩预告 VIP：按报告期全市场拉取。"""
+    return _sync_vip_by_period(task, trade_date, dry_run)
+
+
+@register("tushare", "express_vip")
+def sync_express_vip(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """业绩快报 VIP：按报告期全市场拉取。"""
+    return _sync_vip_by_period(task, trade_date, dry_run)
+
+
+@register("tushare", "fund_portfolio")
+def sync_fund_portfolio(
+    task: TaskDict, trade_date: date | None, dry_run: bool
+) -> SyncResult:
+    """公募基金持仓：按报告期 period 拉取（与 VIP 报表同调度模式）。"""
+    return _sync_vip_by_period(task, trade_date, dry_run)
 
 
 @register("tushare", "dc_index")

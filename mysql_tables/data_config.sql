@@ -880,3 +880,354 @@ UPDATE db_sync_task
 SET schedule_type = 'monthly',
     remark = '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2季全市场；monthly+月批 --force（单次约1万行上限，需配合 fina_mainbz 按股补全）'
 WHERE source_table = 'fina_mainbz_vip';
+
+-- ============================================================================
+-- P0：财务报表 / 业绩预告快报 / 公募持仓
+-- ============================================================================
+
+-- Tushare income_vip → ods_income_di（利润表；monthly 近2季）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'income_vip', 'stock_data', 'ods_income_di', '利润表', 'snapshot', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT(
+            'fields', 'ts_code,ann_date,f_ann_date,end_date,report_type,comp_type,end_type,basic_eps,diluted_eps,total_revenue,revenue,oper_cost,sell_exp,admin_exp,fin_exp,rd_exp,operate_profit,total_profit,n_income,n_income_attr_p,minority_gain,ebit,ebitda,update_flag'
+        ),
+        'full_start', '20180101',
+        'snapshot_periods', 2,
+        'sleep_seconds', 0.5,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'f_ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'report_type', 'ann_date'),
+        'dropna', JSON_ARRAY('ts_code', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'f_ann_date', 'end_date', 'report_type', 'comp_type', 'end_type',
+            'basic_eps', 'diluted_eps', 'total_revenue', 'revenue', 'oper_cost',
+            'sell_exp', 'admin_exp', 'fin_exp', 'rd_exp',
+            'operate_profit', 'total_profit', 'n_income', 'n_income_attr_p', 'minority_gain',
+            'ebit', 'ebitda', 'update_flag'
+        )
+    ),
+    1, '利润表VIP(Tushare income_vip)；snapshot=近2季全市场；约5000积分；月批 --force'
+);
+
+-- Tushare cashflow_vip → ods_cashflow_di（现金流量表；含 CapEx）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'cashflow_vip', 'stock_data', 'ods_cashflow_di', '现金流量表', 'snapshot', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT(
+            'fields', 'ts_code,ann_date,f_ann_date,end_date,report_type,comp_type,end_type,net_profit,n_cashflow_act,n_cashflow_inv_act,n_cash_flows_fnc_act,c_pay_acq_const_fiolta,free_cashflow,n_incr_cash_cash_equ,c_cash_equ_end_period,update_flag'
+        ),
+        'full_start', '20180101',
+        'snapshot_periods', 2,
+        'sleep_seconds', 0.5,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'f_ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'report_type', 'ann_date'),
+        'dropna', JSON_ARRAY('ts_code', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'f_ann_date', 'end_date', 'report_type', 'comp_type', 'end_type',
+            'net_profit', 'n_cashflow_act', 'n_cashflow_inv_act', 'n_cash_flows_fnc_act',
+            'c_pay_acq_const_fiolta', 'free_cashflow', 'n_incr_cash_cash_equ',
+            'c_cash_equ_end_period', 'update_flag'
+        )
+    ),
+    1, '现金流量表VIP(Tushare cashflow_vip)；含CapEx；snapshot=近2季；约5000积分；月批 --force'
+);
+
+-- Tushare balancesheet_vip → ods_balancesheet_di
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'balancesheet_vip', 'stock_data', 'ods_balancesheet_di', '资产负债表', 'snapshot', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT(
+            'fields', 'ts_code,ann_date,f_ann_date,end_date,report_type,comp_type,end_type,total_share,money_cap,accounts_receiv,inventories,total_cur_assets,fix_assets,cip,intan_assets,goodwill,total_assets,st_borr,lt_borr,total_cur_liab,total_liab,total_hldr_eqy_exc_min_int,total_hldr_eqy_inc_min_int,update_flag'
+        ),
+        'full_start', '20180101',
+        'snapshot_periods', 2,
+        'sleep_seconds', 0.5,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'f_ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'report_type', 'ann_date'),
+        'dropna', JSON_ARRAY('ts_code', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'f_ann_date', 'end_date', 'report_type', 'comp_type', 'end_type',
+            'total_share', 'money_cap', 'accounts_receiv', 'inventories', 'total_cur_assets',
+            'fix_assets', 'cip', 'intan_assets', 'goodwill', 'total_assets',
+            'st_borr', 'lt_borr', 'total_cur_liab', 'total_liab',
+            'total_hldr_eqy_exc_min_int', 'total_hldr_eqy_inc_min_int', 'update_flag'
+        )
+    ),
+    1, '资产负债表VIP(Tushare balancesheet_vip)；snapshot=近2季；约5000积分；月批 --force'
+);
+
+-- Tushare forecast_vip → ods_forecast_di（业绩预告；type 字段映射为 forecast_type）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'forecast_vip', 'stock_data', 'ods_forecast_di', '业绩预告', 'snapshot', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT(
+            'fields', 'ts_code,ann_date,end_date,type,p_change_min,p_change_max,net_profit_min,net_profit_max,last_parent_net,first_ann_date,summary,change_reason'
+        ),
+        'full_start', '20180101',
+        'snapshot_periods', 2,
+        'sleep_seconds', 0.5,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('type', 'forecast_type'),
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'end_date', '%Y%m%d', 'first_ann_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'ann_date', 'end_date', 'forecast_type'),
+        'dropna', JSON_ARRAY('ts_code', 'ann_date', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'end_date', 'forecast_type',
+            'p_change_min', 'p_change_max', 'net_profit_min', 'net_profit_max',
+            'last_parent_net', 'first_ann_date', 'summary', 'change_reason'
+        )
+    ),
+    1, '业绩预告VIP(Tushare forecast_vip)；snapshot=近2季；约5000积分；月批 --force'
+);
+
+-- Tushare express_vip → ods_express_di（业绩快报）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'express_vip', 'stock_data', 'ods_express_di', '业绩快报', 'snapshot', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT(
+            'fields', 'ts_code,ann_date,end_date,revenue,operate_profit,total_profit,n_income,total_assets,total_hldr_eqy_exc_min_int,diluted_eps,diluted_roe,yoy_net_profit,bps,yoy_sales,yoy_op,yoy_tp,yoy_dedu_np,perf_summary,is_audit,remark'
+        ),
+        'full_start', '20180101',
+        'snapshot_periods', 2,
+        'sleep_seconds', 0.5,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'ann_date', 'end_date'),
+        'dropna', JSON_ARRAY('ts_code', 'ann_date', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'end_date',
+            'revenue', 'operate_profit', 'total_profit', 'n_income', 'total_assets',
+            'total_hldr_eqy_exc_min_int', 'diluted_eps', 'diluted_roe', 'yoy_net_profit',
+            'bps', 'yoy_sales', 'yoy_op', 'yoy_tp', 'yoy_dedu_np',
+            'perf_summary', 'is_audit', 'remark'
+        )
+    ),
+    1, '业绩快报VIP(Tushare express_vip)；snapshot=近2季；约5000积分；月批 --force'
+);
+
+-- Tushare fund_portfolio → ods_fund_hold_di（公募持仓；按报告期全市场）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, schedule_type, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'fund_portfolio', 'stock_data', 'ods_fund_hold_di', '公募基金持仓', 'snapshot', 'monthly',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT(
+            'fields', 'ts_code,ann_date,end_date,symbol,mkv,amount,stk_mkv_ratio,stk_float_ratio'
+        ),
+        'full_start', '20180101',
+        'snapshot_periods', 2,
+        'sleep_seconds', 0.5,
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('ts_code', 'end_date', 'symbol'),
+        'dropna', JSON_ARRAY('ts_code', 'end_date', 'symbol'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'end_date', 'symbol',
+            'mkv', 'amount', 'stk_mkv_ratio', 'stk_float_ratio'
+        )
+    ),
+    1, '公募基金持仓(Tushare fund_portfolio)；按period拉取近2季；约2000积分；月批 --force；需求2机构龙头'
+);
+
+-- ============================================================================
+-- P1：交易侧增强（日快照）
+-- ============================================================================
+
+-- Tushare top_inst → ods_top_inst_di（龙虎榜机构明细）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'top_inst', 'stock_data', 'ods_top_inst_di', '龙虎榜机构明细', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'exalter', 'side', 'reason'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'exalter', 'side',
+            'buy', 'buy_rate', 'sell', 'sell_rate', 'net_buy', 'reason'
+        )
+    ),
+    1, '龙虎榜机构明细日快照(Tushare top_inst；约5000积分，建议20点后)'
+);
+
+-- Tushare margin → ods_margin_di（融资融券汇总，按交易所）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'margin', 'stock_data', 'ods_margin_di', '融资融券交易汇总', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'exchange_id'),
+        'dropna', JSON_ARRAY('trade_date', 'exchange_id'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'exchange_id',
+            'rzye', 'rzmre', 'rzche', 'rqye', 'rqmcl', 'rqyl', 'rzrqye'
+        )
+    ),
+    1, '融资融券交易汇总日快照(Tushare margin；交易所合计，约2000积分)'
+);
+
+-- Tushare margin_detail → ods_margin_detail_di（融资融券个股明细）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'margin_detail', 'stock_data', 'ods_margin_detail_di', '融资融券交易明细', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'name',
+            'rzye', 'rqye', 'rzmre', 'rqyl', 'rzche', 'rqchl', 'rqmcl', 'rzrqye'
+        )
+    ),
+    1, '融资融券个股明细日快照(Tushare margin_detail；单次最多6000行，约2000积分)'
+);
+
+-- Tushare stk_holdertrade → ods_stk_holdertrade_di（股东增减持，按公告日）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'stk_holdertrade', 'stock_data', 'ods_stk_holdertrade_di', '股东增减持', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('ann_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT(
+            'ann_date', '%Y%m%d', 'begin_date', '%Y%m%d', 'close_date', '%Y%m%d'
+        ),
+        'snapshot_delete_column', 'ann_date',
+        'dedupe', JSON_ARRAY('ts_code', 'ann_date', 'holder_name', 'in_de'),
+        'dropna', JSON_ARRAY('ts_code', 'ann_date', 'holder_name'),
+        'keep_columns', JSON_ARRAY(
+            'ts_code', 'ann_date', 'holder_name', 'holder_type', 'in_de',
+            'change_vol', 'change_ratio', 'after_share', 'after_ratio',
+            'avg_price', 'total_share', 'begin_date', 'close_date'
+        )
+    ),
+    1, '股东增减持日快照(Tushare stk_holdertrade,ann_date=$trade_date；约2000积分)'
+);
+
+-- Tushare stk_holdernumber → ods_stk_holdernumber_di（股东人数，按公告日）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'stk_holdernumber', 'stock_data', 'ods_stk_holdernumber_di', '股东人数', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('ann_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('ann_date', '%Y%m%d', 'end_date', '%Y%m%d'),
+        'snapshot_delete_column', 'ann_date',
+        'dedupe', JSON_ARRAY('ts_code', 'ann_date', 'end_date'),
+        'dropna', JSON_ARRAY('ts_code', 'ann_date', 'end_date'),
+        'keep_columns', JSON_ARRAY('ts_code', 'ann_date', 'end_date', 'holder_num')
+    ),
+    1, '股东人数日快照(Tushare stk_holdernumber,ann_date=$trade_date；不定期披露，空日正常)'
+);
+
+-- Tushare adj_factor → ods_adj_factor_di（复权因子）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'adj_factor', 'stock_data', 'ods_adj_factor_di', '复权因子', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('ts_code', 'trade_date'),
+        'dropna', JSON_ARRAY('ts_code', 'trade_date'),
+        'keep_columns', JSON_ARRAY('ts_code', 'trade_date', 'adj_factor')
+    ),
+    1, '复权因子日快照(Tushare adj_factor；约2000积分，盘前更新)'
+);
+
+-- Tushare stk_limit → ods_stk_limit_di（每日涨跌停价格）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'stk_limit', 'stock_data', 'ods_stk_limit_di', '每日涨跌停价格', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY('trade_date', 'ts_code', 'pre_close', 'up_limit', 'down_limit')
+    ),
+    1, '每日涨跌停价格日快照(Tushare stk_limit；约2000积分，盘前更新)'
+);

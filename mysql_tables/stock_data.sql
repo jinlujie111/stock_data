@@ -241,6 +241,263 @@ CREATE TABLE IF NOT EXISTS ods_fina_mainbz_di (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主营业务构成(Tushare fina_mainbz_vip,按产品)';
 
 -- ============================================================================
+-- P0：三张报表 + 业绩预告/快报 + 公募持仓
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ods_income_di (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code         VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date        DATE           NULL COMMENT '公告日期',
+    f_ann_date      DATE           NULL COMMENT '实际公告日期',
+    end_date        DATE           NOT NULL COMMENT '报告期',
+    report_type     VARCHAR(8)     NULL COMMENT '报告类型',
+    comp_type       VARCHAR(8)     NULL COMMENT '公司类型',
+    end_type        VARCHAR(8)     NULL COMMENT '报告期类型',
+    basic_eps       DECIMAL(20, 6) NULL COMMENT '基本每股收益',
+    diluted_eps     DECIMAL(20, 6) NULL COMMENT '稀释每股收益',
+    total_revenue   DECIMAL(24, 4) NULL COMMENT '营业总收入(元)',
+    revenue         DECIMAL(24, 4) NULL COMMENT '营业收入(元)',
+    oper_cost       DECIMAL(24, 4) NULL COMMENT '营业成本(元)',
+    sell_exp        DECIMAL(24, 4) NULL COMMENT '销售费用(元)',
+    admin_exp       DECIMAL(24, 4) NULL COMMENT '管理费用(元)',
+    fin_exp         DECIMAL(24, 4) NULL COMMENT '财务费用(元)',
+    rd_exp          DECIMAL(24, 4) NULL COMMENT '研发费用(元)',
+    operate_profit  DECIMAL(24, 4) NULL COMMENT '营业利润(元)',
+    total_profit    DECIMAL(24, 4) NULL COMMENT '利润总额(元)',
+    n_income        DECIMAL(24, 4) NULL COMMENT '净利润含少数股东(元)',
+    n_income_attr_p DECIMAL(24, 4) NULL COMMENT '归母净利润(元)',
+    minority_gain   DECIMAL(24, 4) NULL COMMENT '少数股东损益(元)',
+    ebit            DECIMAL(24, 4) NULL COMMENT '息税前利润(元)',
+    ebitda          DECIMAL(24, 4) NULL COMMENT 'EBITDA(元)',
+    update_flag     VARCHAR(8)     NULL COMMENT '更新标识',
+    created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_income (ts_code, end_date, report_type, ann_date),
+    KEY idx_income_ann (ann_date),
+    KEY idx_income_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='利润表(Tushare income_vip)';
+
+CREATE TABLE IF NOT EXISTS ods_cashflow_di (
+    id                       BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code                  VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date                 DATE           NULL COMMENT '公告日期',
+    f_ann_date               DATE           NULL COMMENT '实际公告日期',
+    end_date                 DATE           NOT NULL COMMENT '报告期',
+    report_type              VARCHAR(8)     NULL COMMENT '报表类型',
+    comp_type                VARCHAR(8)     NULL COMMENT '公司类型',
+    end_type                 VARCHAR(8)     NULL COMMENT '报告期类型',
+    net_profit               DECIMAL(24, 4) NULL COMMENT '净利润(元)',
+    n_cashflow_act           DECIMAL(24, 4) NULL COMMENT '经营现金流净额(元)',
+    n_cashflow_inv_act       DECIMAL(24, 4) NULL COMMENT '投资现金流净额(元)',
+    n_cash_flows_fnc_act     DECIMAL(24, 4) NULL COMMENT '筹资现金流净额(元)',
+    c_pay_acq_const_fiolta   DECIMAL(24, 4) NULL COMMENT 'CapEx购建固定资产等(元)',
+    free_cashflow            DECIMAL(24, 4) NULL COMMENT '企业自由现金流(元)',
+    n_incr_cash_cash_equ     DECIMAL(24, 4) NULL COMMENT '现金净增加额(元)',
+    c_cash_equ_end_period    DECIMAL(24, 4) NULL COMMENT '期末现金及等价物(元)',
+    update_flag              VARCHAR(8)     NULL COMMENT '更新标识',
+    created_at               DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cashflow (ts_code, end_date, report_type, ann_date),
+    KEY idx_cashflow_ann (ann_date),
+    KEY idx_cashflow_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='现金流量表(Tushare cashflow_vip)';
+
+CREATE TABLE IF NOT EXISTS ods_balancesheet_di (
+    id                          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code                     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date                    DATE           NULL COMMENT '公告日期',
+    f_ann_date                  DATE           NULL COMMENT '实际公告日期',
+    end_date                    DATE           NOT NULL COMMENT '报告期',
+    report_type                 VARCHAR(8)     NULL COMMENT '报表类型',
+    comp_type                   VARCHAR(8)     NULL COMMENT '公司类型',
+    end_type                    VARCHAR(8)     NULL COMMENT '报告期类型',
+    total_share                 DECIMAL(24, 4) NULL COMMENT '期末总股本',
+    money_cap                   DECIMAL(24, 4) NULL COMMENT '货币资金(元)',
+    accounts_receiv             DECIMAL(24, 4) NULL COMMENT '应收账款(元)',
+    inventories                 DECIMAL(24, 4) NULL COMMENT '存货(元)',
+    total_cur_assets            DECIMAL(24, 4) NULL COMMENT '流动资产合计(元)',
+    fix_assets                  DECIMAL(24, 4) NULL COMMENT '固定资产(元)',
+    cip                         DECIMAL(24, 4) NULL COMMENT '在建工程(元)',
+    intan_assets                DECIMAL(24, 4) NULL COMMENT '无形资产(元)',
+    goodwill                    DECIMAL(24, 4) NULL COMMENT '商誉(元)',
+    total_assets                DECIMAL(24, 4) NULL COMMENT '资产总计(元)',
+    st_borr                     DECIMAL(24, 4) NULL COMMENT '短期借款(元)',
+    lt_borr                     DECIMAL(24, 4) NULL COMMENT '长期借款(元)',
+    total_cur_liab              DECIMAL(24, 4) NULL COMMENT '流动负债合计(元)',
+    total_liab                  DECIMAL(24, 4) NULL COMMENT '负债合计(元)',
+    total_hldr_eqy_exc_min_int  DECIMAL(24, 4) NULL COMMENT '股东权益不含少数(元)',
+    total_hldr_eqy_inc_min_int  DECIMAL(24, 4) NULL COMMENT '股东权益含少数(元)',
+    update_flag                 VARCHAR(8)     NULL COMMENT '更新标识',
+    created_at                  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_balancesheet (ts_code, end_date, report_type, ann_date),
+    KEY idx_balancesheet_ann (ann_date),
+    KEY idx_balancesheet_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产负债表(Tushare balancesheet_vip)';
+
+CREATE TABLE IF NOT EXISTS ods_forecast_di (
+    id               BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code          VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date         DATE           NOT NULL COMMENT '公告日期',
+    end_date         DATE           NOT NULL COMMENT '报告期',
+    forecast_type    VARCHAR(16)    NULL COMMENT '预告类型',
+    p_change_min     DECIMAL(20, 6) NULL COMMENT '净利润变动幅度下限(%)',
+    p_change_max     DECIMAL(20, 6) NULL COMMENT '净利润变动幅度上限(%)',
+    net_profit_min   DECIMAL(24, 4) NULL COMMENT '预告净利润下限(万元)',
+    net_profit_max   DECIMAL(24, 4) NULL COMMENT '预告净利润上限(万元)',
+    last_parent_net  DECIMAL(24, 4) NULL COMMENT '上年同期归母净利润(万元)',
+    first_ann_date   DATE           NULL COMMENT '首次公告日',
+    summary          TEXT           NULL COMMENT '业绩预告摘要',
+    change_reason    TEXT           NULL COMMENT '业绩变动原因',
+    created_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_forecast (ts_code, ann_date, end_date, forecast_type),
+    KEY idx_forecast_ann (ann_date),
+    KEY idx_forecast_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业绩预告(Tushare forecast_vip)';
+
+CREATE TABLE IF NOT EXISTS ods_express_di (
+    id                          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code                     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date                    DATE           NOT NULL COMMENT '公告日期',
+    end_date                    DATE           NOT NULL COMMENT '报告期',
+    revenue                     DECIMAL(24, 4) NULL COMMENT '营业收入(元)',
+    operate_profit              DECIMAL(24, 4) NULL COMMENT '营业利润(元)',
+    total_profit                DECIMAL(24, 4) NULL COMMENT '利润总额(元)',
+    n_income                    DECIMAL(24, 4) NULL COMMENT '净利润(元)',
+    total_assets                DECIMAL(24, 4) NULL COMMENT '总资产(元)',
+    total_hldr_eqy_exc_min_int  DECIMAL(24, 4) NULL COMMENT '股东权益不含少数(元)',
+    diluted_eps                 DECIMAL(20, 6) NULL COMMENT '摊薄每股收益(元)',
+    diluted_roe                 DECIMAL(20, 6) NULL COMMENT '摊薄ROE(%)',
+    yoy_net_profit              DECIMAL(20, 6) NULL COMMENT '去年同期修正后净利润',
+    bps                         DECIMAL(20, 6) NULL COMMENT '每股净资产',
+    yoy_sales                   DECIMAL(20, 6) NULL COMMENT '营收同比(%)',
+    yoy_op                      DECIMAL(20, 6) NULL COMMENT '营业利润同比(%)',
+    yoy_tp                      DECIMAL(20, 6) NULL COMMENT '利润总额同比(%)',
+    yoy_dedu_np                 DECIMAL(20, 6) NULL COMMENT '归母净利同比(%)',
+    perf_summary                TEXT           NULL COMMENT '业绩简要说明',
+    is_audit                    TINYINT        NULL COMMENT '是否审计1是0否',
+    remark                      VARCHAR(256)   NULL COMMENT '备注',
+    created_at                  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_express (ts_code, ann_date, end_date),
+    KEY idx_express_ann (ann_date),
+    KEY idx_express_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业绩快报(Tushare express_vip)';
+
+CREATE TABLE IF NOT EXISTS ods_fund_hold_di (
+    id               BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code          VARCHAR(24)    NOT NULL COMMENT '基金TS代码',
+    ann_date         DATE           NULL COMMENT '公告日期',
+    end_date         DATE           NOT NULL COMMENT '报告期',
+    symbol           VARCHAR(16)    NOT NULL COMMENT '股票代码',
+    mkv              DECIMAL(24, 4) NULL COMMENT '持仓市值(元)',
+    amount           DECIMAL(24, 4) NULL COMMENT '持仓数量(股)',
+    stk_mkv_ratio    DECIMAL(20, 6) NULL COMMENT '占股票市值比(%)',
+    stk_float_ratio  DECIMAL(20, 6) NULL COMMENT '占流通股本比(%)',
+    created_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_fund_hold (ts_code, end_date, symbol),
+    KEY idx_fund_hold_symbol_end (symbol, end_date),
+    KEY idx_fund_hold_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公募基金持仓(Tushare fund_portfolio)';
+
+-- ============================================================================
+-- P1：龙虎榜席位 / 融资融券 / 股东 / 复权 / 涨跌停价
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ods_top_inst_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    exalter     VARCHAR(128)   NULL COMMENT '营业部名称',
+    side        VARCHAR(8)     NULL COMMENT '买卖类型0买/1卖',
+    buy         DECIMAL(24, 4) NULL COMMENT '买入额(元)',
+    buy_rate    DECIMAL(20, 6) NULL COMMENT '买入占总成交比例',
+    sell        DECIMAL(24, 4) NULL COMMENT '卖出额(元)',
+    sell_rate   DECIMAL(20, 6) NULL COMMENT '卖出占总成交比例',
+    net_buy     DECIMAL(24, 4) NULL COMMENT '净买入额(元)',
+    reason      VARCHAR(256)   NULL COMMENT '上榜理由',
+    UNIQUE KEY uk_top_inst (trade_date, ts_code, exalter(64), side, reason(64))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='龙虎榜机构明细(Tushare top_inst)';
+
+CREATE TABLE IF NOT EXISTS ods_margin_di (
+    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date   DATE           NOT NULL COMMENT '交易日期',
+    exchange_id  VARCHAR(16)    NOT NULL COMMENT '交易所SSE/SZSE/BSE',
+    rzye         DECIMAL(24, 4) NULL COMMENT '融资余额(元)',
+    rzmre        DECIMAL(24, 4) NULL COMMENT '融资买入额(元)',
+    rzche        DECIMAL(24, 4) NULL COMMENT '融资偿还额(元)',
+    rqye         DECIMAL(24, 4) NULL COMMENT '融券余额(元)',
+    rqmcl        DECIMAL(24, 4) NULL COMMENT '融券卖出量',
+    rqyl         DECIMAL(24, 4) NULL COMMENT '融券余量',
+    rzrqye       DECIMAL(24, 4) NULL COMMENT '融资融券余额(元)',
+    UNIQUE KEY uk_margin (trade_date, exchange_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='融资融券交易汇总(Tushare margin)';
+
+CREATE TABLE IF NOT EXISTS ods_margin_detail_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    name        VARCHAR(64)    NULL COMMENT '股票名称',
+    rzye        DECIMAL(24, 4) NULL COMMENT '融资余额(元)',
+    rqye        DECIMAL(24, 4) NULL COMMENT '融券余额(元)',
+    rzmre       DECIMAL(24, 4) NULL COMMENT '融资买入额(元)',
+    rqyl        DECIMAL(24, 4) NULL COMMENT '融券余量(股)',
+    rzche       DECIMAL(24, 4) NULL COMMENT '融资偿还额(元)',
+    rqchl       DECIMAL(24, 4) NULL COMMENT '融券偿还量(股)',
+    rqmcl       DECIMAL(24, 4) NULL COMMENT '融券卖出量(股)',
+    rzrqye      DECIMAL(24, 4) NULL COMMENT '融资融券余额(元)',
+    UNIQUE KEY uk_margin_detail (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='融资融券交易明细(Tushare margin_detail)';
+
+CREATE TABLE IF NOT EXISTS ods_stk_holdertrade_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    ann_date      DATE           NOT NULL COMMENT '公告日期',
+    holder_name   VARCHAR(128)   NOT NULL COMMENT '股东名称',
+    holder_type   VARCHAR(8)     NULL COMMENT '股东类型G高管P个人C公司',
+    in_de         VARCHAR(8)     NULL COMMENT 'IN增持DE减持',
+    change_vol    DECIMAL(24, 4) NULL COMMENT '变动数量',
+    change_ratio  DECIMAL(20, 6) NULL COMMENT '占流通比例(%)',
+    after_share   DECIMAL(24, 4) NULL COMMENT '变动后持股',
+    after_ratio   DECIMAL(20, 6) NULL COMMENT '变动后占流通比例(%)',
+    avg_price     DECIMAL(20, 6) NULL COMMENT '平均价格',
+    total_share   DECIMAL(24, 4) NULL COMMENT '持股总数',
+    begin_date    DATE           NULL COMMENT '增减持开始日期',
+    close_date    DATE           NULL COMMENT '增减持结束日期',
+    UNIQUE KEY uk_stk_holdertrade (ts_code, ann_date, holder_name(64), in_de)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股东增减持(Tushare stk_holdertrade)';
+
+CREATE TABLE IF NOT EXISTS ods_stk_holdernumber_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16) NOT NULL COMMENT 'TS代码',
+    ann_date    DATE        NOT NULL COMMENT '公告日期',
+    end_date    DATE        NOT NULL COMMENT '截止日期',
+    holder_num  INT         NULL COMMENT '股东户数',
+    UNIQUE KEY uk_stk_holdernumber (ts_code, ann_date, end_date),
+    KEY idx_holdernumber_ann (ann_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股东人数(Tushare stk_holdernumber)';
+
+CREATE TABLE IF NOT EXISTS ods_adj_factor_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    adj_factor  DECIMAL(20, 6) NULL COMMENT '复权因子',
+    UNIQUE KEY uk_adj_factor (ts_code, trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='复权因子(Tushare adj_factor)';
+
+CREATE TABLE IF NOT EXISTS ods_stk_limit_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    pre_close   DECIMAL(20, 6) NULL COMMENT '昨日收盘价',
+    up_limit    DECIMAL(20, 6) NULL COMMENT '涨停价',
+    down_limit  DECIMAL(20, 6) NULL COMMENT '跌停价',
+    UNIQUE KEY uk_stk_limit (trade_date, ts_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日涨跌停价格(Tushare stk_limit)';
+
+-- ============================================================================
 -- 股票的预测信息
 -- ============================================================================
 

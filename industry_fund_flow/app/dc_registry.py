@@ -153,6 +153,8 @@ _NAV_RAW: list[dict[str, str]] = [
     # 我的自选
     {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
     {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks", "section": "我的自选"},
+    {"slug": "vip-start-short", "label": "VIP-短期板块启动", "href": "/vip/start-short", "section": "我的自选"},
+    {"slug": "vip-start-mid", "label": "VIP-中期板块启动", "href": "/vip/start-mid", "section": "我的自选"},
 ]
 
 
