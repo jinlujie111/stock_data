@@ -14,6 +14,50 @@
   let trendChart = null;
   let marketSentimentChart = null;
 
+  const SENTIMENT_BANDS = [
+    { min: 0, max: 10, label: "0~10 躺平", color: "rgba(100, 116, 139, 0.12)" },
+    { min: 10, max: 20, label: "10~20 冰点", color: "rgba(59, 130, 246, 0.08)" },
+    { min: 20, max: 40, label: "20~40 偏弱", color: "rgba(34, 197, 94, 0.06)" },
+    { min: 40, max: 60, label: "40~60 中性", color: "rgba(250, 204, 21, 0.06)" },
+    { min: 60, max: 80, label: "60~80 偏强", color: "rgba(249, 115, 22, 0.07)" },
+    { min: 80, max: 90, label: "80~90 高潮", color: "rgba(239, 68, 68, 0.08)" },
+    { min: 90, max: 100, label: "90~100 极度高潮", color: "rgba(168, 85, 247, 0.09)" },
+  ];
+
+  function sentimentMarkAreas() {
+    return SENTIMENT_BANDS.map((band) => [
+      {
+        yAxis: band.min,
+        itemStyle: { color: band.color },
+        label: {
+          show: true,
+          color: "#94a3b8",
+          fontSize: 11,
+          position: "insideTopLeft",
+          formatter: band.label,
+        },
+      },
+      { yAxis: band.max },
+    ]);
+  }
+
+  function sentimentMarkLines() {
+    return [10, 20, 80, 90].map((value) => ({
+      yAxis: value,
+      label: {
+        show: true,
+        formatter: `${value}`,
+        color: "#cbd5e1",
+        fontSize: 11,
+      },
+      lineStyle: {
+        color: "rgba(148, 163, 184, 0.5)",
+        type: "dashed",
+        width: 1,
+      },
+    }));
+  }
+
   function fmtValue(val, fmt) {
     if (val === null || val === undefined || val === "") return "—";
     if (fmt === "int") return Number(val).toLocaleString("zh-CN");
@@ -238,6 +282,15 @@
                 { offset: 1, color: "rgba(96, 165, 250, 0)" },
               ],
             },
+          },
+          markLine: {
+            symbol: "none",
+            silent: true,
+            data: sentimentMarkLines(),
+          },
+          markArea: {
+            silent: true,
+            data: sentimentMarkAreas(),
           },
         },
       ],
