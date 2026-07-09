@@ -1,0 +1,41 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head">
+  <h1>问数助手</h1>
+  <p class="muted">自然语言查询主线、自选、热点、涨停、启动信号等；支持简短追问（如「昨天呢？」）。</p>
+</div>
+
+<section class="card ask-panel">
+  <div id="ask-messages" class="ask-messages" aria-live="polite">
+    <div class="ask-msg ask-msg-bot">
+      <div class="ask-msg-body">
+        你好，我可以帮你查：<strong>主线/量化主线</strong>、<strong>市场广度</strong>、<strong>资金强度</strong>、
+        <strong>板块龙头</strong>、<strong>自选板块/股票</strong>、<strong>热点股</strong>、<strong>涨停分析</strong>、
+        <strong>启动信号</strong>。问完后可追问「昨天呢」「Top5 呢」等。
+      </div>
+    </div>
+  </div>
+
+  <div class="ask-suggestions" id="ask-suggestions">
+    {% for item in suggestions %}
+    <button type="button" class="ask-chip" data-question="{{ item }}">{{ item }}</button>
+    {% endfor %}
+  </div>
+
+  <form id="ask-form" class="ask-form">
+    <textarea
+      id="ask-input"
+      class="ask-input"
+      rows="2"
+      maxlength="500"
+      placeholder="例如：我的自选板块今天表现怎么样？"
+      required
+    ></textarea>
+    <button type="submit" class="btn btn-primary ask-submit" id="ask-submit">发送</button>
+  </form>
+  <p class="muted ask-foot">数据与业务菜单同源；支持最近 3 轮上下文追问。</p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/ask.js?v=20260709b"></script>
+{% endblock %}

@@ -138,6 +138,8 @@ CONTENT_TYPES = ["行业", "概念"]
 DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "diffusion"})
 
 _NAV_RAW: list[dict[str, str]] = [
+    # 智能问数
+    {"slug": "ask", "label": "问数助手", "href": "/ask", "section": "智能问数"},
     # 主线决策
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "主线决策"},
     {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline", "section": "主线决策"},
