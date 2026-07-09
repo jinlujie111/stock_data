@@ -26,6 +26,20 @@
     <div id="breadth-trend-chart"></div>
   </div>
 </section>
+
+<section class="card breadth-card">
+  <div class="breadth-head">
+    <div>
+      <h2 class="section-title">大盘情绪</h2>
+      <p id="market-sentiment-summary" class="muted section-desc">加载中…</p>
+    </div>
+  </div>
+  <div class="breadth-trend">
+    <h3 class="breadth-trend-title">近30天大盘情绪</h3>
+    <div id="market-sentiment-empty" class="table-empty hidden">暂无大盘情绪数据</div>
+    <div id="market-sentiment-chart"></div>
+  </div>
+</section>
 {% endblock %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>

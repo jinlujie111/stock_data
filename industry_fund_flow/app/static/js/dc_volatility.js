@@ -52,12 +52,20 @@
     return Array.from(selectedBoards.keys());
   }
 
+  function boardLabel(item) {
+    return `[${item.content_type}] ${item.industry_name} (${item.industry_code})`;
+  }
+
   function renderSelectedBoards() {
+    if (!selectedBoards.size) {
+      elBoardSelected.innerHTML = '<span class="board-placeholder">未选择板块（展示默认常看板块）</span>';
+      return;
+    }
     elBoardSelected.innerHTML = "";
     selectedBoards.forEach((item, code) => {
       const wrap = document.createElement("span");
       wrap.className = "board-tag";
-      wrap.innerHTML = `${item.industry_name || code}<button type="button" data-code="${code}">x</button>`;
+      wrap.innerHTML = `${boardLabel(item)}<button type="button" data-code="${code}">×</button>`;
       elBoardSelected.appendChild(wrap);
     });
     elBoardSelected.querySelectorAll("button").forEach((btn) => {
@@ -207,7 +215,7 @@
     items.forEach((item) => {
       const div = document.createElement("div");
       div.className = "board-option";
-      div.textContent = `${item.industry_name} (${item.content_type})`;
+      div.textContent = boardLabel(item);
       div.addEventListener("click", () => {
         selectedBoards.set(item.industry_code, item);
         renderSelectedBoards();
@@ -287,7 +295,11 @@
   });
 
   btnReset.addEventListener("click", () => {
-    setDefaultBoards(defaultBoardNames).then(refresh).catch((e) => showError(e.message || String(e)));
+    selectedBoards.clear();
+    elBoardSearch.value = "";
+    elBoardDropdown.classList.add("hidden");
+    renderSelectedBoards();
+    refresh().catch((e) => showError(e.message || String(e)));
   });
   btnQuery.addEventListener("click", () => {
     refresh().catch((e) => showError(e.message || String(e)));

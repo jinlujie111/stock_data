@@ -12,6 +12,7 @@
   .board-selected { display: flex; flex-wrap: wrap; gap: 0.35rem; min-height: 2rem; margin-bottom: 0.35rem; }
   .board-tag { padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.35); }
   .board-tag button { margin-left: 0.35rem; background: transparent; border: 0; color: inherit; cursor: pointer; }
+  .board-placeholder { color: var(--muted); font-size: 0.875rem; }
   .board-search { width: 100%; }
   .board-dropdown { position: absolute; top: calc(100% + 0.25rem); left: 0; right: 0; max-height: 240px; overflow: auto; background: #0b1220; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; z-index: 20; }
   .board-option { padding: 0.55rem 0.75rem; cursor: pointer; }
@@ -45,16 +46,16 @@
       </select>
     </label>
     <label class="filter-field filter-field--grow">
-      <span>板块（默认 4 个，可搜索添加）</span>
+      <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
       <div class="board-picker" id="board-picker">
         <div class="board-selected" id="board-selected"></div>
-        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，点击添加" autocomplete="off" />
+        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，模糊匹配…" autocomplete="off" />
         <div class="board-dropdown hidden" id="board-dropdown"></div>
       </div>
     </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>
-      <button type="button" class="btn btn-ghost" id="btn-reset-boards">恢复默认板块</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
     </div>
   </div>
 </div>
@@ -76,7 +77,7 @@
   <div class="snapshot-head">
     <div>
       <h2 class="section-title">板块年化波动率</h2>
-      <p class="muted toolbar-note">支持多板块对比，默认展示常看板块</p>
+      <p class="muted toolbar-note">支持多板块对比，未选板块时展示默认常看板块</p>
     </div>
   </div>
   <div id="industry-chart" class="chart-box"></div>

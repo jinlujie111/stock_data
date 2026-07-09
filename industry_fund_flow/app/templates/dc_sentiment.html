@@ -56,18 +56,19 @@
   #sentiment-chart {
     height: 440px;
   }
-  .board-search-row {
-    display: flex;
-    gap: 0.5rem;
-  }
-  .board-search-row input {
-    min-width: 220px;
-  }
+  .board-picker { position: relative; min-width: 260px; }
+  .board-selected { display: flex; flex-wrap: wrap; gap: 0.35rem; min-height: 2rem; margin-bottom: 0.35rem; }
+  .board-tag { padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.35); }
+  .board-tag button { margin-left: 0.35rem; background: transparent; border: 0; color: inherit; cursor: pointer; }
+  .board-dropdown { position: absolute; top: calc(100% + 0.25rem); left: 0; right: 0; max-height: 240px; overflow: auto; background: #0b1220; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; z-index: 20; }
+  .board-option { display: block; width: 100%; padding: 0.55rem 0.75rem; cursor: pointer; background: transparent; border: 0; color: inherit; text-align: left; }
+  .board-option:hover { background: rgba(255,255,255,.06); }
+  .board-placeholder { color: var(--muted); font-size: 0.875rem; }
 </style>
 
 <div class="page-head">
-  <h1>市场情绪</h1>
-  <p class="muted">近 1 年大盘情绪与板块情绪评分曲线，横轴为交易时间，纵轴为 0-100 分。</p>
+  <h1>板块情绪</h1>
+  <p class="muted">板块情绪评分曲线，横轴为交易时间，纵轴为 0-100 分。</p>
 </div>
 
 <div id="page-error" class="alert alert-error hidden"></div>
@@ -82,21 +83,37 @@
       <label class="filter-field">
         <span>历史区间</span>
         <select id="days">
+          <option value="30" selected>近30天</option>
           <option value="120">近120日</option>
           <option value="180">近180日</option>
           <option value="240">近240日</option>
-          <option value="365" selected>近1年</option>
+          <option value="365">近1年</option>
         </select>
       </label>
+      <label class="filter-field filter-field--wide">
+        <span>板块类型</span>
+        <div class="chip-group" id="content-type-chips">
+          <button type="button" class="chip active" data-value="行业">行业</button>
+          <button type="button" class="chip active" data-value="概念">概念</button>
+        </div>
+      </label>
       <label class="filter-field filter-field--grow">
-        <span>板块</span>
-        <div class="board-search-row">
-          <input type="text" id="board-keyword" class="board-search" placeholder="输入板块名称或代码，留空默认取当日最强板块" />
-          <button type="button" class="btn btn-ghost" id="btn-resolve-board">定位板块</button>
+        <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
+        <div class="board-picker" id="board-picker">
+          <div class="board-selected" id="board-selected"></div>
+          <input
+            type="text"
+            id="board-search"
+            class="board-search"
+            placeholder="输入板块名称或代码，模糊匹配…"
+            autocomplete="off"
+          />
+          <div class="board-dropdown hidden" id="board-dropdown"></div>
         </div>
       </label>
       <div class="filter-actions">
         <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+        <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
       </div>
     </div>
     <p id="filter-hint" class="filter-hint muted"></p>
@@ -117,7 +134,7 @@
     <div class="chart-toolbar">
       <div>
         <h2 class="section-title">情绪曲线</h2>
-        <p class="muted section-desc">双折线对比：大盘情绪 vs 所选板块情绪</p>
+        <p class="muted section-desc">近30天默认展示所选板块情绪</p>
       </div>
     </div>
     <div id="chart-empty" class="table-empty hidden">暂无情绪历史数据</div>

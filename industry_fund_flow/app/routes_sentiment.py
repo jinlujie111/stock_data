@@ -29,7 +29,7 @@ def sentiment_page(request: Request, user: dict = Depends(require_user)):
             "user": user,
             "nav_items": NAV_ITEMS,
             "active_nav": "sentiment",
-            "title": "市场情绪",
+            "title": "板块情绪",
         },
     )
 
@@ -68,7 +68,7 @@ def api_history(
     industry_code: str | None = Query(None),
     keyword: str | None = Query(None),
     trade_date: str | None = Query(None),
-    days: int = Query(365, ge=30, le=365),
+    days: int = Query(30, ge=30, le=365),
     _user: dict = Depends(require_user),
 ):
     try:

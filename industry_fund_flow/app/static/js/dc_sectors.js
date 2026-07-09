@@ -16,7 +16,10 @@
 
   const elDate = document.getElementById("trade-date");
   const typeChips = document.getElementById("content-type-chips");
-  const elKeyword = document.getElementById("sector-keyword");
+  const elBoardSearch = document.getElementById("board-search");
+  const elBoardDropdown = document.getElementById("board-dropdown");
+  const elBoardSelected = document.getElementById("board-selected");
+  const elBoardPicker = document.getElementById("board-picker");
   const elSectorHeadRow = document.getElementById("sector-head-row");
   const elSectorBody = document.getElementById("sector-body");
   const elSectorEmpty = document.getElementById("sector-empty");
@@ -29,11 +32,15 @@
   const elMembersBody = document.getElementById("members-body");
   const elMembersEmpty = document.getElementById("members-empty");
   const btnCloseMembers = document.getElementById("btn-close-members");
+  const btnResetBoards = document.getElementById("btn-reset-boards");
 
   let contentType = "行业";
   let boardFavCodes = new Set();
   let stockFavCodes = new Set();
   let tableRows = [];
+  let allBoards = [];
+  const selectedBoards = new Map();
+  let boardSearchTimer = null;
   const sortState = { sortKey: "pct_change", sortDir: "desc" };
 
   function tdParam() {
@@ -75,7 +82,89 @@
       typeChips.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
       btn.classList.add("active");
       contentType = btn.dataset.value || "行业";
+      loadBoardOptions().catch(() => {});
     });
+  }
+
+  function boardLabel(b) {
+    return `[${b.content_type}] ${b.industry_name} (${b.industry_code})`;
+  }
+
+  function renderSelectedTags() {
+    if (!selectedBoards.size) {
+      elBoardSelected.innerHTML = '<span class="board-placeholder">未选择板块（展示全部）</span>';
+      return;
+    }
+    elBoardSelected.innerHTML = Array.from(selectedBoards.values())
+      .map(
+        (b) =>
+          `<span class="board-tag" data-code="${b.industry_code}">` +
+          `${boardLabel(b)}<button type="button" aria-label="移除">×</button></span>`
+      )
+      .join("");
+  }
+
+  function selectedBoardCodes() {
+    return Array.from(selectedBoards.keys());
+  }
+
+  function hideDropdown() {
+    elBoardDropdown.classList.add("hidden");
+  }
+
+  function matchBoard(board, q) {
+    const text = `${board.industry_name} ${board.industry_code} ${board.content_type}`.toLowerCase();
+    const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return true;
+    return tokens.every((t) => text.includes(t));
+  }
+
+  function renderDropdown(matches) {
+    if (!matches.length) {
+      elBoardDropdown.innerHTML = '<div class="board-option">无匹配板块</div>';
+      elBoardDropdown.classList.remove("hidden");
+      return;
+    }
+    elBoardDropdown.innerHTML = matches
+      .slice(0, 50)
+      .map(
+        (b) =>
+          `<button type="button" class="board-option" data-code="${b.industry_code}">` +
+          `${boardLabel(b)}</button>`
+      )
+      .join("");
+    elBoardDropdown.classList.remove("hidden");
+  }
+
+  async function fetchBoards(keyword) {
+    const params = new URLSearchParams();
+    const td = tdParam();
+    if (td) params.set("trade_date", td);
+    params.set("content_types", contentType);
+    const kw = (keyword || "").trim();
+    if (kw) params.set("keyword", kw);
+    const data = await apiGet(`/api/v1/dragon/boards?${params}`);
+    return data.items || [];
+  }
+
+  async function loadBoardOptions() {
+    allBoards = await fetchBoards("");
+    const keep = new Map();
+    selectedBoards.forEach((b, code) => {
+      if (allBoards.some((x) => x.industry_code === code)) keep.set(code, b);
+    });
+    selectedBoards.clear();
+    keep.forEach((b, code) => selectedBoards.set(code, b));
+    renderSelectedTags();
+  }
+
+  function addBoard(code) {
+    const board = allBoards.find((b) => b.industry_code === code);
+    if (!board) return;
+    selectedBoards.set(code, board);
+    renderSelectedTags();
+    elBoardSearch.value = "";
+    hideDropdown();
   }
 
   function buildListUrl() {
@@ -83,8 +172,8 @@
     const td = tdParam();
     if (td) params.set("trade_date", td);
     params.set("content_type", contentType);
-    const kw = elKeyword.value.trim();
-    if (kw) params.set("keyword", kw);
+    const codes = selectedBoardCodes();
+    if (codes.length) params.set("industry_codes", codes.join(","));
     return `/api/v1/sectors/list?${params}`;
   }
 
@@ -250,8 +339,58 @@
     await querySectors();
   });
   btnCloseMembers.addEventListener("click", () => elMembersCard.classList.add("hidden"));
-  elKeyword.addEventListener("keydown", (e) => {
+  elBoardSearch.addEventListener("input", () => {
+    const q = elBoardSearch.value;
+    if (!q.trim()) {
+      hideDropdown();
+      return;
+    }
+    clearTimeout(boardSearchTimer);
+    boardSearchTimer = setTimeout(async () => {
+      try {
+        const remote = await fetchBoards(q);
+        const pool = remote.length ? remote : allBoards;
+        const matches = pool.filter((b) => !selectedBoards.has(b.industry_code) && matchBoard(b, q));
+        renderDropdown(matches);
+      } catch (err) {
+        showError(err.message);
+      }
+    }, 200);
+  });
+  elBoardSearch.addEventListener("focus", () => {
+    if (elBoardSearch.value.trim()) elBoardSearch.dispatchEvent(new Event("input"));
+  });
+  elBoardSearch.addEventListener("keydown", (e) => {
     if (e.key === "Enter") btnQuery.click();
+  });
+  elBoardDropdown.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".board-option[data-code]");
+    if (!btn) return;
+    const code = btn.dataset.code;
+    if (!allBoards.some((b) => b.industry_code === code)) {
+      const found = await fetchBoards(code);
+      const board = found.find((b) => b.industry_code === code);
+      if (board) allBoards.push(board);
+    }
+    addBoard(code);
+  });
+  elBoardSelected.addEventListener("click", (e) => {
+    const tag = e.target.closest(".board-tag");
+    if (!tag) return;
+    if (e.target.tagName === "BUTTON") {
+      selectedBoards.delete(tag.dataset.code);
+      renderSelectedTags();
+    }
+  });
+  btnResetBoards.addEventListener("click", () => {
+    selectedBoards.clear();
+    elBoardSearch.value = "";
+    hideDropdown();
+    renderSelectedTags();
+    querySectors();
+  });
+  document.addEventListener("click", (e) => {
+    if (!elBoardPicker.contains(e.target)) hideDropdown();
   });
 
   (async function init() {
@@ -263,6 +402,7 @@
       sortState.sortKey = sectorTable().DEFAULT_SORT.key;
       sortState.sortDir = sectorTable().DEFAULT_SORT.dir;
       await initTradeDateCalendar(elDate, "/api/v1/sectors/trade-dates?limit=90");
+      await loadBoardOptions();
       await querySectors();
       refreshFavCodes();
     } catch (err) {

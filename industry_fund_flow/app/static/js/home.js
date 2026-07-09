@@ -7,8 +7,12 @@
   const elSummary = document.getElementById("breadth-summary");
   const elTrendChart = document.getElementById("breadth-trend-chart");
   const elTrendEmpty = document.getElementById("breadth-trend-empty");
+  const elMarketSentimentSummary = document.getElementById("market-sentiment-summary");
+  const elMarketSentimentChart = document.getElementById("market-sentiment-chart");
+  const elMarketSentimentEmpty = document.getElementById("market-sentiment-empty");
 
   let trendChart = null;
+  let marketSentimentChart = null;
 
   function fmtValue(val, fmt) {
     if (val === null || val === undefined || val === "") return "—";
@@ -163,6 +167,83 @@
     });
   }
 
+  function renderMarketSentiment(items) {
+    if (!items || !items.length) {
+      if (marketSentimentChart) {
+        marketSentimentChart.dispose();
+        marketSentimentChart = null;
+      }
+      elMarketSentimentChart.style.display = "none";
+      elMarketSentimentEmpty.classList.remove("hidden");
+      elMarketSentimentSummary.textContent = "暂无大盘情绪数据";
+      return;
+    }
+
+    const latest = items[items.length - 1];
+    elMarketSentimentSummary.textContent = `最新交易日 ${latest.trade_date} · 大盘情绪 ${fmtValue(latest.score, "num")} 分`;
+    elMarketSentimentEmpty.classList.add("hidden");
+    elMarketSentimentChart.style.display = "block";
+
+    if (!marketSentimentChart) {
+      marketSentimentChart = echarts.init(elMarketSentimentChart);
+      window.addEventListener("resize", () => marketSentimentChart && marketSentimentChart.resize());
+    }
+
+    marketSentimentChart.setOption({
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "#1a2332",
+        borderColor: "#2d3748",
+        textStyle: { color: "#e2e8f0", fontSize: 12 },
+        formatter(params) {
+          const item = params[0];
+          return `${item.axisValue}<br/>${item.marker}大盘情绪：${Number(item.value).toFixed(1)}`;
+        },
+      },
+      grid: { left: 48, right: 16, top: 20, bottom: 28 },
+      xAxis: {
+        type: "category",
+        data: items.map((r) => r.trade_date),
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: "#334155" } },
+        axisLabel: { color: "#94a3b8", fontSize: 11 },
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        max: 100,
+        splitLine: { lineStyle: { color: "#1e293b" } },
+        axisLabel: { color: "#94a3b8", fontSize: 11 },
+      },
+      series: [
+        {
+          name: "大盘情绪",
+          type: "line",
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 5,
+          data: items.map((r) => r.score),
+          lineStyle: { width: 2, color: "#60a5fa" },
+          itemStyle: { color: "#60a5fa" },
+          areaStyle: {
+            color: {
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: "rgba(96, 165, 250, 0.25)" },
+                { offset: 1, color: "rgba(96, 165, 250, 0)" },
+              ],
+            },
+          },
+        },
+      ],
+    });
+  }
+
   async function loadBreadth() {
     elError.classList.add("hidden");
     const td = elDate.value;
@@ -182,6 +263,11 @@
     renderTrendChart(res.items);
   }
 
+  async function loadMarketSentiment() {
+    const res = await apiGet("/api/v1/sentiment/history?days=30");
+    renderMarketSentiment((res.market && res.market.items) || []);
+  }
+
   elDate.addEventListener("change", () => {
     loadBreadth().catch((err) => {
       elError.textContent = err.message;
@@ -190,7 +276,7 @@
   });
 
   initTradeDateCalendar(elDate, "/api/market-breadth/trade-dates?limit=90")
-    .then(() => Promise.all([loadBreadth(), loadTrend()]))
+    .then(() => Promise.all([loadBreadth(), loadTrend(), loadMarketSentiment()]))
     .catch((err) => {
       elError.textContent = err.message;
       elError.classList.remove("hidden");
