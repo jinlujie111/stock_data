@@ -233,7 +233,8 @@
       window.addEventListener("resize", () => marketSentimentChart && marketSentimentChart.resize());
     }
 
-    marketSentimentChart.setOption({
+    marketSentimentChart.setOption(
+      {
       backgroundColor: "transparent",
       tooltip: {
         trigger: "axis",
@@ -294,7 +295,10 @@
           },
         },
       ],
-    });
+      },
+      true
+    );
+    marketSentimentChart.resize();
   }
 
   function showMarketSentimentError(message) {
