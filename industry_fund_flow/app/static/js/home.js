@@ -297,6 +297,17 @@
     });
   }
 
+  function showMarketSentimentError(message) {
+    if (marketSentimentChart) {
+      marketSentimentChart.dispose();
+      marketSentimentChart = null;
+    }
+    elMarketSentimentChart.style.display = "none";
+    elMarketSentimentEmpty.classList.remove("hidden");
+    elMarketSentimentEmpty.textContent = message || "大盘情绪数据加载失败";
+    elMarketSentimentSummary.textContent = "大盘情绪加载失败";
+  }
+
   async function loadBreadth() {
     elError.classList.add("hidden");
     const td = elDate.value;
@@ -317,8 +328,12 @@
   }
 
   async function loadMarketSentiment() {
-    const res = await apiGet("/api/v1/sentiment/history?days=30");
-    renderMarketSentiment((res.market && res.market.items) || []);
+    try {
+      const res = await apiGet("/api/v1/sentiment/history?days=30");
+      renderMarketSentiment((res.market && res.market.items) || []);
+    } catch (err) {
+      showMarketSentimentError(err.message || String(err));
+    }
   }
 
   elDate.addEventListener("change", () => {
@@ -329,7 +344,11 @@
   });
 
   initTradeDateCalendar(elDate, "/api/market-breadth/trade-dates?limit=90")
-    .then(() => Promise.all([loadBreadth(), loadTrend(), loadMarketSentiment()]))
+    .then(async () => {
+      await loadBreadth();
+      await loadTrend();
+      await loadMarketSentiment();
+    })
     .catch((err) => {
       elError.textContent = err.message;
       elError.classList.remove("hidden");

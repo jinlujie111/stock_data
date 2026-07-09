@@ -23,6 +23,7 @@
   let selectedTypes = ["行业", "概念"];
   const selectedBoards = new Map();
   let boardSearchTimer = null;
+  const DEFAULT_BOARD_KEYWORD = "半导体";
 
   const SENTIMENT_BANDS = [
     { min: 0, max: 10, label: "0~10 躺平", color: "rgba(100, 116, 139, 0.12)" },
@@ -169,8 +170,16 @@
     });
     selectedBoards.clear();
     keep.forEach((b, code) => selectedBoards.set(code, b));
+    if (!selectedBoards.size) {
+      const defaultBoard =
+        allBoards.find((b) => b.industry_name === DEFAULT_BOARD_KEYWORD) ||
+        allBoards.find((b) => String(b.industry_name || "").includes(DEFAULT_BOARD_KEYWORD));
+      if (defaultBoard) {
+        selectedBoards.set(defaultBoard.industry_code, defaultBoard);
+      }
+    }
     renderSelectedTags();
-    elFilterHint.textContent = `共 ${allBoards.length} 个板块可选；输入名称或代码模糊匹配后点选；未选板块表示展示默认强势板块（类型：${getContentTypesParam().replace(",", "、")}）`;
+    elFilterHint.textContent = `共 ${allBoards.length} 个板块可选；输入名称或代码模糊匹配后点选；默认板块为${DEFAULT_BOARD_KEYWORD}（类型：${getContentTypesParam().replace(",", "、")}）`;
   }
 
   function addBoard(code) {
@@ -396,7 +405,7 @@
     selectedBoards.clear();
     elBoardSearch.value = "";
     hideDropdown();
-    renderSelectedTags();
+    loadBoardOptions().catch((err) => showError(err.message || String(err)));
   });
   document.addEventListener("click", (e) => {
     if (!elBoardPicker.contains(e.target)) hideDropdown();
