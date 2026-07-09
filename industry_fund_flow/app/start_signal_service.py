@@ -275,6 +275,7 @@ def _apply_hard_filters(
     days = int(_num(row.get("net_inflow_days")) or 0)
     accel = _num(row.get("fund_accel"))
     stage = row.get("mainline_stage") or ""
+    level = row.get("mainline_level") or ""
     vp_status = (row.get("vp_status") or "").strip()
     signal = (row.get("vp_signal_type") or "").strip()
     vp_score = _num(row.get("vp_score"))
@@ -302,12 +303,19 @@ def _apply_hard_filters(
         downgrade = True
     if vp_status in ("weak", "ebbing"):
         downgrade = True
+    if leader_clarity != "clear":
+        downgrade = True
+    if vp_score is not None and vp_score < 70:
+        downgrade = True
+    if level not in ("主线", "超级主线") and stage not in ("板块爆发", "机构化"):
+        downgrade = True
     if downgrade and status == "启动":
         return "观察"
     return status
 
 
 def _short_flags(row: dict, strength_rank_pct: float | None, leader_clarity: str) -> dict[str, Any]:
+    level = row.get("mainline_level") or ""
     stage = row.get("mainline_stage") or ""
     days = int(_num(row.get("net_inflow_days")) or 0)
     accel = _num(row.get("fund_accel"))
@@ -317,17 +325,20 @@ def _short_flags(row: dict, strength_rank_pct: float | None, leader_clarity: str
     streak = int(_num(row.get("amount_streak_days")) or 0)
 
     start_hits = [
+        level in ("主线", "超级主线"),
         stage in ("资金试探", "板块爆发"),
-        days >= 2,
-        accel is not None and accel > 0,
-        vp_score is not None and vp_score >= 70,
+        days >= 3,
+        accel is not None and accel > 5e7,
+        vp_score is not None and vp_score >= 75,
         signal in ("launch", "main_rise"),
+        leader_clarity == "clear",
     ]
     incr_hits = [
         days >= 3,
-        accel is not None and accel > 0,
-        strength_rank_pct is not None and strength_rank_pct <= 0.30,
+        accel is not None and accel > 5e7,
+        strength_rank_pct is not None and strength_rank_pct <= 0.20,
         streak >= 2,
+        leader_clarity == "clear",
     ]
     abandon_hits = [
         accel is not None and accel < 0,
@@ -343,7 +354,7 @@ def _short_flags(row: dict, strength_rank_pct: float | None, leader_clarity: str
 
     if abandon_cnt >= 2:
         signal_status = "放弃"
-    elif start_cnt >= 3:
+    elif start_cnt >= 5:
         signal_status = "启动"
     else:
         signal_status = "观察"
@@ -383,13 +394,14 @@ def _mid_flags(row: dict, strength_rank_pct: float | None, leader_clarity: str) 
         level in ("主线", "超级主线"),
         stage in ("板块爆发", "机构化"),
         ma_rising,
-        days >= 3,
-        accel is not None and accel > 0,
+        days >= 4,
+        accel is not None and accel > 5e7,
+        leader_clarity == "clear",
     ]
     incr_hits = [
-        days >= 3,
-        accel is not None and accel > 0,
-        strength_rank_pct is not None and strength_rank_pct <= 0.30,
+        days >= 4,
+        accel is not None and accel > 5e7,
+        strength_rank_pct is not None and strength_rank_pct <= 0.20,
         ma_rising,
         leader_clarity == "clear",
     ]
@@ -407,7 +419,7 @@ def _mid_flags(row: dict, strength_rank_pct: float | None, leader_clarity: str) 
 
     if abandon_cnt >= 2:
         signal_status = "放弃"
-    elif start_cnt >= 3:
+    elif start_cnt >= 5:
         signal_status = "启动"
     else:
         signal_status = "观察"
