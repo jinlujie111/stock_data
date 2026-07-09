@@ -18,6 +18,7 @@ from app import (
     routes_limit_up,
     routes_mainline,
     routes_quant_mainline,
+    routes_sentiment,
     routes_sectors,
     routes_start_signal,
     routes_volatility,
@@ -43,6 +44,7 @@ routes_dc.init_dc_routes(_TEMPLATES)
 routes_dragon.init_dragon_routes(_TEMPLATES)
 routes_mainline.init_mainline_routes(_TEMPLATES)
 routes_quant_mainline.init_quant_mainline_routes(_TEMPLATES)
+routes_sentiment.init_sentiment_routes(_TEMPLATES)
 routes_sectors.init_sectors_routes(_TEMPLATES)
 routes_hot_stocks.init_hot_stocks_routes(_TEMPLATES)
 routes_limit_up.init_limit_up_routes(_TEMPLATES)
@@ -54,6 +56,8 @@ app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_quant_mainline.page_router)
 app.include_router(routes_quant_mainline.api_router)
+app.include_router(routes_sentiment.page_router)
+app.include_router(routes_sentiment.api_router)
 app.include_router(routes_sectors.page_router)
 app.include_router(routes_sectors.api_router)
 app.include_router(routes_sectors.fav_router)

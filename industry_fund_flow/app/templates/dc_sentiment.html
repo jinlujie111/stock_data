@@ -1,0 +1,133 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<style>
+  .sentiment-layout {
+    display: grid;
+    gap: 1rem;
+  }
+  .sentiment-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .sentiment-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .sentiment-metric {
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .sentiment-metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-bottom: 0.3rem;
+  }
+  .sentiment-metric strong {
+    font-size: 1.4rem;
+  }
+  .board-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.14);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+  }
+  .chart-card {
+    min-height: 520px;
+  }
+  .chart-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+  }
+  #sentiment-chart {
+    height: 440px;
+  }
+  .board-search-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .board-search-row input {
+    min-width: 220px;
+  }
+</style>
+
+<div class="page-head">
+  <h1>市场情绪</h1>
+  <p class="muted">近 1 年大盘情绪与板块情绪评分曲线，横轴为交易时间，纵轴为 0-100 分。</p>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<div class="sentiment-layout">
+  <section class="card filters-card">
+    <div class="filters">
+      <label class="filter-field">
+        <span>交易日期</span>
+        <input type="date" id="trade-date" class="date-input" />
+      </label>
+      <label class="filter-field">
+        <span>历史区间</span>
+        <select id="days">
+          <option value="120">近120日</option>
+          <option value="180">近180日</option>
+          <option value="240">近240日</option>
+          <option value="365" selected>近1年</option>
+        </select>
+      </label>
+      <label class="filter-field filter-field--grow">
+        <span>板块</span>
+        <div class="board-search-row">
+          <input type="text" id="board-keyword" class="board-search" placeholder="输入板块名称或代码，留空默认取当日最强板块" />
+          <button type="button" class="btn btn-ghost" id="btn-resolve-board">定位板块</button>
+        </div>
+      </label>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      </div>
+    </div>
+    <p id="filter-hint" class="filter-hint muted"></p>
+  </section>
+
+  <section class="card">
+    <div class="sentiment-head">
+      <div>
+        <h2 class="section-title">情绪概览</h2>
+        <p id="summary-text" class="muted section-desc">加载中…</p>
+      </div>
+      <div id="board-pill" class="board-pill hidden"></div>
+    </div>
+    <div id="summary-metrics" class="sentiment-summary"></div>
+  </section>
+
+  <section class="card chart-card">
+    <div class="chart-toolbar">
+      <div>
+        <h2 class="section-title">情绪曲线</h2>
+        <p class="muted section-desc">双折线对比：大盘情绪 vs 所选板块情绪</p>
+      </div>
+    </div>
+    <div id="chart-empty" class="table-empty hidden">暂无情绪历史数据</div>
+    <div id="sentiment-chart"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="/static/js/dc_board_common.js?v=20260702"></script>
+<script src="/static/js/dc_sentiment.js?v=20260709"></script>
+{% endblock %}
