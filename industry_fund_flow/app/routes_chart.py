@@ -51,7 +51,7 @@ def api_chart_kline(
     kind: str = Query("stock", pattern="^(stock|board)$"),
     code: str = Query(..., min_length=1),
     trade_date: str | None = Query(None),
-    days: int = Query(120, ge=20, le=365),
+    days: int = Query(60, ge=20, le=365),
     _user: dict = Depends(require_user),
 ):
     try:

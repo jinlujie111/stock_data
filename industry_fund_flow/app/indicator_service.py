@@ -244,40 +244,74 @@ def _slope_label(p1: tuple[int, float], p2: tuple[int, float], role: str) -> str
     return "水平阻力线"
 
 
+def _trendline_violations(
+    bars: list[dict],
+    p1: tuple[int, float],
+    p2: tuple[int, float],
+    last_idx: int,
+    mode: str,
+    tol: float = 0.008,
+) -> int:
+    """统计趋势线被价格有效突破的次数（支撑被跌破 / 阻力被突破）。"""
+    violations = 0
+    for i in range(p1[0], last_idx + 1):
+        y = _line_at_index(p1, p2, i)
+        if mode == "support":
+            low = _f(bars[i].get("low")) or 0.0
+            if low < y * (1 - tol):
+                violations += 1
+        else:
+            high = _f(bars[i].get("high")) or 0.0
+            if high > y * (1 + tol):
+                violations += 1
+    return violations
+
+
 def _best_trendline_pair(
     points: list[tuple[int, float]],
+    bars: list[dict],
     last_idx: int,
     last_close: float,
     *,
     mode: str,
     min_sep: int = 8,
-    min_recent_idx: int | None = None,
+    anchor_lookback: int = 60,
+    max_violation_ratio: float = 0.2,
 ) -> tuple[tuple[int, float], tuple[int, float], float] | None:
-    """选取外推到最新 K 线时最贴近现价的一侧趋势线锚点。"""
+    """选取近期有效、少被突破的趋势线锚点。"""
     if len(points) < 2:
         return None
-    if min_recent_idx is None:
-        min_recent_idx = max(0, last_idx - max(35, last_idx // 3))
-    best: tuple[tuple[int, float], tuple[int, float], float] | None = None
+    min_anchor_idx = max(0, last_idx - anchor_lookback)
+    candidates: list[tuple[int, float, tuple[int, float], tuple[int, float]]] = []
+
     for i in range(len(points)):
         for j in range(i + 1, len(points)):
             p1, p2 = points[i], points[j]
+            if p1[0] < min_anchor_idx or p2[0] < min_anchor_idx:
+                continue
             if p2[0] - p1[0] < min_sep:
                 continue
-            if p2[0] < min_recent_idx:
-                continue
             end_price = _line_at_index(p1, p2, last_idx)
-            if mode == "support":
-                if end_price >= last_close:
-                    continue
-                if best is None or end_price > best[2]:
-                    best = (p1, p2, end_price)
-            else:
-                if end_price <= last_close:
-                    continue
-                if best is None or end_price < best[2]:
-                    best = (p1, p2, end_price)
-    return best
+            if mode == "support" and end_price >= last_close:
+                continue
+            if mode == "resistance" and end_price <= last_close:
+                continue
+            span = last_idx - p1[0] + 1
+            violations = _trendline_violations(bars, p1, p2, last_idx, mode)
+            if span > 0 and violations / span > max_violation_ratio:
+                continue
+            candidates.append((violations, end_price, p1, p2))
+
+    if not candidates:
+        return None
+
+    if mode == "support":
+        candidates.sort(key=lambda x: (x[0], -x[1]))
+    else:
+        candidates.sort(key=lambda x: (x[0], x[1]))
+
+    _, end_price, p1, p2 = candidates[0]
+    return p1, p2, end_price
 
 
 def _append_trendline(
@@ -322,13 +356,17 @@ def compute_trendline_levels(bars: list[dict]) -> dict[str, Any]:
     resistances: list[dict] = []
 
     recent_troughs = _recent_extrema(troughs, last_idx, lookback=90)
-    support_pair = _best_trendline_pair(recent_troughs, last_idx, last_close, mode="support")
+    support_pair = _best_trendline_pair(
+        recent_troughs, bars, last_idx, last_close, mode="support"
+    )
     if support_pair:
         p1, p2, end_price = support_pair
         _append_trendline(lines, supports, bars, p1, p2, end_price, "support")
 
     recent_peaks = _recent_extrema(peaks, last_idx, lookback=90)
-    resistance_pair = _best_trendline_pair(recent_peaks, last_idx, last_close, mode="resistance")
+    resistance_pair = _best_trendline_pair(
+        recent_peaks, bars, last_idx, last_close, mode="resistance"
+    )
     if resistance_pair:
         p1, p2, end_price = resistance_pair
         _append_trendline(lines, resistances, bars, p1, p2, end_price, "resistance")

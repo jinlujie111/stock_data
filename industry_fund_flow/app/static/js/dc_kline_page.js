@@ -158,7 +158,7 @@
       return;
     }
     const td = tdParam();
-    const days = elDays ? elDays.value : "120";
+    const days = elDays ? elDays.value : "60";
     const tdQ = td ? `&trade_date=${td}` : "";
     try {
       const payload = await apiGet(

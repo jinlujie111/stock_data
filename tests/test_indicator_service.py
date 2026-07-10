@@ -63,6 +63,34 @@ def test_compute_all_levels_keys():
         assert "resistances" in all_lv[key]
 
 
+def test_trendline_rejects_line_crossing_price_action():
+    """支撑线不应从极早期低点连到近期，导致穿过大量 K 线。"""
+    bars = []
+    for i in range(90):
+        if i < 12:
+            low, close = 40.0 + i, 45.0 + i
+        elif i < 55:
+            low, close = 85.0 + (i % 7) * 2, 92.0 + (i % 7) * 2
+        else:
+            pb = 12 if i % 11 == 5 else 0
+            low, close = 78.0 + (i - 55) * 1.1 - pb, 88.0 + (i - 55) * 1.4 - pb
+        bars.append(
+            {
+                "trade_date": f"2026{i:03d}",
+                "open": close - 2,
+                "high": close + 3,
+                "low": low,
+                "close": close,
+                "vol": 1_000_000,
+            }
+        )
+    result = compute_trendline_levels(bars)
+    assert result["supports"], "应有有效支撑线"
+    line = result["lines"][0]
+    p1_idx = line["points"][0]["index"]
+    assert p1_idx >= len(bars) - 65, f"支撑锚点不应落在极早期: index={p1_idx}"
+
+
 def test_trendline_support_near_price_in_rally():
     """急涨+回踩行情中，支撑应取贴近现价下方的外推位。"""
     bars = []

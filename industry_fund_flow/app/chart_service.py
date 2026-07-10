@@ -162,7 +162,7 @@ def _attach_pre_close(bars: list[dict], pct_key: str) -> None:
 def get_board_kline(
     industry_code: str,
     trade_date: str | None = None,
-    days: int = 120,
+    days: int = 60,
 ) -> dict[str, Any]:
     if not industry_code or not industry_code.strip():
         raise ValueError("industry_code 必填")
@@ -211,7 +211,7 @@ def get_board_kline(
 def get_stock_kline(
     ts_code: str,
     trade_date: str | None = None,
-    days: int = 120,
+    days: int = 60,
 ) -> dict[str, Any]:
     if not ts_code or not ts_code.strip():
         raise ValueError("ts_code 必填")
