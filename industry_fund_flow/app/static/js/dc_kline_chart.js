@@ -220,17 +220,21 @@
 
     const bars = payload.bars || [];
     if (!bars.length) {
-      if (existingChart) existingChart.dispose();
+      if (existingChart && !existingChart.isDisposed()) existingChart.dispose();
       chartEl.innerHTML = '<div class="table-empty">暂无 K 线数据</div>';
       return null;
     }
 
-    chartEl.innerHTML = "";
-    chartEl.style.height = opts.height || "480px";
-    const chart = existingChart || echarts.init(chartEl);
-    if (!existingChart && !chartEl._resizeBound) {
-      chartEl._resizeBound = true;
-      window.addEventListener("resize", () => chart && chart.resize());
+    let chart = existingChart;
+    if (chart && chart.isDisposed()) chart = null;
+    if (!chart) {
+      chartEl.innerHTML = "";
+      chartEl.style.height = opts.height || "480px";
+      chart = echarts.init(chartEl);
+      if (!chartEl._resizeBound) {
+        chartEl._resizeBound = true;
+        window.addEventListener("resize", () => chart && !chart.isDisposed() && chart.resize());
+      }
     }
 
     const dates = bars.map((b) => b.trade_date);
@@ -287,6 +291,8 @@
     if (allMarkLines.length) {
       series[0].markLine.data = allMarkLines;
       series[0].markLine.label = { show: true };
+    } else {
+      series[0].markLine.data = [];
     }
 
     series.push({
