@@ -3,6 +3,7 @@ from app.indicator_service import (
     compute_all_levels,
     compute_fibonacci_levels,
     compute_ma_levels,
+    compute_trendline_levels,
 )
 
 
@@ -60,3 +61,31 @@ def test_compute_all_levels_keys():
         assert key in all_lv
         assert "supports" in all_lv[key]
         assert "resistances" in all_lv[key]
+
+
+def test_trendline_support_near_price_in_rally():
+    """急涨+回踩行情中，支撑应取贴近现价下方的外推位。"""
+    bars = []
+    for i in range(120):
+        base = 9000 + i * 40
+        if i > 75:
+            base += (i - 75) * 130
+        pullback = 900 if i % 12 == 8 else (450 if i % 12 == 9 else 0)
+        low = base - pullback
+        close = base + 120 - pullback * 0.4
+        bars.append(
+            {
+                "trade_date": f"2026{(i // 30) + 1:02d}{(i % 30) + 1:02d}",
+                "open": close - 30,
+                "high": close + 80,
+                "low": low,
+                "close": close,
+                "vol": 1_000_000 + i * 20_000,
+            }
+        )
+    last_close = bars[-1]["close"]
+    result = compute_trendline_levels(bars)
+    assert result["supports"], "应有趋势线支撑"
+    support_price = result["supports"][0]["price"]
+    assert support_price < last_close
+    assert support_price > last_close * 0.9, f"支撑 {support_price} 应贴近现价 {last_close}"

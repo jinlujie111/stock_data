@@ -143,8 +143,10 @@
       if (pts.length < 2) return;
       const data = pts.map((p) => [dates[p.index] || p.date, p.price]);
       const color = line.type === "support" ? "#34d399" : "#f87171";
+      const lineName =
+        line.label || (line.type === "support" ? "上升支撑线" : "下降阻力线");
       out.push({
-        name: line.type === "support" ? "上升支撑线" : "下降阻力线",
+        name: lineName,
         type: "line",
         data,
         showSymbol: true,
@@ -323,12 +325,10 @@
           legendItems.push(s.name);
           series.push(s);
         });
-      }
-      if (key !== "trendline") {
         allMarkLines.push(...buildMarkLines(key, levelData));
-      } else {
-        allMarkLines.push(...buildMarkLines(key, levelData));
+        return;
       }
+      allMarkLines.push(...buildMarkLines(key, levelData));
     });
 
     const hasLevelLines = allMarkLines.length > 0;

@@ -222,6 +222,95 @@ def _line_at_index(p1: tuple[int, float], p2: tuple[int, float], idx: int) -> fl
     return v1 + slope * (idx - i1)
 
 
+def _recent_extrema(points: list[tuple[int, float]], last_idx: int, lookback: int = 90) -> list[tuple[int, float]]:
+    cutoff = max(0, last_idx - lookback)
+    return [(i, v) for i, v in points if cutoff <= i <= last_idx]
+
+
+def _slope_label(p1: tuple[int, float], p2: tuple[int, float], role: str) -> str:
+    i1, v1 = p1
+    i2, v2 = p2
+    slope = (v2 - v1) / (i2 - i1) if i2 != i1 else 0.0
+    if role == "support":
+        if slope > 0:
+            return "上升支撑线"
+        if slope < 0:
+            return "下降支撑线"
+        return "水平支撑线"
+    if slope > 0:
+        return "上升阻力线"
+    if slope < 0:
+        return "下降阻力线"
+    return "水平阻力线"
+
+
+def _best_trendline_pair(
+    points: list[tuple[int, float]],
+    last_idx: int,
+    last_close: float,
+    *,
+    mode: str,
+    min_sep: int = 8,
+    min_recent_idx: int | None = None,
+) -> tuple[tuple[int, float], tuple[int, float], float] | None:
+    """选取外推到最新 K 线时最贴近现价的一侧趋势线锚点。"""
+    if len(points) < 2:
+        return None
+    if min_recent_idx is None:
+        min_recent_idx = max(0, last_idx - max(35, last_idx // 3))
+    best: tuple[tuple[int, float], tuple[int, float], float] | None = None
+    for i in range(len(points)):
+        for j in range(i + 1, len(points)):
+            p1, p2 = points[i], points[j]
+            if p2[0] - p1[0] < min_sep:
+                continue
+            if p2[0] < min_recent_idx:
+                continue
+            end_price = _line_at_index(p1, p2, last_idx)
+            if mode == "support":
+                if end_price >= last_close:
+                    continue
+                if best is None or end_price > best[2]:
+                    best = (p1, p2, end_price)
+            else:
+                if end_price <= last_close:
+                    continue
+                if best is None or end_price < best[2]:
+                    best = (p1, p2, end_price)
+    return best
+
+
+def _append_trendline(
+    lines: list[dict],
+    levels: list[dict],
+    bars: list[dict],
+    p1: tuple[int, float],
+    p2: tuple[int, float],
+    end_price: float,
+    role: str,
+) -> None:
+    last_idx = len(bars) - 1
+    label = _slope_label(p1, p2, role)
+    d1 = str(bars[p1[0]].get("trade_date", ""))
+    d2 = str(bars[p2[0]].get("trade_date", ""))
+    lines.append(
+        {
+            "type": "support" if role == "support" else "resistance",
+            "label": label,
+            "points": [
+                {"index": p1[0], "date": d1, "price": _round_price(p1[1])},
+                {"index": p2[0], "date": d2, "price": _round_price(p2[1])},
+                {
+                    "index": last_idx,
+                    "date": str(bars[-1].get("trade_date", "")),
+                    "price": _round_price(end_price),
+                },
+            ],
+        }
+    )
+    levels.append(_level(end_price, label, role))
+
+
 def compute_trendline_levels(bars: list[dict]) -> dict[str, Any]:
     if len(bars) < 30:
         return {"supports": [], "resistances": [], "lines": []}
@@ -232,45 +321,17 @@ def compute_trendline_levels(bars: list[dict]) -> dict[str, Any]:
     supports: list[dict] = []
     resistances: list[dict] = []
 
-    if len(troughs) >= 2:
-        p1, p2 = troughs[-2], troughs[-1]
-        end_price = _line_at_index(p1, p2, last_idx)
-        d1 = str(bars[p1[0]].get("trade_date", ""))
-        d2 = str(bars[p2[0]].get("trade_date", ""))
-        lines.append(
-            {
-                "type": "support",
-                "points": [
-                    {"index": p1[0], "date": d1, "price": _round_price(p1[1])},
-                    {"index": p2[0], "date": d2, "price": _round_price(p2[1])},
-                    {"index": last_idx, "date": str(bars[-1].get("trade_date", "")), "price": _round_price(end_price)},
-                ],
-            }
-        )
-        role = "support" if end_price < last_close else "resistance"
-        label = "上升支撑线" if end_price < last_close else "趋势线压力"
-        item = _level(end_price, label, role)
-        (supports if role == "support" else resistances).append(item)
+    recent_troughs = _recent_extrema(troughs, last_idx, lookback=90)
+    support_pair = _best_trendline_pair(recent_troughs, last_idx, last_close, mode="support")
+    if support_pair:
+        p1, p2, end_price = support_pair
+        _append_trendline(lines, supports, bars, p1, p2, end_price, "support")
 
-    if len(peaks) >= 2:
-        p1, p2 = peaks[-2], peaks[-1]
-        end_price = _line_at_index(p1, p2, last_idx)
-        d1 = str(bars[p1[0]].get("trade_date", ""))
-        d2 = str(bars[p2[0]].get("trade_date", ""))
-        lines.append(
-            {
-                "type": "resistance",
-                "points": [
-                    {"index": p1[0], "date": d1, "price": _round_price(p1[1])},
-                    {"index": p2[0], "date": d2, "price": _round_price(p2[1])},
-                    {"index": last_idx, "date": str(bars[-1].get("trade_date", "")), "price": _round_price(end_price)},
-                ],
-            }
-        )
-        role = "resistance" if end_price > last_close else "support"
-        label = "下降阻力线" if end_price > last_close else "趋势线支撑"
-        item = _level(end_price, label, role)
-        (resistances if role == "resistance" else supports).append(item)
+    recent_peaks = _recent_extrema(peaks, last_idx, lookback=90)
+    resistance_pair = _best_trendline_pair(recent_peaks, last_idx, last_close, mode="resistance")
+    if resistance_pair:
+        p1, p2, end_price = resistance_pair
+        _append_trendline(lines, resistances, bars, p1, p2, end_price, "resistance")
 
     return {"supports": supports, "resistances": resistances, "lines": lines}
 
