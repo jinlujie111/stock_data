@@ -11,7 +11,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import (
     auth_service,
-    routes_ask,
     routes_chart,
     routes_dc,
     routes_dragon,
@@ -53,7 +52,6 @@ routes_vp.init_vp_routes(_TEMPLATES)
 routes_volatility.init_volatility_routes(_TEMPLATES)
 routes_start_signal.init_start_signal_routes(_TEMPLATES)
 routes_chart.init_chart_routes(_TEMPLATES)
-routes_ask.init_ask_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_quant_mainline.page_router)
@@ -77,8 +75,6 @@ app.include_router(routes_start_signal.page_router)
 app.include_router(routes_start_signal.api_router)
 app.include_router(routes_dc.page_router)
 app.include_router(routes_dc.api_router)
-app.include_router(routes_ask.page_router)
-app.include_router(routes_ask.api_router)
 app.include_router(routes_chart.page_router)
 app.include_router(routes_chart.api_router)
 
