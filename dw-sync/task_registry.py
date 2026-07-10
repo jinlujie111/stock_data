@@ -1484,6 +1484,186 @@ def sync_dc_hot(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncR
     )
 
 
+def _delete_cyq_stock_date(database: str, table: str, ts_code: str, trade_date: date) -> None:
+    from mysql_config import get_target_engine
+
+    engine = get_target_engine(database)
+    with engine.begin() as conn:
+        conn.execute(
+            text(f"DELETE FROM `{table}` WHERE ts_code = :tc AND trade_date = :td"),
+            {"tc": ts_code, "td": trade_date},
+        )
+
+
+def _load_cyq_stock_codes(task: TaskDict, trade_date: date | None) -> list[str]:
+    fetch_cfg = get_fetch_config(task)
+    stock_db = str(fetch_cfg.get("stock_database") or task["target_database"])
+    stock_table = str(fetch_cfg.get("stock_table") or "ods_stock_detail_di")
+    td = trade_date or date.today()
+    missing_only = bool(fetch_cfg.get("missing_only", True))
+    max_stocks = fetch_cfg.get("max_stocks")
+
+    from mysql_config import get_target_engine
+
+    engine = get_target_engine(stock_db)
+    if missing_only:
+        sql = f"""
+            SELECT d.ts_code
+            FROM `{stock_table}` d
+            WHERE d.trade_date = :td
+              AND NOT EXISTS (
+                  SELECT 1 FROM `{task['target_table']}` c
+                  WHERE c.ts_code = d.ts_code AND c.trade_date = :td
+              )
+            ORDER BY d.ts_code
+        """
+    else:
+        sql = f"""
+            SELECT ts_code FROM `{stock_table}`
+            WHERE trade_date = :td
+            ORDER BY ts_code
+        """
+    with engine.connect() as conn:
+        codes = [row[0] for row in conn.execute(text(sql), {"td": td}).fetchall()]
+
+    if max_stocks is not None:
+        codes = codes[: int(max_stocks)]
+    return codes
+
+
+@register("tushare", "cyq_chips")
+def sync_cyq_chips(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """cyq_chips 按个股循环拉取当日筹码分布；股票列表来自 ods_stock_detail_di。"""
+    from sync_writer import write_dataframe
+
+    fetch_cfg = get_fetch_config(task)
+    token_type = fetch_cfg.get("token_type") or "tushare"
+    sleep_s = float(fetch_cfg.get("sleep_seconds") or 0.35)
+    log_every = int(fetch_cfg.get("batch_log_every") or 200)
+    td = trade_date or date.today()
+    td_str = td.strftime("%Y%m%d")
+
+    codes = _load_cyq_stock_codes(task, td)
+    if not codes:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=True,
+            message=f"cyq_chips {td_str} 无待同步股票（missing_only 已覆盖或当日无行情）",
+        )
+
+    logger.info("cyq_chips 待拉取 %s 只股票 trade_date=%s", len(codes), td_str)
+
+    if dry_run:
+        preview_rows = 0
+        ok_cnt = 0
+        for i, ts_code in enumerate(codes, start=1):
+            try:
+                part = fetch_tushare(
+                    "cyq_chips",
+                    token_type=token_type,
+                    ts_code=ts_code,
+                    trade_date=td_str,
+                )
+            except Exception as exc:
+                logger.warning("cyq_chips ts_code=%s 失败: %s", ts_code, exc)
+                continue
+            if not part.empty:
+                preview_rows += len(apply_transform(part, task))
+                ok_cnt += 1
+            if log_every > 0 and i % log_every == 0:
+                logger.info("cyq_chips 进度 %s/%s ok=%s", i, len(codes), ok_cnt)
+            if sleep_s > 0 and i < len(codes):
+                time.sleep(sleep_s)
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=preview_rows,
+            ok=True,
+            message="dry-run",
+        )
+
+    total_rows = 0
+    ok_cnt = 0
+    write_fail = 0
+    for i, ts_code in enumerate(codes, start=1):
+        try:
+            part = fetch_tushare(
+                "cyq_chips",
+                token_type=token_type,
+                ts_code=ts_code,
+                trade_date=td_str,
+            )
+        except Exception as exc:
+            logger.warning("cyq_chips ts_code=%s 拉取失败: %s", ts_code, exc)
+            continue
+        if part.empty:
+            continue
+        out = apply_transform(part, task)
+        if out.empty:
+            continue
+        try:
+            _delete_cyq_stock_date(
+                task["target_database"],
+                task["target_table"],
+                ts_code,
+                td,
+            )
+            total_rows += write_dataframe(
+                database=task["target_database"],
+                table=task["target_table"],
+                df=out,
+                sync_mode="append",
+                trade_date=None,
+            )
+            ok_cnt += 1
+        except Exception as exc:
+            write_fail += 1
+            logger.warning("cyq_chips ts_code=%s 写入失败: %s", ts_code, exc)
+        if log_every > 0 and i % log_every == 0:
+            logger.info(
+                "cyq_chips 进度 %s/%s 写入成功=%s 行=%s 失败=%s",
+                i,
+                len(codes),
+                ok_cnt,
+                total_rows,
+                write_fail,
+            )
+        if sleep_s > 0 and i < len(codes):
+            time.sleep(sleep_s)
+
+    logger.info(
+        "cyq_chips id=%s 股票=%s 写入成功=%s 行=%s 写入失败=%s",
+        task["id"],
+        len(codes),
+        ok_cnt,
+        total_rows,
+        write_fail,
+    )
+
+    if ok_cnt == 0:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=write_fail == 0,
+            message=f"cyq_chips 未写入数据（待拉 {len(codes)} 只，写入失败 {write_fail}）",
+        )
+
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=total_rows,
+        ok=write_fail == 0,
+        message=f"同步 {ok_cnt} 只股票筹码" + (f"，{write_fail} 只写入失败" if write_fail else ""),
+    )
+
+
 def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
     """通用同步：fetch_config → 拉数 → transform_config → 写库。"""
     from sync_writer import write_dataframe

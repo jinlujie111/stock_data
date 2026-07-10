@@ -372,6 +372,31 @@ INSERT INTO db_sync_task (
     1, 'A股每日指标日快照(Tushare daily_basic；含总市值/流通市值/换手率，供需求4 V1权重等)'
 );
 
+-- Tushare cyq_chips → ods_cyq_chips_di（按日 snapshot，按个股循环拉取筹码分布）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'cyq_chips', 'stock_data', 'ods_cyq_chips_di', '每日筹码分布', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'stock_table', 'ods_stock_detail_di',
+        'stock_database', 'stock_data',
+        'missing_only', TRUE,
+        'sleep_seconds', 0.35,
+        'batch_log_every', 200
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', '%Y%m%d'),
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'price'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code', 'price'),
+        'keep_columns', JSON_ARRAY('ts_code', 'trade_date', 'price', 'percent'),
+        'add_timestamps', TRUE
+    ),
+    1, 'A股每日筹码分布(Tushare cyq_chips，按 ods_stock_detail_di 当日个股循环；需较高积分)'
+);
+
 -- Tushare limit_list_d → ods_limit_list_di（按日 snapshot，含涨停U/跌停D/炸板Z）
 INSERT INTO db_sync_task (
     proxy_source, source_table, target_database, target_table, target_table_describe,

@@ -556,6 +556,8 @@ body {
 }
 
 .filters-card {
+  position: relative;
+  z-index: 10;
   margin-bottom: 1rem;
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.03);
@@ -737,6 +739,8 @@ body {
 .filter-actions {
   display: flex;
   gap: 0.5rem;
+  flex-shrink: 0;
+  align-items: flex-end;
 }
 
 .filter-hint {
@@ -1424,5 +1428,179 @@ body {
 
 .ask-error {
   color: var(--danger);
+}
+
+/* ── K 线分析页 ── */
+.kline-filters .kline-indicator-bar {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.kline-indicator-label {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.kline-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.kline-main-card {
+  min-width: 0;
+}
+
+.kline-chart-host {
+  min-height: 480px;
+}
+
+.kline-side-card {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+
+.kline-side-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.kline-levels-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kline-level-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  background: #0b0f14;
+}
+
+.kline-level-title {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.kline-level-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  padding: 0.2rem 0;
+}
+
+.kline-level-item--res strong {
+  color: #f87171;
+}
+
+.kline-level-item--sup strong {
+  color: #34d399;
+}
+
+.chip-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.chip-bar-row {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr;
+  gap: 0.35rem;
+  align-items: center;
+  font-size: 0.6875rem;
+}
+
+.chip-bar-price {
+  color: var(--muted);
+  text-align: right;
+}
+
+.chip-bar-track {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chip-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fb923c, #f59e0b);
+  border-radius: 2px;
+}
+
+.kline-head {
+  margin-bottom: 0.5rem;
+}
+
+.kline-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.kline-title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.kline-code {
+  font-size: 0.8125rem;
+}
+
+.kline-price-block {
+  text-align: right;
+}
+
+.kline-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.kline-pct {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.kline-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.35rem 0.75rem;
+}
+
+.kline-metric {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.kline-metric strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 1100px) {
+  .kline-layout {
+    grid-template-columns: 1fr;
+  }
+  .kline-side-card {
+    position: static;
+    max-height: none;
+  }
 }
 

@@ -17,8 +17,10 @@
 
   const SERIES_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444", "#14b8a6"];
   const selectedBoards = new Map();
+  const boardSearchResults = new Map();
   let defaultBoardNames = [];
   let boardSearchTimer = null;
+  const elBoardPicker = document.getElementById("board-picker");
 
   function fmt(v, digits) {
     if (v === null || v === undefined || v === "") return "—";
@@ -195,10 +197,22 @@
     renderLegend(elMarketLegend, data.series || []);
   }
 
+  function hideDropdown() {
+    elBoardDropdown.classList.add("hidden");
+  }
+
+  function addBoard(item) {
+    if (!item || !item.industry_code) return;
+    selectedBoards.set(item.industry_code, item);
+    renderSelectedBoards();
+    elBoardSearch.value = "";
+    hideDropdown();
+  }
+
   async function searchBoards(keyword) {
     if (!keyword || !keyword.trim()) {
       elBoardDropdown.innerHTML = "";
-      elBoardDropdown.classList.add("hidden");
+      hideDropdown();
       return;
     }
     const data = await apiGet(
@@ -207,23 +221,20 @@
         `&keyword=${encodeURIComponent(keyword.trim())}&limit=20`
     );
     const items = data.items || [];
-    elBoardDropdown.innerHTML = "";
+    boardSearchResults.clear();
     if (!items.length) {
-      elBoardDropdown.classList.add("hidden");
+      elBoardDropdown.innerHTML = "";
+      hideDropdown();
       return;
     }
-    items.forEach((item) => {
-      const div = document.createElement("div");
-      div.className = "board-option";
-      div.textContent = boardLabel(item);
-      div.addEventListener("click", () => {
-        selectedBoards.set(item.industry_code, item);
-        renderSelectedBoards();
-        elBoardSearch.value = "";
-        elBoardDropdown.classList.add("hidden");
-      });
-      elBoardDropdown.appendChild(div);
-    });
+    items.forEach((item) => boardSearchResults.set(item.industry_code, item));
+    elBoardDropdown.innerHTML = items
+      .map(
+        (item) =>
+          `<button type="button" class="board-option" data-code="${item.industry_code}">` +
+          `${boardLabel(item)}</button>`
+      )
+      .join("");
     elBoardDropdown.classList.remove("hidden");
   }
 
@@ -288,16 +299,23 @@
       searchBoards(elBoardSearch.value).catch((e) => showError(e.message || String(e)));
     }
   });
+  elBoardDropdown.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+  });
+  elBoardDropdown.addEventListener("click", (e) => {
+    const btn = e.target.closest(".board-option[data-code]");
+    if (!btn) return;
+    const item = boardSearchResults.get(btn.dataset.code);
+    if (item) addBoard(item);
+  });
   document.addEventListener("click", (e) => {
-    if (!document.getElementById("board-picker").contains(e.target)) {
-      elBoardDropdown.classList.add("hidden");
-    }
+    if (!elBoardPicker.contains(e.target)) hideDropdown();
   });
 
   btnReset.addEventListener("click", () => {
     selectedBoards.clear();
     elBoardSearch.value = "";
-    elBoardDropdown.classList.add("hidden");
+    hideDropdown();
     renderSelectedBoards();
     refresh().catch((e) => showError(e.message || String(e)));
   });

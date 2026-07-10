@@ -47,19 +47,43 @@ def api_vp_trade_dates(
     return {"latest": latest, "dates": dates}
 
 
+@api_router.get("/boards/search")
+def api_vp_board_search(
+    trade_date: str | None = Query(None),
+    content_types: str = Query("行业,概念"),
+    keyword: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return vp_svc.search_boards(
+            trade_date,
+            content_types=content_types,
+            keyword=keyword,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询板块列表失败: {exc}") from exc
+
+
 @api_router.get("/industries/rank")
 def api_vp_industries_rank(
     trade_date: str | None = Query(None),
     content_types: str = Query("行业,概念"),
+    industry_codes: str | None = Query(None, description="板块代码，逗号分隔"),
     window: int = Query(20, ge=3, le=120),
     top: int = Query(50, ge=1, le=200),
     sort: str = Query("vp_score"),
     _user: dict = Depends(require_user),
 ):
+    codes = [x.strip() for x in (industry_codes or "").split(",") if x.strip()] or None
     try:
         return vp_svc.rank_industries(
             trade_date,
             content_types=content_types,
+            industry_codes=codes,
             window=window,
             top=top,
             sort=sort,
@@ -112,14 +136,17 @@ def api_vp_industry_stocks(
 def api_vp_signals(
     trade_date: str | None = Query(None),
     signal_type: str | None = Query(None),
+    industry_codes: str | None = Query(None, description="板块代码，逗号分隔"),
     window: int = Query(20, ge=3, le=120),
     top: int = Query(50, ge=1, le=200),
     _user: dict = Depends(require_user),
 ):
+    codes = [x.strip() for x in (industry_codes or "").split(",") if x.strip()] or None
     try:
         return vp_svc.list_signals(
             trade_date,
             signal_type=signal_type,
+            industry_codes=codes,
             window=window,
             top=top,
         )

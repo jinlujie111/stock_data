@@ -1,0 +1,75 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head page-head--row">
+  <div>
+    <h1>K线分析</h1>
+    <p class="muted page-head-desc">同花顺风格 K 线 · 切换指标显示支撑/阻力位（均线、斐波那契、量价、趋势线、筹码）</p>
+  </div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<div class="card filters-card kline-filters">
+  <div class="filters">
+    <label class="filter-field">
+      <span>类型</span>
+      <div class="chip-group" id="kind-chips">
+        <button type="button" class="chip active" data-value="stock">股票</button>
+        <button type="button" class="chip" data-value="board">板块</button>
+      </div>
+    </label>
+    <label class="filter-field">
+      <span>交易日期</span>
+      <input type="date" id="trade-date" class="date-input" />
+    </label>
+    <label class="filter-field filter-field--grow">
+      <span id="symbol-label">股票（名称/代码搜索）</span>
+      <div class="board-picker" id="symbol-picker">
+        <input type="text" id="symbol-search" class="board-search" placeholder="输入名称或代码…" autocomplete="off" />
+        <div class="board-dropdown hidden" id="symbol-dropdown"></div>
+      </div>
+    </label>
+    <label class="filter-field">
+      <span>K线天数</span>
+      <select id="kline-days" class="date-input">
+        <option value="60">60日</option>
+        <option value="120" selected>120日</option>
+        <option value="180">180日</option>
+        <option value="250">250日</option>
+      </select>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-load">加载</button>
+    </div>
+  </div>
+  <div class="kline-indicator-bar">
+    <span class="kline-indicator-label">技术指标</span>
+    <div class="chip-group" id="indicator-chips">
+      {% for opt in indicator_options %}
+      <button type="button" class="chip" data-value="{{ opt.key }}">{{ opt.label }}</button>
+      {% endfor %}
+    </div>
+    <p class="filter-hint muted">点击指标切换显示；可同时选择多个，图表将叠加该指标的全部支撑/阻力位</p>
+  </div>
+</div>
+
+<div class="kline-layout">
+  <section class="card kline-main-card">
+    <div id="kline-header"></div>
+    <div id="kline-chart" class="kline-chart-host"></div>
+  </section>
+  <aside class="card kline-side-card">
+    <h3 class="kline-side-title">支撑 / 阻力位</h3>
+    <div id="kline-levels" class="kline-levels-panel">
+      <div class="table-empty">请选择标的并加载 K 线</div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="/static/js/dc_board_common.js?v=20260710"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260710"></script>
+<script src="/static/js/dc_kline_page.js?v=20260710"></script>
+{% endblock %}

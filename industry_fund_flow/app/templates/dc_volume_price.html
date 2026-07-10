@@ -25,8 +25,17 @@
         <option value="20" selected>20日</option>
       </select>
     </label>
+    <label class="filter-field filter-field--grow">
+      <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
+      <div class="board-picker" id="board-picker">
+        <div class="board-selected" id="board-selected"></div>
+        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，模糊匹配…" autocomplete="off" />
+        <div class="board-dropdown hidden" id="board-dropdown"></div>
+      </div>
+    </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
     </div>
   </div>
 </div>
@@ -72,5 +81,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/dc_volume_price.js?v=20260703"></script>
+<script src="/static/js/dc_volume_price.js?v=20260710"></script>
 {% endblock %}

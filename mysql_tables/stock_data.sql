@@ -81,6 +81,18 @@ CREATE TABLE IF NOT EXISTS ods_daily_basic_di (
     UNIQUE KEY uk_daily_basic (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='A股每日指标(Tushare daily_basic)';
 
+CREATE TABLE IF NOT EXISTS ods_cyq_chips_di (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ts_code     VARCHAR(16)    NOT NULL COMMENT 'TS代码',
+    trade_date  DATE           NOT NULL COMMENT '交易日期',
+    price       DECIMAL(20, 6) NOT NULL COMMENT '筹码价格',
+    percent     DECIMAL(10, 4) NULL COMMENT '筹码占比(%)',
+    created_at  DATETIME       NULL COMMENT '创建时间',
+    updated_at  DATETIME       NULL COMMENT '更新时间',
+    UNIQUE KEY uk_cyq_chips (trade_date, ts_code, price),
+    KEY idx_cyq_ts_date (ts_code, trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日筹码分布(Tushare cyq_chips)';
+
 
 CREATE TABLE IF NOT EXISTS ods_limit_list_di (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT,

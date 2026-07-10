@@ -10,8 +10,17 @@
   const elDetailTitle = document.getElementById("detail-title");
   const elDetailMetrics = document.getElementById("detail-metrics");
   const elDetailStocks = document.getElementById("detail-stocks");
+  const elBoardSelected = document.getElementById("board-selected");
+  const elBoardSearch = document.getElementById("board-search");
+  const elBoardDropdown = document.getElementById("board-dropdown");
+  const elBoardPicker = document.getElementById("board-picker");
   const btnQuery = document.getElementById("btn-query");
+  const btnResetBoards = document.getElementById("btn-reset-boards");
   let activeTab = "rank";
+
+  const selectedBoards = new Map();
+  const boardSearchResults = new Map();
+  let boardSearchTimer = null;
 
   const STATUS_LABEL = {
     mainline_burst: "主线爆发",
@@ -74,11 +83,78 @@
     elError.classList.add("hidden");
   }
 
+  function boardLabel(item) {
+    return `[${item.content_type}] ${item.industry_name} (${item.industry_code})`;
+  }
+
+  function renderSelectedBoards() {
+    if (!selectedBoards.size) {
+      elBoardSelected.innerHTML = '<span class="board-placeholder">未选择板块（展示全部）</span>';
+      return;
+    }
+    elBoardSelected.innerHTML = "";
+    selectedBoards.forEach((item, code) => {
+      const wrap = document.createElement("span");
+      wrap.className = "board-tag";
+      wrap.innerHTML = `${boardLabel(item)}<button type="button" data-code="${code}">×</button>`;
+      elBoardSelected.appendChild(wrap);
+    });
+    elBoardSelected.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectedBoards.delete(btn.dataset.code);
+        renderSelectedBoards();
+      });
+    });
+  }
+
+  function hideDropdown() {
+    elBoardDropdown.classList.add("hidden");
+  }
+
+  function addBoard(item) {
+    if (!item || !item.industry_code) return;
+    selectedBoards.set(item.industry_code, item);
+    renderSelectedBoards();
+    elBoardSearch.value = "";
+    hideDropdown();
+  }
+
+  async function searchBoards(keyword) {
+    if (!keyword || !keyword.trim()) {
+      elBoardDropdown.innerHTML = "";
+      hideDropdown();
+      return;
+    }
+    const data = await apiGet(
+      `/api/v1/vp/boards/search?trade_date=${encodeURIComponent(elDate.value)}` +
+        `&content_types=${encodeURIComponent(elTypes.value)}` +
+        `&keyword=${encodeURIComponent(keyword.trim())}&limit=20`
+    );
+    const items = data.items || [];
+    boardSearchResults.clear();
+    if (!items.length) {
+      elBoardDropdown.innerHTML = "";
+      hideDropdown();
+      return;
+    }
+    items.forEach((item) => boardSearchResults.set(item.industry_code, item));
+    elBoardDropdown.innerHTML = items
+      .map(
+        (item) =>
+          `<button type="button" class="board-option" data-code="${item.industry_code}">` +
+          `${boardLabel(item)}</button>`
+      )
+      .join("");
+    elBoardDropdown.classList.remove("hidden");
+  }
+
   function queryParams() {
+    const codes = Array.from(selectedBoards.keys());
     return {
       td: elDate.value,
       types: elTypes.value,
       w: elWindow.value,
+      codes: codes.length ? codes.join(",") : "",
     };
   }
 
@@ -160,20 +236,21 @@
 
   async function loadRank() {
     clearError();
-    const { td, types, w } = queryParams();
-    const data = await apiGet(
+    const { td, types, w, codes } = queryParams();
+    let url =
       `/api/v1/vp/industries/rank?trade_date=${encodeURIComponent(td)}` +
-        `&content_types=${encodeURIComponent(types)}&window=${w}&top=50`
-    );
+      `&content_types=${encodeURIComponent(types)}&window=${w}&top=50`;
+    if (codes) url += `&industry_codes=${encodeURIComponent(codes)}`;
+    const data = await apiGet(url);
     renderRank(data.items || []);
   }
 
   async function loadSignals() {
     clearError();
-    const { td, w } = queryParams();
-    const data = await apiGet(
-      `/api/v1/vp/signals?trade_date=${encodeURIComponent(td)}&window=${w}&top=50`
-    );
+    const { td, w, codes } = queryParams();
+    let url = `/api/v1/vp/signals?trade_date=${encodeURIComponent(td)}&window=${w}&top=50`;
+    if (codes) url += `&industry_codes=${encodeURIComponent(codes)}`;
+    const data = await apiGet(url);
     renderSignals(data.items || []);
   }
 
@@ -239,8 +316,41 @@
     });
   });
 
+  elBoardSearch.addEventListener("input", () => {
+    clearTimeout(boardSearchTimer);
+    boardSearchTimer = setTimeout(() => {
+      searchBoards(elBoardSearch.value).catch((e) => showError(e.message || String(e)));
+    }, 180);
+  });
+  elBoardSearch.addEventListener("focus", () => {
+    if (elBoardSearch.value.trim()) {
+      searchBoards(elBoardSearch.value).catch((e) => showError(e.message || String(e)));
+    }
+  });
+  elBoardDropdown.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+  });
+  elBoardDropdown.addEventListener("click", (e) => {
+    const btn = e.target.closest(".board-option[data-code]");
+    if (!btn) return;
+    const item = boardSearchResults.get(btn.dataset.code);
+    if (item) addBoard(item);
+  });
+  document.addEventListener("click", (e) => {
+    if (!elBoardPicker.contains(e.target)) hideDropdown();
+  });
+
+  btnResetBoards.addEventListener("click", () => {
+    selectedBoards.clear();
+    elBoardSearch.value = "";
+    hideDropdown();
+    renderSelectedBoards();
+    refresh();
+  });
+
   btnQuery.addEventListener("click", refresh);
 
+  renderSelectedBoards();
   loadDates()
     .then(refresh)
     .catch((e) => showError(e.message || String(e)));

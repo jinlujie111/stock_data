@@ -7,12 +7,14 @@ from typing import Any
 
 from app.db import fetch_all_stock, fetch_one_stock
 from app.dc_query_util import resolve_trade_date
+from app.indicator_service import compute_all_levels
 from app.sector_service import FUND_TABLE, _board_code_variants, _serialize_row
 
 BOARD_DAILY = "ods_dc_daily_di"
 BOARD_INDEX = "ods_dc_index_di"
 STOCK_DAILY = "ods_stock_detail_di"
 STOCK_BASIC = "ods_daily_basic_di"
+CYQ_CHIPS = "ods_cyq_chips_di"
 
 
 def _serialize(value: Any) -> Any:
@@ -130,6 +132,19 @@ def _stock_snapshot(ts_code: str, end_date: str) -> dict | None:
     return item
 
 
+def _fetch_cyq_chips(ts_code: str, trade_date: str) -> list[dict]:
+    rows = fetch_all_stock(
+        f"""
+        SELECT price, percent
+        FROM {CYQ_CHIPS}
+        WHERE ts_code = :tc AND trade_date = :td
+        ORDER BY price
+        """,
+        {"tc": ts_code.strip(), "td": trade_date},
+    )
+    return [_serialize_row(r) for r in rows]
+
+
 def _attach_pre_close(bars: list[dict], pct_key: str) -> None:
     for i, bar in enumerate(bars):
         if i == 0:
@@ -179,7 +194,7 @@ def get_board_kline(
     if header:
         name = name or header.get("industry_name")
     display_code = code.replace(".DC", "") if code.endswith(".DC") else code
-    return {
+    payload = {
         "kind": "board",
         "code": code,
         "display_code": display_code,
@@ -189,6 +204,8 @@ def get_board_kline(
         "snapshot": snap,
         "bars": bars,
     }
+    payload["levels"] = compute_all_levels(bars)
+    return payload
 
 
 def get_stock_kline(
@@ -214,7 +231,8 @@ def get_stock_kline(
         {"tc": code, "end": end},
     )
     stock_name = name_row.get("stock_name") if name_row else None
-    return {
+    cyq_rows = _fetch_cyq_chips(code, end)
+    payload = {
         "kind": "stock",
         "code": code,
         "display_code": code,
@@ -222,4 +240,7 @@ def get_stock_kline(
         "trade_date": end,
         "snapshot": snap,
         "bars": bars,
+        "cyq_chips": cyq_rows,
     }
+    payload["levels"] = compute_all_levels(bars, cyq_rows=cyq_rows or None)
+    return payload

@@ -82,10 +82,45 @@ def _parse_content_types(content_types: str | None) -> list[str]:
     return [x.strip() for x in content_types.split(",") if x.strip()]
 
 
+def search_boards(
+    trade_date: str | None = None,
+    *,
+    content_types: str | None = "行业,概念",
+    keyword: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    td = _resolve_trade_date(trade_date)
+    ctypes = _parse_content_types(content_types)
+    limit = max(1, min(limit, 200))
+    placeholders = ", ".join(f":ct{i}" for i in range(len(ctypes)))
+    params: dict[str, Any] = {"td": td, **{f"ct{i}": ct for i, ct in enumerate(ctypes)}}
+    kw_sql = ""
+    if keyword and keyword.strip():
+        kw_sql = " AND (industry_name LIKE :kw OR industry_code LIKE :kw)"
+        params["kw"] = f"%{keyword.strip()}%"
+    rows = fetch_all_stock(
+        f"""
+        SELECT DISTINCT industry_code, industry_name, content_type
+        FROM {SCORE_TABLE}
+        WHERE trade_date = :td
+          AND content_type IN ({placeholders})
+          {kw_sql}
+        ORDER BY industry_name
+        LIMIT {limit}
+        """,
+        params,
+    )
+    return {
+        "trade_date": td,
+        "items": [_serialize_row(r) for r in rows],
+    }
+
+
 def rank_industries(
     trade_date: str | None = None,
     *,
     content_types: str | None = "行业,概念",
+    industry_codes: list[str] | None = None,
     window: int = 20,
     top: int = 50,
     sort: str = "vp_score",
@@ -101,6 +136,12 @@ def rank_industries(
     for i, ct in enumerate(ctypes):
         params[f"ct{i}"] = ct
 
+    code_sql = ""
+    if industry_codes:
+        code_sql = f" AND industry_code IN ({', '.join(f':c{i}' for i in range(len(industry_codes)))})"
+        for i, code in enumerate(industry_codes):
+            params[f"c{i}"] = code
+
     rows = fetch_all_stock(
         f"""
         SELECT
@@ -111,6 +152,7 @@ def rank_industries(
         FROM {SCORE_TABLE}
         WHERE trade_date = :td AND vp_window = :w
           AND content_type IN ({placeholders})
+          {code_sql}
         ORDER BY {sort_key} DESC, rank_vp ASC
         LIMIT :lim
         """,
@@ -255,6 +297,7 @@ def list_signals(
     trade_date: str | None = None,
     *,
     signal_type: str | None = None,
+    industry_codes: list[str] | None = None,
     window: int = 20,
     top: int = 50,
 ) -> dict[str, Any]:
@@ -266,6 +309,11 @@ def list_signals(
     if signal_type and signal_type.strip():
         sig_sql = " AND signal_type = :sig"
         params["sig"] = signal_type.strip()
+    code_sql = ""
+    if industry_codes:
+        code_sql = f" AND industry_code IN ({', '.join(f':c{i}' for i in range(len(industry_codes)))})"
+        for i, code in enumerate(industry_codes):
+            params[f"c{i}"] = code
 
     rows = fetch_all_stock(
         f"""
@@ -276,6 +324,7 @@ def list_signals(
         WHERE trade_date = :td AND vp_window = :w
           AND signal_type IS NOT NULL AND signal_type <> 'none'
           {sig_sql}
+          {code_sql}
         ORDER BY vp_score DESC
         LIMIT :lim
         """,
