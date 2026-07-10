@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.deps import require_user
-from app.dc_registry import DC_DIMENSIONS, DISABLED_DC_SLUGS, NAV_ITEMS, get_dimension
+from app.dc_registry import DC_DIMENSIONS, DISABLED_DC_SLUGS, NAV_ITEMS, RESERVED_DC_PAGE_SLUGS, get_dimension
 from app.dc_service import (
     latest_trade_date,
     list_boards,
@@ -42,6 +42,8 @@ def _ctx(user: dict, active_nav: str, **extra):
 
 @page_router.get("/dc/{slug}", response_class=HTMLResponse)
 def dc_list_page(slug: str, request: Request, user: dict = Depends(require_user)):
+    if slug in RESERVED_DC_PAGE_SLUGS:
+        raise HTTPException(status_code=404, detail="页面不存在")
     if slug in DISABLED_DC_SLUGS:
         raise HTTPException(status_code=404, detail="该功能已下线")
     try:

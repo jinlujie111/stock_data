@@ -73,10 +73,10 @@ app.include_router(routes_volatility.page_router)
 app.include_router(routes_volatility.api_router)
 app.include_router(routes_start_signal.page_router)
 app.include_router(routes_start_signal.api_router)
-app.include_router(routes_dc.page_router)
-app.include_router(routes_dc.api_router)
 app.include_router(routes_chart.page_router)
 app.include_router(routes_chart.api_router)
+app.include_router(routes_dc.page_router)
+app.include_router(routes_dc.api_router)
 
 
 @app.on_event("startup")

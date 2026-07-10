@@ -137,6 +137,22 @@ CONTENT_TYPES = ["行业", "概念"]
 # 已下线 Web 入口（ETL/数仓仍保留）
 DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "diffusion"})
 
+# 非东财维度页的 /dc/* 路径（由独立 page_router 处理，勿落入 /dc/{slug}）
+RESERVED_DC_PAGE_SLUGS = frozenset(
+    {
+        "mainline",
+        "quant-mainline",
+        "dragon",
+        "sectors",
+        "kline",
+        "sentiment",
+        "volume-price",
+        "volatility",
+        "hot-stocks",
+        "limit-up",
+    }
+)
+
 _NAV_RAW: list[dict[str, str]] = [
     # 主线决策
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "主线决策"},
