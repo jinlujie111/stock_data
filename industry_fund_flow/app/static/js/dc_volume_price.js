@@ -1,4 +1,6 @@
 (function () {
+  const { klineLink } = window.DcBoard || {};
+
   const elDate = document.getElementById("trade-date");
   const elTypes = document.getElementById("content-types");
   const elWindow = document.getElementById("window");
@@ -183,7 +185,7 @@
   function renderRank(items) {
     elThead.innerHTML =
       "<tr><th>#</th><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th>" +
-      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续放量</th><th>操作</th></tr>";
+      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续放量</th><th>K线分析</th><th>操作</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {
       elEmpty.classList.remove("hidden");
@@ -203,6 +205,7 @@
         `<td>${pct(row.rising_ratio)}</td>` +
         `<td>${pct(row.breakout_ratio)}</td>` +
         `<td>${row.amount_streak_days ?? "—"}</td>` +
+        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>` +
         `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">详情</button></td>`;
       elBody.appendChild(tr);
     });
@@ -213,7 +216,7 @@
 
   function renderSignals(items) {
     elThead.innerHTML =
-      "<tr><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th><th>行业量比</th><th>连续放量</th></tr>";
+      "<tr><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th><th>行业量比</th><th>连续放量</th><th>K线分析</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {
       elEmpty.classList.remove("hidden");
@@ -229,7 +232,8 @@
         `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
         `<td>${labelSignal(row.signal_type)}</td>` +
         `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
-        `<td>${row.amount_streak_days ?? "—"}</td>`;
+        `<td>${row.amount_streak_days ?? "—"}</td>` +
+        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>`;
       elBody.appendChild(tr);
     });
   }
@@ -292,7 +296,8 @@
         `<td>${row.vol_streak_days ?? "—"}</td>` +
         `<td>${row.is_breakout_60 ? "是" : "—"}</td>` +
         `<td>${labelPattern(row.vp_pattern)}</td>` +
-        `<td>${fmt(row.vp_pattern_score, 0)}</td>`;
+        `<td>${fmt(row.vp_pattern_score, 0)}</td>` +
+        `<td>${klineLink ? klineLink("stock", row.ts_code, td) : "—"}</td>`;
       elDetailStocks.appendChild(tr);
     });
     elDetailCard.classList.remove("hidden");

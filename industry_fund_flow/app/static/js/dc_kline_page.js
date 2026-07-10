@@ -3,7 +3,7 @@
   const kline = window.DcKline;
   if (!board || !kline) return;
 
-  const { apiGet, toApiTradeDate, initTradeDateCalendar } = board;
+  const { apiGet, toApiTradeDate, initTradeDateCalendar, normalizeIsoDate } = board;
 
   const elDate = document.getElementById("trade-date");
   const kindChips = document.getElementById("kind-chips");
@@ -177,6 +177,7 @@
   const urlKind = params.get("kind");
   const urlCode = params.get("code");
   const urlIndicator = params.get("indicator");
+  const urlTradeDate = params.get("trade_date");
 
   if (urlKind && kindChips) {
     kind = urlKind;
@@ -201,6 +202,10 @@
 
   initTradeDateCalendar(elDate, "/api/v1/sectors/trade-dates")
     .then(() => {
+      if (urlTradeDate && elDate) {
+        const iso = normalizeIsoDate(urlTradeDate);
+        if (iso) elDate.value = iso;
+      }
       if (selectedCode) return loadKline();
       return null;
     })

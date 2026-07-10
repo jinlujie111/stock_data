@@ -143,7 +143,16 @@
   }
 
   function renderHead() {
-    elHead.innerHTML = columns.map((c) => `<th>${c.label}</th>`).join("");
+    elHead.innerHTML =
+      columns.map((c) => `<th>${c.label}</th>`).join("") + `<th>K线分析</th>`;
+  }
+
+  function boardKlineCell(row) {
+    const code = row.industry_code;
+    if (!code) return "<td>—</td>";
+    const link = window.DcBoard && window.DcBoard.klineLink;
+    if (!link) return "<td>—</td>";
+    return `<td>${link("board", code, elDate.value)}</td>`;
   }
 
   function renderRows(items) {
@@ -156,7 +165,10 @@
     elBody.innerHTML = items
       .map(
         (row) =>
-          "<tr>" + columns.map((c) => renderCell(row, c)).join("") + "</tr>"
+          "<tr>" +
+          columns.map((c) => renderCell(row, c)).join("") +
+          boardKlineCell(row) +
+          "</tr>"
       )
       .join("");
   }

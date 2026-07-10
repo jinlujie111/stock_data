@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = window.DcBoard;
 
   const elDate = document.getElementById("trade-date");
   const elAddPicker = document.getElementById("stock-add-picker");
@@ -125,6 +125,7 @@
         <td class="${cellClass(row.net_mf_20d_yi)}">${row.net_mf_20d_yi != null ? fmtYi(row.net_mf_20d_yi) : "—"}</td>
         <td class="${cellClass(row.ytd_pct)}">${row.ytd_pct != null ? fmtPctCell(row.ytd_pct) : "—"}</td>
         <td><button type="button" class="btn btn-ghost btn-sm" data-del="${row.ts_code}">移除</button></td>
+        <td>${klineLink("stock", row.ts_code, elDate.value)}</td>
       </tr>`
       )
       .join("");

@@ -82,6 +82,27 @@
       </svg>`;
   }
 
+  /** 跳转 K 线分析页（kind: stock | board） */
+  function klineHref(kind, code, tradeDate) {
+    if (!code) return "/dc/kline";
+    const params = new URLSearchParams();
+    params.set("kind", kind === "board" ? "board" : "stock");
+    params.set("code", String(code));
+    if (tradeDate) {
+      const raw = String(tradeDate).trim();
+      const apiTd = /^\d{8}$/.test(raw) ? raw : toApiTradeDate(normalizeIsoDate(raw) || raw);
+      if (apiTd) params.set("trade_date", apiTd);
+    }
+    return `/dc/kline?${params}`;
+  }
+
+  function klineLink(kind, code, tradeDate, label) {
+    if (!code) return "—";
+    const text = label || "K线分析";
+    const href = klineHref(kind, code, tradeDate);
+    return `<a href="${href}" class="kline-link">${text}</a>`;
+  }
+
   window.DcBoard = {
     fmtNum,
     fmtPct,
@@ -90,5 +111,7 @@
     toApiTradeDate,
     initTradeDateCalendar,
     renderHistoryChart,
+    klineHref,
+    klineLink,
   };
 })();

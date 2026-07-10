@@ -1,5 +1,5 @@
 (function () {
-  const { apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
+  const { apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = window.DcBoard;
 
   const elDate = document.getElementById("trade-date");
   const marketChips = document.getElementById("market-chips");
@@ -93,6 +93,7 @@
         <td>${row.turnover_rate != null ? fmtNum(row.turnover_rate, 2) + "%" : "—"}</td>
         <td>${row.pe_ttm != null ? fmtNum(row.pe_ttm, 2) : "—"}</td>
         <td>${row.rank_time || "—"}</td>
+        <td>${klineLink("stock", row.ts_code, elDate.value)}</td>
       </tr>`
       )
       .join("");

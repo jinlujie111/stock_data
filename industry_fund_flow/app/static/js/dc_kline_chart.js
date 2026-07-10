@@ -1,11 +1,22 @@
 /** K 线趋势图（ECharts candlestick + MA + 支撑阻力叠加） */
 (function () {
+  const SUPPORT_COLOR = "#22c55e";
+  const RESISTANCE_COLOR = "#ef4444";
+
   const INDICATOR_COLORS = {
-    ma: { support: "#f59e0b", resistance: "#f59e0b" },
-    fibonacci: { support: "#22d3ee", resistance: "#22d3ee" },
-    volume_price: { support: "#a855f7", resistance: "#a855f7" },
-    trendline: { support: "#34d399", resistance: "#f87171" },
-    chip: { support: "#fb923c", resistance: "#fb923c" },
+    ma: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
+    fibonacci: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
+    volume_price: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
+    trendline: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
+    chip: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
+  };
+
+  const INDICATOR_LABELS = {
+    ma: "均线",
+    fibonacci: "斐波那契",
+    volume_price: "量价关系",
+    trendline: "趋势线",
+    chip: "筹码分布",
   };
 
   const MA_COLORS = {
@@ -84,20 +95,29 @@
       </div>`;
   }
 
-  function buildMarkLines(indicatorKey, levelData, dates) {
-    const colors = INDICATOR_COLORS[indicatorKey] || { support: "#94a3b8", resistance: "#94a3b8" };
+  function buildMarkLines(indicatorKey, levelData) {
+    const colors = INDICATOR_COLORS[indicatorKey] || {
+      support: SUPPORT_COLOR,
+      resistance: RESISTANCE_COLOR,
+    };
     const lines = [];
+    const labelBase = {
+      show: true,
+      position: "end",
+      fontSize: 10,
+      padding: [2, 6, 2, 4],
+      backgroundColor: "rgba(15, 20, 25, 0.85)",
+      borderRadius: 3,
+    };
     (levelData.supports || []).forEach((lv) => {
       lines.push({
         name: lv.label,
         yAxis: lv.price,
-        lineStyle: { color: colors.support, type: "dashed", width: 1.2 },
+        lineStyle: { color: colors.support, type: "dashed", width: 1.4 },
         label: {
-          show: true,
-          formatter: lv.label + " " + fmtPrice(lv.price),
+          ...labelBase,
+          formatter: fmtPrice(lv.price),
           color: colors.support,
-          fontSize: 10,
-          position: "insideEndTop",
         },
       });
     });
@@ -105,13 +125,11 @@
       lines.push({
         name: lv.label,
         yAxis: lv.price,
-        lineStyle: { color: colors.resistance, type: "dashed", width: 1.2 },
+        lineStyle: { color: colors.resistance, type: "dashed", width: 1.4 },
         label: {
-          show: true,
-          formatter: lv.label + " " + fmtPrice(lv.price),
+          ...labelBase,
+          formatter: fmtPrice(lv.price),
           color: colors.resistance,
-          fontSize: 10,
-          position: "insideEndBottom",
         },
       });
     });
@@ -166,12 +184,13 @@
 
   function renderLevelPanel(container, activeIndicators, levels) {
     if (!container) return;
-    const blocks = [];
+    const chipBlocks = [];
+    const allResistances = [];
+    const allSupports = [];
+
     activeIndicators.forEach((key) => {
       const data = levels[key];
       if (!data) return;
-      const supports = data.supports || [];
-      const resistances = data.resistances || [];
       if (key === "chip" && (data.profile || []).length) {
         const profile = data.profile.slice().sort((a, b) => a.price - b.price);
         const maxPct = Math.max(...profile.map((x) => x.pct), 1);
@@ -181,33 +200,57 @@
               `<div class="chip-bar-row"><span class="chip-bar-price">${fmtPrice(p.price)}</span><div class="chip-bar-track"><div class="chip-bar-fill" style="width:${(p.pct / maxPct) * 100}%"></div></div></div>`
           )
           .join("");
-        blocks.push(`<div class="kline-level-block"><div class="kline-level-title">筹码分布轮廓${data.meta && data.meta.source === "cyq_chips" ? "(CYQ)" : ""}</div><div class="chip-profile">${bars}</div></div>`);
+        chipBlocks.push(
+          `<div class="kline-level-block"><div class="kline-level-title">${INDICATOR_LABELS.chip}${data.meta && data.meta.source === "cyq_chips" ? " (CYQ)" : ""}</div><div class="chip-profile">${bars}</div></div>`
+        );
       }
-      if (!supports.length && !resistances.length) return;
-      const title = {
-        ma: "均线",
-        fibonacci: "斐波那契",
-        volume_price: "量价关系",
-        trendline: "趋势线",
-        chip: "筹码分布",
-      }[key] || key;
+      (data.resistances || []).forEach((lv) => {
+        allResistances.push({ ...lv, indicator: key });
+      });
+      (data.supports || []).forEach((lv) => {
+        allSupports.push({ ...lv, indicator: key });
+      });
+    });
+
+    allResistances.sort((a, b) => b.price - a.price);
+    allSupports.sort((a, b) => b.price - a.price);
+
+    const blocks = [...chipBlocks];
+
+    if (allResistances.length) {
       blocks.push(`
-        <div class="kline-level-block">
-          <div class="kline-level-title">${title}</div>
-          ${resistances
+        <div class="kline-level-block kline-level-block--res">
+          <div class="kline-level-title kline-level-title--res">阻力位 <span class="kline-level-legend">红色虚线</span></div>
+          ${allResistances
             .map(
-              (lv) =>
-                `<div class="kline-level-item kline-level-item--res"><span>${lv.label}</span><strong>${fmtPrice(lv.price)}</strong></div>`
-            )
-            .join("")}
-          ${supports
-            .map(
-              (lv) =>
-                `<div class="kline-level-item kline-level-item--sup"><span>${lv.label}</span><strong>${fmtPrice(lv.price)}</strong></div>`
+              (lv) => `
+            <div class="kline-level-item kline-level-item--res">
+              <span class="kline-level-tag">${INDICATOR_LABELS[lv.indicator] || lv.indicator}</span>
+              <span class="kline-level-name">${lv.label}</span>
+              <strong>${fmtPrice(lv.price)}</strong>
+            </div>`
             )
             .join("")}
         </div>`);
-    });
+    }
+
+    if (allSupports.length) {
+      blocks.push(`
+        <div class="kline-level-block kline-level-block--sup">
+          <div class="kline-level-title kline-level-title--sup">支撑位 <span class="kline-level-legend">绿色虚线</span></div>
+          ${allSupports
+            .map(
+              (lv) => `
+            <div class="kline-level-item kline-level-item--sup">
+              <span class="kline-level-tag">${INDICATOR_LABELS[lv.indicator] || lv.indicator}</span>
+              <span class="kline-level-name">${lv.label}</span>
+              <strong>${fmtPrice(lv.price)}</strong>
+            </div>`
+            )
+            .join("")}
+        </div>`);
+    }
+
     container.innerHTML = blocks.length
       ? blocks.join("")
       : '<div class="table-empty">请选择指标查看支撑/阻力位</div>';
@@ -282,11 +325,14 @@
         });
       }
       if (key !== "trendline") {
-        allMarkLines.push(...buildMarkLines(key, levelData, dates));
+        allMarkLines.push(...buildMarkLines(key, levelData));
       } else {
-        allMarkLines.push(...buildMarkLines(key, levelData, dates));
+        allMarkLines.push(...buildMarkLines(key, levelData));
       }
     });
+
+    const hasLevelLines = allMarkLines.length > 0;
+    const gridRight = hasLevelLines ? 72 : 24;
 
     if (allMarkLines.length) {
       series[0].markLine.data = allMarkLines;
@@ -325,8 +371,8 @@
           textStyle: { color: "#94a3b8", fontSize: 11 },
         },
         grid: [
-          { left: 56, right: 24, top: 36, height: "58%" },
-          { left: 56, right: 24, top: "72%", height: "16%" },
+          { left: 56, right: gridRight, top: 36, height: "58%" },
+          { left: 56, right: gridRight, top: "72%", height: "16%" },
         ],
         xAxis: [
           {
@@ -390,6 +436,6 @@
     renderLevelPanel,
     cellCls,
     fmtPct,
-    INDICATOR_COLORS,
+    INDICATOR_LABELS,
   };
 })();

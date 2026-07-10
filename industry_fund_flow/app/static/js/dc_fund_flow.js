@@ -1,5 +1,5 @@
 (function () {
-  const { apiGet, initTradeDateCalendar } = window.DcBoard;
+  const { apiGet, initTradeDateCalendar, klineLink } = window.DcBoard;
   const cfg = window.__DC_PAGE__;
   const slug = cfg.slug;
   const columns = cfg.columns;
@@ -235,9 +235,11 @@
     const pctCls = pctClass(item.pct_change);
     const amtCls = mode === "in" ? "cell-rise" : "cell-fall";
     const amt = item.net_amount_yi_abs != null ? item.net_amount_yi_abs : item.net_amount_yi;
+    const kline = klineLink("board", item.industry_code, elDate.value);
     return (
       `<div class="board-top5-item">` +
       `<span class="board-top5-name" title="${item.industry_name || ""}">${item.industry_name || "—"}</span>` +
+      `<span class="board-top5-kline">${kline}</span>` +
       `<span class="board-top5-pct ${pctCls}">${fmtPct(item.pct_change)}</span>` +
       `<span class="board-top5-amt ${amtCls}">${fmtYi(amt)}</span>` +
       `</div>`
@@ -284,6 +286,7 @@
           `<td class="${pctCls}">${fmtPct(row.pct_chg)}</td>` +
           `<td>${fmtYi(row.amount_yi)}</td>` +
           `<td>${row.amount_ratio != null ? Number(row.amount_ratio).toFixed(2) + "%" : "—"}</td>` +
+          `<td>${klineLink("stock", row.ts_code, elDate.value)}</td>` +
           "</tr>"
         );
       })
@@ -334,17 +337,24 @@
   }
 
   function renderHead() {
-    elHead.innerHTML = columns
-      .map((c) => {
-        if (!c.sortable) return `<th>${c.label}</th>`;
-        const active = c.key === sortKey;
-        const arrow = active ? (sortDir === "asc" ? " ▲" : " ▼") : "";
-        return (
-          `<th class="sortable-th" data-key="${c.key}" title="点击排序">` +
-          `${c.label}${arrow}</th>`
-        );
-      })
-      .join("");
+    elHead.innerHTML =
+      columns
+        .map((c) => {
+          if (!c.sortable) return `<th>${c.label}</th>`;
+          const active = c.key === sortKey;
+          const arrow = active ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+          return (
+            `<th class="sortable-th" data-key="${c.key}" title="点击排序">` +
+            `${c.label}${arrow}</th>`
+          );
+        })
+        .join("") + `<th>K线分析</th>`;
+  }
+
+  function boardKlineCell(row) {
+    const code = row.industry_code;
+    if (!code || !klineLink) return "<td>—</td>";
+    return `<td>${klineLink("board", code, elDate.value)}</td>`;
   }
 
   function renderRows(items) {
@@ -355,7 +365,7 @@
     }
     elEmpty.classList.add("hidden");
     elBody.innerHTML = items
-      .map((row) => "<tr>" + columns.map((c) => renderCell(row, c)).join("") + "</tr>")
+      .map((row) => "<tr>" + columns.map((c) => renderCell(row, c)).join("") + boardKlineCell(row) + "</tr>")
       .join("");
   }
 

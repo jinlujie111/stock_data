@@ -1,4 +1,6 @@
 (function () {
+  const { klineLink } = window.DcBoard || {};
+
   const elDate = document.getElementById("trade-date");
   const elWindow = document.getElementById("window");
   const elTypes = document.getElementById("content-types");
@@ -276,7 +278,8 @@
         `<td>${fmt(row.close, 2)}</td>` +
         `<td>${pct(row.pct_change)}</td>` +
         `<td>${pct(row.annual_vol_20d)}</td>` +
-        `<td>${pct(row.annual_vol_60d)}</td>`;
+        `<td>${pct(row.annual_vol_60d)}</td>` +
+        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>`;
       elRankBody.appendChild(tr);
     });
   }

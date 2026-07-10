@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, fmtPct, apiGet, toApiTradeDate, initTradeDateCalendar, renderHistoryChart } = window.DcBoard;
+  const { fmtNum, fmtPct, apiGet, toApiTradeDate, initTradeDateCalendar, renderHistoryChart, klineLink } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elTop = document.getElementById("top-n");
@@ -143,6 +143,7 @@
         <td>${fmtPct(row.rs_5d)}</td>
         <td>${row.limit_up_cnt ?? "—"}</td>
         <td>${scoreBar(row)}</td>
+        <td>${klineLink("board", row.industry_code, elDate.value)}</td>
         <td><button type="button" class="btn btn-ghost btn-sm btn-history" data-code="${row.industry_code}" data-name="${row.industry_name || ""}">历史</button></td>
       </tr>`
       )

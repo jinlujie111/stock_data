@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = window.DcBoard;
   const page = window.__START_SIGNAL_PAGE__ || { mode: "short" };
   const mode = page.mode === "mid" ? "mid" : "short";
 
@@ -149,6 +149,7 @@
         <td>${row.vp_signal_label || row.vp_signal_type || "—"}<br><span class="muted">${row.vp_status_label || row.vp_status || ""}</span></td>
         <td>${row.leader_name || "—"}</td>
         <td class="muted">${hits}</td>
+        <td>${klineLink("board", row.industry_code, elDate.value)}</td>
       </tr>`;
       })
       .join("");

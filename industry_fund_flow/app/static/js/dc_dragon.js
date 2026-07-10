@@ -1,4 +1,6 @@
 (function () {
+  const { klineLink } = window.DcBoard || {};
+
   const elDate = document.getElementById("trade-date");
   const chipGroup = document.getElementById("content-type-chips");
   const elBoardSearch = document.getElementById("board-search");
@@ -235,6 +237,7 @@
           `<td>${fmtNum(r.score_composite)}</td>` +
           `<td>${r.leader_fund_name || "—"}</td>` +
           `<td>${r.leader_trend_name || "—"}</td>` +
+          `<td>${klineLink ? klineLink("board", r.industry_code, td) : "—"}</td>` +
           `<td><button type="button" class="btn btn-ghost btn-drill" data-code="${r.industry_code}">下钻</button></td>` +
           `</tr>`
       )
@@ -279,6 +282,7 @@
           `<td>${fmtNum(r.score_trend)}</td>` +
           `<td>${fmtNum(r.score_inst)}</td>` +
           `<td>${r.rank_composite ?? "—"}</td>` +
+          `<td>${klineLink ? klineLink("stock", r.ts_code, td) : "—"}</td>` +
           `</tr>`
       )
       .join("");

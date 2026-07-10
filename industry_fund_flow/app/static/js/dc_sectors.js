@@ -2,7 +2,7 @@
   const board = window.DcBoard;
   if (!board) return;
 
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar } = board;
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = board;
 
   function sectorTable() {
     return window.DcSectorTable;
@@ -184,7 +184,7 @@
     st.bindSortHeaders(elSectorHeadRow.closest("thead"), sortState, () => {
       applySortAndRender(meta);
     });
-    st.renderTableBody(elSectorBody, sorted, { boardFavCodes });
+    st.renderTableBody(elSectorBody, sorted, { boardFavCodes, tradeDate: elDate.value });
     elSectorUpdated.textContent = st.toolbarText(meta, sortState.sortKey, sortState.sortDir, sorted.length);
     bindSectorActions();
   }
@@ -240,6 +240,7 @@
             <td>${row.pe_ttm != null ? fmtNum(row.pe_ttm, 2) : "—"}</td>
             <td class="${st.cellClass(row.net_mf_yi)}">${row.net_mf_yi != null ? st.fmtYi(row.net_mf_yi) : "—"}</td>
             <td><button type="button" class="star-btn${isFav ? " is-fav" : ""}" data-ts="${row.ts_code}" data-name="${row.stock_name || ""}">★</button></td>
+            <td>${klineLink("stock", row.ts_code, elDate.value)}</td>
           </tr>`;
           })
           .join("");

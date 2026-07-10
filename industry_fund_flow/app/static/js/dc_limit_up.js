@@ -1,5 +1,5 @@
 (function () {
-  const { apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
+  const { apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = window.DcBoard;
 
   const elDate = document.getElementById("trade-date");
   const elLadderBody = document.getElementById("ladder-body");
@@ -44,6 +44,7 @@
         <div class="ladder-card-name">${item.name || item.ts_code}${industry}</div>
         <div class="ladder-card-stat ${cellClass(item.pct_chg)}">${item.stat_text || "—"}</div>
         <div class="ladder-card-code">${item.ts_code || ""}</div>
+        <div class="ladder-card-kline">${klineLink("stock", item.ts_code, elDate.value)}</div>
       </div>`;
   }
 

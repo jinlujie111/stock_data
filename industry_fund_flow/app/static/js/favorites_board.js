@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar } = window.DcBoard;
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = window.DcBoard;
   const {
     DEFAULT_SORT,
     fmtPctCell,
@@ -112,7 +112,7 @@
     const sorted = sortItems(tableRows, sortState.sortKey, sortState.sortDir);
     renderTableHead(elSectorHeadRow, sortState.sortKey, sortState.sortDir);
     bindSortHeaders(elSectorHeadRow.closest("thead"), sortState, () => applySortAndRender(meta));
-    renderTableBody(elSectorBody, sorted, { boardFavCodes });
+    renderTableBody(elSectorBody, sorted, { boardFavCodes, tradeDate: elDate.value });
     elSectorUpdated.textContent = toolbarText(meta, sortState.sortKey, sortState.sortDir, sorted.length);
     bindSectorActions();
   }
@@ -165,6 +165,7 @@
             <td>${row.turnover_rate != null ? fmtNum(row.turnover_rate, 2) + "%" : "—"}</td>
             <td>${row.pe_ttm != null ? fmtNum(row.pe_ttm, 2) : "—"}</td>
             <td class="${cellClass(row.net_mf_yi)}">${row.net_mf_yi != null ? fmtYi(row.net_mf_yi) : "—"}</td>
+            <td>${klineLink("stock", row.ts_code, elDate.value)}</td>
           </tr>`
           )
           .join("");

@@ -1,5 +1,5 @@
 (function () {
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, renderHistoryChart } = window.DcBoard;
+  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, renderHistoryChart, klineLink } = window.DcBoard;
   const elDate = document.getElementById("trade-date");
   const elMa = document.getElementById("ma-window");
   const elSignalStatus = document.getElementById("signal-status");
@@ -67,6 +67,7 @@
         <td class="${signalClass(row.signal_status)}">${row.signal_status || "—"}</td>
         <td>${row.leader_name || "—"}<br><span class="muted">${row.leader_code || ""} ${row.leader_pct_chg != null ? fmtNum(row.leader_pct_chg, 2) + "%" : ""}</span></td>
         <td>${ftelpBar(row)}</td>
+        <td>${klineLink("board", row.industry_code, elDate.value)}</td>
         <td><button type="button" class="btn btn-ghost btn-sm btn-history" data-code="${row.industry_code}" data-name="${row.industry_name || ""}">历史</button></td>
       </tr>`;
   }
@@ -123,6 +124,7 @@
         <td>${row.rank_no ?? "—"}</td>
         <td>${fmtNum(row.main_score)}</td>
         <td>${ftelpBar(row)}</td>
+        <td>${klineLink("board", row.industry_code, elDate.value)}</td>
       </tr>`
       )
       .join("");
