@@ -89,12 +89,138 @@
     return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
   }
 
+  /** VP 指标配色（榜单与详情共用） */
+  function scoreTier(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    if (v >= 80) return "vp-l5";
+    if (v >= 60) return "vp-l4";
+    if (v >= 40) return "vp-l3";
+    if (v >= 20) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function statusTone(key) {
+    return (
+      {
+        mainline_burst: "vp-st-mainline",
+        trend_up: "vp-st-trend",
+        range_bound: "vp-st-range",
+        weak: "vp-st-weak",
+        ebbing: "vp-st-ebbing",
+      }[key] || ""
+    );
+  }
+
+  function signalTone(key) {
+    return (
+      {
+        main_rise: "vp-sig-rise",
+        launch: "vp-sig-launch",
+        distribution: "vp-sig-dist",
+        ebbing: "vp-sig-ebbing",
+        none: "vp-sig-none",
+      }[key] || "vp-sig-none"
+    );
+  }
+
+  function volRatioTone(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    if (v >= 1.8) return "vp-l5";
+    if (v >= 1.3) return "vp-l4";
+    if (v >= 1.0) return "vp-l3";
+    if (v >= 0.8) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function ratioPctTone(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    const pctVal = v <= 1 ? v * 100 : v;
+    if (pctVal >= 80) return "vp-l5";
+    if (pctVal >= 65) return "vp-l4";
+    if (pctVal >= 50) return "vp-l3";
+    if (pctVal >= 35) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function breakoutPctTone(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    const pctVal = v <= 1 ? v * 100 : v;
+    if (pctVal >= 25) return "vp-l5";
+    if (pctVal >= 15) return "vp-l4";
+    if (pctVal >= 8) return "vp-l3";
+    if (pctVal >= 3) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function continuityTone(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    if (v >= 25) return "vp-l5";
+    if (v >= 15) return "vp-l4";
+    if (v >= 8) return "vp-l3";
+    if (v >= 3) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function trendRetTone(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    if (v >= 15) return "vp-l5";
+    if (v >= 8) return "vp-l4";
+    if (v >= 3) return "vp-l3";
+    if (v >= 0) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function leaderTone(n) {
+    const v = Number(n);
+    if (Number.isNaN(v)) return "";
+    if (v >= 3) return "vp-l5";
+    if (v >= 2.2) return "vp-l4";
+    if (v >= 1.5) return "vp-l3";
+    if (v >= 1) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function rankTone(rank) {
+    const r = Number(rank);
+    if (Number.isNaN(r)) return "";
+    if (r <= 3) return "vp-l5";
+    if (r <= 10) return "vp-l4";
+    if (r <= 20) return "vp-l3";
+    if (r <= 35) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function streakDaysTone(d) {
+    const v = Number(d);
+    if (Number.isNaN(v)) return "";
+    if (v >= 6) return "vp-l5";
+    if (v >= 4) return "vp-l4";
+    if (v >= 2) return "vp-l3";
+    if (v >= 1) return "vp-l2";
+    return "vp-l1";
+  }
+
+  function vpVal(text, tone, badge) {
+    if (!tone) return text ?? "—";
+    const cls = badge ? `vp-val vp-badge ${tone}` : `vp-val ${tone}`;
+    return `<span class="${cls}">${text ?? "—"}</span>`;
+  }
+
   function metricItems(pairs) {
     return pairs
-      .map(
-        ([k, v]) =>
-          `<div class="metric-item"><span class="metric-label">${k}</span><span class="metric-value">${v ?? "—"}</span></div>`
-      )
+      .map(([k, v, tone, badge]) => {
+        const valCls = tone ? `metric-value ${tone}${badge ? " metric-value--badge" : ""}` : "metric-value";
+        return (
+          `<div class="metric-item"><span class="metric-label">${k}</span>` +
+          `<span class="${valCls}">${v ?? "—"}</span></div>`
+        );
+      })
       .join("");
   }
 
@@ -117,26 +243,26 @@
 
   function renderDetailMetrics(s) {
     const raw = [
-      ["VP 综合分", fmt(s.vp_score, 1)],
-      ["排名", s.rank_vp != null ? "#" + s.rank_vp : "—"],
-      ["状态", STATUS_LABEL[s.vp_status] || s.vp_status],
-      ["信号", labelSignal(s.signal_type)],
-      ["行业量比", fmt(s.industry_vol_ratio_20, 2)],
-      ["上涨占比", pct(s.rising_ratio)],
-      ["突破占比", pct(s.breakout_ratio)],
-      ["连续放量强度", fmt(s.continuity_strength, 2)],
-      ["连续放量天数", s.amount_streak_days ?? "—"],
-      ["20日趋势", retPct(s.trend_return_20d)],
-      ["龙头强度", fmt(s.leader_strength, 2)],
+      ["VP 综合分", fmt(s.vp_score, 1), scoreTier(s.vp_score)],
+      ["排名", s.rank_vp != null ? "#" + s.rank_vp : "—", rankTone(s.rank_vp)],
+      ["状态", STATUS_LABEL[s.vp_status] || s.vp_status, statusTone(s.vp_status), true],
+      ["信号", labelSignal(s.signal_type), signalTone(s.signal_type), true],
+      ["行业量比", fmt(s.industry_vol_ratio_20, 2), volRatioTone(s.industry_vol_ratio_20)],
+      ["上涨占比", pct(s.rising_ratio), ratioPctTone(s.rising_ratio)],
+      ["突破占比", pct(s.breakout_ratio), breakoutPctTone(s.breakout_ratio)],
+      ["连续放量强度", fmt(s.continuity_strength, 2), continuityTone(s.continuity_strength)],
+      ["连续放量天数", s.amount_streak_days ?? "—", streakDaysTone(s.amount_streak_days)],
+      ["20日趋势", retPct(s.trend_return_20d), trendRetTone(s.trend_return_20d)],
+      ["龙头强度", fmt(s.leader_strength, 2), leaderTone(s.leader_strength)],
       ["成分数", s.member_cnt],
     ];
     const subs = [
-      ["子分·连续", fmt(s.score_continuity, 1)],
-      ["子分·量比", fmt(s.score_vol, 1)],
-      ["子分·趋势", fmt(s.score_trend, 1)],
-      ["子分·上涨", fmt(s.score_breadth, 1)],
-      ["子分·突破", fmt(s.score_breakout, 1)],
-      ["子分·龙头", fmt(s.score_leader, 1)],
+      ["子分·连续", fmt(s.score_continuity, 1), scoreTier(s.score_continuity)],
+      ["子分·量比", fmt(s.score_vol, 1), scoreTier(s.score_vol)],
+      ["子分·趋势", fmt(s.score_trend, 1), scoreTier(s.score_trend)],
+      ["子分·上涨", fmt(s.score_breadth, 1), scoreTier(s.score_breadth)],
+      ["子分·突破", fmt(s.score_breakout, 1), scoreTier(s.score_breakout)],
+      ["子分·龙头", fmt(s.score_leader, 1), scoreTier(s.score_leader)],
     ];
     elDetailMetrics.innerHTML =
       `<div class="vp-metric-block"><div class="vp-metric-block-title">原始指标</div>` +
@@ -395,25 +521,40 @@
     hideTableEmpty();
     items.forEach((row, idx) => {
       const tr = document.createElement("tr");
+      if (row.industry_code === detailIndustryCode) tr.classList.add("vp-row-active");
+      const statusText = STATUS_LABEL[row.vp_status] || row.vp_status || "—";
+      const signalText = labelSignal(row.signal_type);
       tr.innerHTML =
         `<td>${row.rank_vp || idx + 1}</td>` +
         `<td>${row.industry_name || row.industry_code}</td>` +
         `<td>${row.content_type || "—"}</td>` +
-        `<td>${fmt(row.vp_score, 1)}</td>` +
-        `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
-        `<td>${labelSignal(row.signal_type)}</td>` +
-        `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
-        `<td>${pct(row.rising_ratio)}</td>` +
-        `<td>${pct(row.breakout_ratio)}</td>` +
-        `<td>${fmt(row.continuity_strength, 2)}</td>` +
-        `<td>${retPct(row.trend_return_20d)}</td>` +
-        `<td>${fmt(row.leader_strength, 2)}</td>` +
-        `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">数据分析</button></td>`;
+        `<td>${vpVal(fmt(row.vp_score, 1), scoreTier(row.vp_score))}</td>` +
+        `<td>${vpVal(statusText, statusTone(row.vp_status), true)}</td>` +
+        `<td>${vpVal(signalText, signalTone(row.signal_type), true)}</td>` +
+        `<td>${vpVal(fmt(row.industry_vol_ratio_20, 2), volRatioTone(row.industry_vol_ratio_20))}</td>` +
+        `<td>${vpVal(pct(row.rising_ratio), ratioPctTone(row.rising_ratio))}</td>` +
+        `<td>${vpVal(pct(row.breakout_ratio), breakoutPctTone(row.breakout_ratio))}</td>` +
+        `<td>${vpVal(fmt(row.continuity_strength, 2), continuityTone(row.continuity_strength))}</td>` +
+        `<td>${vpVal(retPct(row.trend_return_20d), trendRetTone(row.trend_return_20d))}</td>` +
+        `<td>${vpVal(fmt(row.leader_strength, 2), leaderTone(row.leader_strength))}</td>` +
+        `<td><button type="button" class="btn-vp-detail${row.industry_code === detailIndustryCode ? " is-active" : ""}" data-code="${row.industry_code}">数据分析</button></td>`;
       elBody.appendChild(tr);
     });
-    elBody.querySelectorAll(".btn-detail").forEach((btn) => {
+    elBody.querySelectorAll(".btn-vp-detail").forEach((btn) => {
       btn.addEventListener("click", () => loadDetail(btn.dataset.code));
     });
+  }
+
+  function markActiveDetailRow(code) {
+    elBody.querySelectorAll("tr").forEach((tr) => tr.classList.remove("vp-row-active"));
+    elBody.querySelectorAll(".btn-vp-detail").forEach((btn) => btn.classList.remove("is-active"));
+    if (!code) return;
+    const btn = elBody.querySelector(`.btn-vp-detail[data-code="${CSS.escape(code)}"]`);
+    if (btn) {
+      btn.classList.add("is-active");
+      const tr = btn.closest("tr");
+      if (tr) tr.classList.add("vp-row-active");
+    }
   }
 
   async function loadRank() {
@@ -443,6 +584,7 @@
   async function loadDetail(code) {
     clearError();
     detailIndustryCode = code;
+    markActiveDetailRow(code);
     elDetailCard.classList.remove("hidden");
     prepareKlineRangeForAnalysis(60);
     showKlineStatus("加载 K 线…", "kline-loading");
