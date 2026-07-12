@@ -34,11 +34,11 @@ STOCK_UPSERT = """
 INSERT INTO dwm_stock_vp_factor_di (
     trade_date, ts_code, close, vol, amount, pct_chg, turnover_rate,
     vol_ma20, vol_ratio_20, price_ma20, price_trend_20, vol_streak_days,
-    is_breakout_60, vp_pattern, vp_pattern_score, vp_window
+    is_breakout_60, is_breakout_strict, vp_pattern, vp_pattern_score, vp_window
 ) VALUES (
     :trade_date, :ts_code, :close, :vol, :amount, :pct_chg, :turnover_rate,
     :vol_ma20, :vol_ratio_20, :price_ma20, :price_trend_20, :vol_streak_days,
-    :is_breakout_60, :vp_pattern, :vp_pattern_score, :vp_window
+    :is_breakout_60, :is_breakout_strict, :vp_pattern, :vp_pattern_score, :vp_window
 )
 ON DUPLICATE KEY UPDATE
     close=VALUES(close), vol=VALUES(vol), amount=VALUES(amount),
@@ -46,6 +46,7 @@ ON DUPLICATE KEY UPDATE
     vol_ma20=VALUES(vol_ma20), vol_ratio_20=VALUES(vol_ratio_20),
     price_ma20=VALUES(price_ma20), price_trend_20=VALUES(price_trend_20),
     vol_streak_days=VALUES(vol_streak_days), is_breakout_60=VALUES(is_breakout_60),
+    is_breakout_strict=VALUES(is_breakout_strict),
     vp_pattern=VALUES(vp_pattern), vp_pattern_score=VALUES(vp_pattern_score),
     updated_at=CURRENT_TIMESTAMP
 """
@@ -54,11 +55,13 @@ AGG_UPSERT = """
 INSERT INTO dwm_industry_vp_agg_di (
     trade_date, industry_code, industry_name, content_type, member_cnt,
     total_amount, avg_pct_chg, rising_ratio, vol_expand_ratio, breakout_ratio,
-    industry_vol_ratio_20, amount_streak_days, weight_mode, vp_window
+    industry_vol_ratio_20, amount_streak_days, continuity_strength,
+    trend_return_20d, leader_strength, weight_mode, vp_window
 ) VALUES (
     :trade_date, :industry_code, :industry_name, :content_type, :member_cnt,
     :total_amount, :avg_pct_chg, :rising_ratio, :vol_expand_ratio, :breakout_ratio,
-    :industry_vol_ratio_20, :amount_streak_days, :weight_mode, :vp_window
+    :industry_vol_ratio_20, :amount_streak_days, :continuity_strength,
+    :trend_return_20d, :leader_strength, :weight_mode, :vp_window
 )
 ON DUPLICATE KEY UPDATE
     industry_name=VALUES(industry_name), content_type=VALUES(content_type),
@@ -66,34 +69,42 @@ ON DUPLICATE KEY UPDATE
     avg_pct_chg=VALUES(avg_pct_chg), rising_ratio=VALUES(rising_ratio),
     vol_expand_ratio=VALUES(vol_expand_ratio), breakout_ratio=VALUES(breakout_ratio),
     industry_vol_ratio_20=VALUES(industry_vol_ratio_20),
-    amount_streak_days=VALUES(amount_streak_days), weight_mode=VALUES(weight_mode),
+    amount_streak_days=VALUES(amount_streak_days),
+    continuity_strength=VALUES(continuity_strength),
+    trend_return_20d=VALUES(trend_return_20d),
+    leader_strength=VALUES(leader_strength),
+    weight_mode=VALUES(weight_mode),
     updated_at=CURRENT_TIMESTAMP
 """
 
 SCORE_UPSERT = """
 INSERT INTO dwm_industry_vp_score_di (
     trade_date, industry_code, industry_name, content_type, vp_window,
-    score_vol, score_trend, score_continuity, score_breadth, score_breakout,
+    score_vol, score_trend, score_continuity, score_breadth, score_breakout, score_leader,
     vp_score, vp_status, signal_type, rank_vp, member_cnt,
     industry_vol_ratio_20, rising_ratio, breakout_ratio, amount_streak_days,
-    detail_json
+    continuity_strength, trend_return_20d, leader_strength, detail_json
 ) VALUES (
     :trade_date, :industry_code, :industry_name, :content_type, :vp_window,
-    :score_vol, :score_trend, :score_continuity, :score_breadth, :score_breakout,
+    :score_vol, :score_trend, :score_continuity, :score_breadth, :score_breakout, :score_leader,
     :vp_score, :vp_status, :signal_type, :rank_vp, :member_cnt,
     :industry_vol_ratio_20, :rising_ratio, :breakout_ratio, :amount_streak_days,
-    :detail_json
+    :continuity_strength, :trend_return_20d, :leader_strength, :detail_json
 )
 ON DUPLICATE KEY UPDATE
     industry_name=VALUES(industry_name), content_type=VALUES(content_type),
     score_vol=VALUES(score_vol), score_trend=VALUES(score_trend),
     score_continuity=VALUES(score_continuity), score_breadth=VALUES(score_breadth),
-    score_breakout=VALUES(score_breakout), vp_score=VALUES(vp_score),
-    vp_status=VALUES(vp_status), signal_type=VALUES(signal_type),
-    rank_vp=VALUES(rank_vp), member_cnt=VALUES(member_cnt),
+    score_breakout=VALUES(score_breakout), score_leader=VALUES(score_leader),
+    vp_score=VALUES(vp_score), vp_status=VALUES(vp_status),
+    signal_type=VALUES(signal_type), rank_vp=VALUES(rank_vp), member_cnt=VALUES(member_cnt),
     industry_vol_ratio_20=VALUES(industry_vol_ratio_20),
     rising_ratio=VALUES(rising_ratio), breakout_ratio=VALUES(breakout_ratio),
-    amount_streak_days=VALUES(amount_streak_days), detail_json=VALUES(detail_json),
+    amount_streak_days=VALUES(amount_streak_days),
+    continuity_strength=VALUES(continuity_strength),
+    trend_return_20d=VALUES(trend_return_20d),
+    leader_strength=VALUES(leader_strength),
+    detail_json=VALUES(detail_json),
     updated_at=CURRENT_TIMESTAMP
 """
 

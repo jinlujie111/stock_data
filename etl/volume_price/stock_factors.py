@@ -64,7 +64,7 @@ def compute_stock_factors(
             logger.warning("加载 ST 列表失败，跳过 ST 过滤")
 
     sql = """
-        SELECT d.trade_date, d.ts_code, d.close, d.vol, d.amount, d.pct_chg,
+        SELECT d.trade_date, d.ts_code, d.close, d.high, d.vol, d.amount, d.pct_chg,
                b.turnover_rate
         FROM ods_stock_detail_di d
         LEFT JOIN ods_daily_basic_di b
@@ -81,6 +81,8 @@ def compute_stock_factors(
     if st_codes:
         df = df[~df["ts_code"].isin(st_codes)]
 
+    df["high"] = df["high"].fillna(df["close"])
+
     df = df.sort_values(["ts_code", "trade_date"])
     parts: list[pd.DataFrame] = []
     for ts_code, grp in df.groupby("ts_code", sort=False):
@@ -90,13 +92,22 @@ def compute_stock_factors(
         g["price_ma20"] = g["close"].rolling(window=window, min_periods=window).mean()
         lag_close = g["close"].shift(window)
         g["price_trend_20"] = (g["close"] - lag_close) / lag_close.replace(0, np.nan) * 100.0
-        g["high_60"] = g["close"].rolling(
+        g["high_60_prior"] = g["high"].shift(1).rolling(
+            window=cfg.breakout_lookback - 1, min_periods=cfg.breakout_lookback - 1
+        ).max()
+        g["high_60"] = g["high"].rolling(
             window=cfg.breakout_lookback, min_periods=cfg.breakout_lookback
         ).max()
+        g["amount_ma5"] = g["amount"].rolling(window=5, min_periods=5).mean()
         g["vol_streak_days"] = _vol_streak_series(g["vol"], g["vol_ma20"])
         g["is_breakout_60"] = (
             (g["close"] >= g["high_60"])
             & (g["vol"] > g["vol_ma20"] * cfg.breakout_vol_mult)
+        ).astype(int)
+        g["is_breakout_strict"] = (
+            (g["close"] >= g["high_60"])
+            & (g["close"] > g["high_60_prior"])
+            & (g["amount"] > g["amount_ma5"] * cfg.breakout_vol_mult)
         ).astype(int)
         parts.append(g)
 
@@ -132,6 +143,7 @@ def compute_stock_factors(
                 "price_trend_20": float(r["price_trend_20"]) if pd.notna(r.get("price_trend_20")) else None,
                 "vol_streak_days": int(r["vol_streak_days"] or 0),
                 "is_breakout_60": int(r["is_breakout_60"] or 0),
+                "is_breakout_strict": int(r["is_breakout_strict"] or 0),
                 "vp_pattern": pattern,
                 "vp_pattern_score": pattern_score,
                 "vp_window": window,

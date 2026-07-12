@@ -13,11 +13,12 @@ from mysql_config import get_engine
 @dataclass
 class VpConfig:
     window_default: int = 20
-    weight_vol: float = 0.30
-    weight_trend: float = 0.25
-    weight_continuity: float = 0.15
+    weight_vol: float = 0.20
+    weight_trend: float = 0.20
+    weight_continuity: float = 0.25
     weight_breadth: float = 0.15
     weight_breakout: float = 0.15
+    weight_leader: float = 0.05
     breakout_vol_mult: float = 1.5
     breakout_lookback: int = 60
     min_member_cnt: int = 5
@@ -64,7 +65,7 @@ def load_config(engine: Engine | None = None) -> VpConfig:
             text(
                 """
                 SELECT window_default, weight_vol, weight_trend, weight_continuity,
-                       weight_breadth, weight_breakout, breakout_vol_mult,
+                       weight_breadth, weight_breakout, weight_leader, breakout_vol_mult,
                        breakout_lookback, min_member_cnt, score_status_burst,
                        score_status_up, score_status_range, score_status_weak,
                        exclude_st, content_types
@@ -83,6 +84,7 @@ def load_config(engine: Engine | None = None) -> VpConfig:
     cfg.weight_continuity = float(row["weight_continuity"])
     cfg.weight_breadth = float(row["weight_breadth"])
     cfg.weight_breakout = float(row["weight_breakout"])
+    cfg.weight_leader = float(row.get("weight_leader") or 0.05)
     cfg.breakout_vol_mult = float(row["breakout_vol_mult"])
     cfg.breakout_lookback = int(row["breakout_lookback"])
     cfg.min_member_cnt = int(row["min_member_cnt"])

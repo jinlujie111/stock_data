@@ -1350,11 +1350,12 @@ CREATE TABLE IF NOT EXISTS dwm_vp_config (
     id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
     config_key          VARCHAR(64)  NOT NULL DEFAULT '__global__',
     window_default      INT          NOT NULL DEFAULT 20,
-    weight_vol          DECIMAL(5,4) NOT NULL DEFAULT 0.3000,
-    weight_trend        DECIMAL(5,4) NOT NULL DEFAULT 0.2500,
-    weight_continuity   DECIMAL(5,4) NOT NULL DEFAULT 0.1500,
+    weight_vol          DECIMAL(5,4) NOT NULL DEFAULT 0.2000,
+    weight_trend        DECIMAL(5,4) NOT NULL DEFAULT 0.2000,
+    weight_continuity   DECIMAL(5,4) NOT NULL DEFAULT 0.2500,
     weight_breadth      DECIMAL(5,4) NOT NULL DEFAULT 0.1500,
     weight_breakout     DECIMAL(5,4) NOT NULL DEFAULT 0.1500,
+    weight_leader       DECIMAL(5,4) NOT NULL DEFAULT 0.0500,
     vol_ratio_shrink    DECIMAL(6,3) NOT NULL DEFAULT 0.800,
     vol_ratio_normal    DECIMAL(6,3) NOT NULL DEFAULT 1.200,
     vol_ratio_expand    DECIMAL(6,3) NOT NULL DEFAULT 2.000,
@@ -1389,7 +1390,8 @@ CREATE TABLE IF NOT EXISTS dwm_stock_vp_factor_di (
     price_ma20       DECIMAL(20,6)  NULL COMMENT '20日均价',
     price_trend_20   DECIMAL(20,6)  NULL COMMENT '20日涨幅(%)',
     vol_streak_days  INT            NOT NULL DEFAULT 0 COMMENT '连续放量天数',
-    is_breakout_60   TINYINT        NOT NULL DEFAULT 0 COMMENT '60日新高且放量',
+    is_breakout_60   TINYINT        NOT NULL DEFAULT 0 COMMENT '60日新高且放量(兼容展示)',
+    is_breakout_strict TINYINT      NOT NULL DEFAULT 0 COMMENT '严格突破:新高+成交额>5日均1.5倍',
     vp_pattern       VARCHAR(32)    NULL COMMENT '量价配合分类',
     vp_pattern_score DECIMAL(10,2)  NULL COMMENT '量价配合分0-100',
     vp_window        INT            NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)',
@@ -1409,11 +1411,14 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_agg_di (
     member_cnt            INT            NOT NULL DEFAULT 0 COMMENT '有效成分数',
     total_amount          DECIMAL(24,4)  NULL COMMENT '行业总成交额(千元)',
     avg_pct_chg           DECIMAL(20,6)  NULL COMMENT '市值加权涨跌幅(%)',
-    rising_ratio          DECIMAL(20,6)  NULL COMMENT '上涨家数占比',
+    rising_ratio          DECIMAL(20,6)  NULL COMMENT '上涨家数占比(流通市值加权)',
     vol_expand_ratio      DECIMAL(20,6)  NULL COMMENT '放量家数占比',
-    breakout_ratio        DECIMAL(20,6)  NULL COMMENT '突破信号家数占比',
+    breakout_ratio        DECIMAL(20,6)  NULL COMMENT '严格突破成交额占比',
     industry_vol_ratio_20 DECIMAL(20,6)  NULL COMMENT '行业成交额/20日均',
-    amount_streak_days    INT            NOT NULL DEFAULT 0 COMMENT '成交额连续高于MA20天数',
+    amount_streak_days    INT            NOT NULL DEFAULT 0 COMMENT '成交额连续高于MA天数',
+    continuity_strength   DECIMAL(20,6)  NULL COMMENT '连续放量强度(加权)',
+    trend_return_20d      DECIMAL(20,6)  NULL COMMENT '板块指数20日收益率(%)',
+    leader_strength       DECIMAL(20,6)  NULL COMMENT '龙头强度(前3市值)',
     weight_mode           VARCHAR(16)    NOT NULL DEFAULT 'mv_weight' COMMENT 'mv_weight/equal',
     vp_window             INT            NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)',
     created_at            DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1434,15 +1439,19 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
     score_continuity DECIMAL(10,2) NULL COMMENT '连续放量子分',
     score_breadth   DECIMAL(10,2)  NULL COMMENT '上涨占比子分',
     score_breakout  DECIMAL(10,2)  NULL COMMENT '突破子分',
+    score_leader    DECIMAL(10,2)  NULL COMMENT '龙头强度子分',
     vp_score        DECIMAL(10,2)  NULL COMMENT '综合VP分0-100',
     vp_status       VARCHAR(32)    NULL COMMENT 'mainline_burst/trend_up/range_bound/weak/ebbing',
     signal_type     VARCHAR(32)    NULL COMMENT 'main_rise/ebbing/none',
-    rank_vp         INT            NULL COMMENT '同类型内VP排名',
+    rank_vp         INT            NULL COMMENT '行业+概念合并池VP排名',
     member_cnt      INT            NULL COMMENT '有效成分数',
     industry_vol_ratio_20 DECIMAL(20,6) NULL COMMENT '行业量比',
-    rising_ratio    DECIMAL(20,6)  NULL COMMENT '上涨占比',
-    breakout_ratio  DECIMAL(20,6)  NULL COMMENT '突破占比',
+    rising_ratio    DECIMAL(20,6)  NULL COMMENT '上涨占比(市值加权)',
+    breakout_ratio  DECIMAL(20,6)  NULL COMMENT '严格突破成交额占比',
     amount_streak_days INT         NULL COMMENT '连续放量天数',
+    continuity_strength DECIMAL(20,6) NULL COMMENT '连续放量强度',
+    trend_return_20d DECIMAL(20,6) NULL COMMENT '20日收益率(%)',
+    leader_strength DECIMAL(20,6) NULL COMMENT '龙头强度',
     detail_json     JSON           NULL COMMENT '子指标快照',
     created_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1455,6 +1464,18 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
 -- ALTER TABLE dwm_stock_vp_factor_di CHANGE COLUMN `window` vp_window INT NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)';
 -- ALTER TABLE dwm_industry_vp_agg_di CHANGE COLUMN `window` vp_window INT NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)';
 -- ALTER TABLE dwm_industry_vp_score_di CHANGE COLUMN `window` vp_window INT NOT NULL DEFAULT 20 COMMENT '计算窗口(交易日)';
+
+-- VP 六维评分升级（按需执行）:
+-- ALTER TABLE dwm_vp_config ADD COLUMN weight_leader DECIMAL(5,4) NOT NULL DEFAULT 0.0500 COMMENT '龙头强度权重' AFTER weight_breakout;
+-- UPDATE dwm_vp_config SET weight_vol=0.20, weight_trend=0.20, weight_continuity=0.25, weight_breadth=0.15, weight_breakout=0.15, weight_leader=0.05 WHERE config_key='__global__';
+-- ALTER TABLE dwm_stock_vp_factor_di ADD COLUMN is_breakout_strict TINYINT NOT NULL DEFAULT 0 COMMENT '严格突破' AFTER is_breakout_60;
+-- ALTER TABLE dwm_industry_vp_agg_di ADD COLUMN continuity_strength DECIMAL(20,6) NULL COMMENT '连续放量强度' AFTER amount_streak_days;
+-- ALTER TABLE dwm_industry_vp_agg_di ADD COLUMN trend_return_20d DECIMAL(20,6) NULL COMMENT '20日收益率' AFTER continuity_strength;
+-- ALTER TABLE dwm_industry_vp_agg_di ADD COLUMN leader_strength DECIMAL(20,6) NULL COMMENT '龙头强度' AFTER trend_return_20d;
+-- ALTER TABLE dwm_industry_vp_score_di ADD COLUMN score_leader DECIMAL(10,2) NULL COMMENT '龙头子分' AFTER score_breakout;
+-- ALTER TABLE dwm_industry_vp_score_di ADD COLUMN continuity_strength DECIMAL(20,6) NULL AFTER amount_streak_days;
+-- ALTER TABLE dwm_industry_vp_score_di ADD COLUMN trend_return_20d DECIMAL(20,6) NULL AFTER continuity_strength;
+-- ALTER TABLE dwm_industry_vp_score_di ADD COLUMN leader_strength DECIMAL(20,6) NULL AFTER trend_return_20d;
 
 
 -- 已有库升级（按需执行一次）:

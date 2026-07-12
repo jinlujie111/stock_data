@@ -9,7 +9,7 @@
   <div class="vp-formula-list">
     <div class="vp-formula-item">
       <strong>VP 分</strong>
-      <span>同板块类型内，行业量比、趋势、连续放量、上涨占比、突破占比转为百分位子分后加权（30% / 25% / 15% / 15% / 15%）</span>
+      <span>行业+概念合并池升序百分位加权：连续放量 25% · 量比 20% · 趋势 20% · 上涨 15% · 突破 15% · 龙头 5%</span>
     </div>
     <div class="vp-formula-item">
       <strong>状态</strong>
@@ -21,15 +21,15 @@
     </div>
     <div class="vp-formula-item">
       <strong>上涨占比</strong>
-      <span>成分股上涨家数 ÷ 有效成分股数（默认 ≥5 只）</span>
+      <span>上涨成分股流通市值之和 ÷ 板块有效成分流通市值之和</span>
     </div>
     <div class="vp-formula-item">
       <strong>突破占比</strong>
-      <span>满足「收盘 ≥ 60 日新高且成交量 &gt; 20 日均量 × 1.5」的成分股占比</span>
+      <span>严格突破股成交额之和 ÷ 板块总成交额（60 日新高 + 收盘&gt;前 60 日最高 + 成交额&gt;5 日均×1.5）</span>
     </div>
     <div class="vp-formula-item">
       <strong>连续放量</strong>
-      <span>板块成交额连续高于其移动均值的天数，纳入 VP 连续性子分（权重 15%）</span>
+      <span>强度=Σ(天数×超额倍数×衰减)；超额=成交额/均值−1；超 5 天每天衰减×0.8</span>
     </div>
   </div>
 </div>
