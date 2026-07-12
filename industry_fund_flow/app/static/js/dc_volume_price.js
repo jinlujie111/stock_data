@@ -131,6 +131,8 @@
   function hideTableEmpty() {
     elEmpty.classList.add("hidden");
   }
+
+  function boardLabel(item) {
     return `[${item.content_type}] ${item.industry_name} (${item.industry_code})`;
   }
 
