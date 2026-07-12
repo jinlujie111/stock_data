@@ -610,8 +610,6 @@
         lastIdx = idx;
         chart.setOption({ graphic: vpSubChartHints(idx) });
         chart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: idx });
-        chart.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: idx });
-        chart.dispatchAction({ type: "highlight", seriesIndex: 2, dataIndex: idx });
       }
 
       chart.on("updateAxisPointer", (event) => {
@@ -625,8 +623,6 @@
 
       chart.on("globalout", () => {
         clearHints();
-        chart.dispatchAction({ type: "downplay", seriesIndex: 1 });
-        chart.dispatchAction({ type: "downplay", seriesIndex: 2 });
       });
     }
 
@@ -676,7 +672,9 @@
           data: ["K线", "VP分", "上涨占比", "突破占比", "连续放量"],
           top: 0,
           textStyle: { color: "#94a3b8", fontSize: 11 },
+          inactiveColor: "#64748b",
         },
+        stateAnimation: { duration: 0 },
         grid: [
           { left: 56, right: 48, top: 32, height: "42%" },
           { left: 56, right: 48, top: "56%", height: "12%" },
@@ -792,6 +790,8 @@
               borderColor0: "#22c55e",
             },
             markPoint: markPoints.length ? { data: markPoints, symbolKeepAspect: true } : undefined,
+            emphasis: { focus: "none", scale: false },
+            blur: { itemStyle: { opacity: 1 } },
           },
           {
             name: "成交量",
@@ -801,13 +801,10 @@
             data: vols.map((v, i) => ({
               value: v,
               itemStyle: {
-                color: ohlc[i][1] >= ohlc[i][0] ? "rgba(239,68,68,0.55)" : "rgba(34,197,94,0.55)",
+                color: ohlc[i][1] >= ohlc[i][0] ? "rgba(239,68,68,0.85)" : "rgba(34,197,94,0.85)",
               },
             })),
-            emphasis: {
-              focus: "self",
-              itemStyle: { opacity: 1, borderColor: "#e2e8f0", borderWidth: 1 },
-            },
+            emphasis: { focus: "none", scale: false },
           },
           {
             name: "VP分",
@@ -819,11 +816,7 @@
             showSymbol: false,
             lineStyle: { width: 2, color: "#3b82f6" },
             itemStyle: { color: "#3b82f6" },
-            emphasis: {
-              focus: "series",
-              scale: true,
-              itemStyle: { borderColor: "#fff", borderWidth: 2 },
-            },
+            emphasis: { focus: "none", scale: false },
           },
           {
             name: "上涨占比",
@@ -834,6 +827,7 @@
             smooth: true,
             showSymbol: false,
             lineStyle: { width: 1.2, color: "#22c55e", type: "dashed" },
+            emphasis: { focus: "none", scale: false },
           },
           {
             name: "突破占比",
@@ -844,6 +838,7 @@
             smooth: true,
             showSymbol: false,
             lineStyle: { width: 1.2, color: "#f59e0b", type: "dashed" },
+            emphasis: { focus: "none", scale: false },
           },
           {
             name: "连续放量",
@@ -856,6 +851,7 @@
             symbolSize: 4,
             lineStyle: { width: 1.5, color: "#a855f7" },
             itemStyle: { color: "#a855f7" },
+            emphasis: { focus: "none", scale: false },
           },
         ],
       },
