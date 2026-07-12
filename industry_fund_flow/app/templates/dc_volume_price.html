@@ -5,54 +5,41 @@
   <p class="muted">东财行业/概念 · 量比 · 量价配合 · VP 评分榜</p>
 </div>
 
-<div class="card vp-formula-card">
-  <div class="vp-formula-rows">
-    <div class="vp-formula-list vp-formula-list--row">
-      <div class="vp-formula-item">
-        <strong>VP 分</strong>
-        <span>行业+概念合并池升序百分位加权：连续放量 25% · 量比 20% · 趋势 20% · 上涨 15% · 突破 15% · 龙头 5%</span>
-      </div>
-      <div class="vp-formula-item">
-        <strong>状态</strong>
-        <span>按 VP 分五档：≥80 主线爆发 · ≥60 趋势上升 · ≥40 震荡 · ≥20 弱势 · &lt;20 退潮；信号：主线爆发→主升，退潮→退潮</span>
-      </div>
-      <div class="vp-formula-item">
-        <strong>行业量比</strong>
-        <span>板块当日总成交额 ÷ 近 20 日板块成交额均值</span>
-      </div>
-      <div class="vp-formula-item">
-        <strong>上涨占比</strong>
-        <span>上涨成分股流通市值之和 ÷ 板块有效成分流通市值之和</span>
-      </div>
+<div class="card vp-guide-card">
+  <div class="vp-guide-head">
+    <div>
+      <h2 class="vp-guide-title">指标说明</h2>
+      <p class="vp-guide-sub">行业与概念合并池 · 六维升序百分位加权</p>
     </div>
-    <div class="vp-formula-list vp-formula-list--row">
-      <div class="vp-formula-item">
-        <strong>突破占比</strong>
-        <span>严格突破股成交额之和 ÷ 板块总成交额（60 日新高 + 收盘&gt;前 60 日最高 + 成交额&gt;5 日均×1.5）</span>
-      </div>
-      <div class="vp-formula-item">
-        <strong>连续放量</strong>
-        <span>强度=Σ(天数×超额倍数×衰减)；超额=成交额/均值−1；超 5 天每天衰减×0.8</span>
-      </div>
-      <div class="vp-formula-item">
-        <strong>20日趋势</strong>
-        <span>板块指数 20 交易日收益率(%)；负值参与打分时归零</span>
-      </div>
-      <div class="vp-formula-item">
-        <strong>龙头强度</strong>
-        <span>流通市值 Top3 成分 (涨幅均值 + 量比均值) ÷ 2</span>
-      </div>
+    <div class="vp-weight-bar" aria-label="VP 分权重">
+      <span class="vp-weight-chip" style="--w-color:#a855f7">连续 25%</span>
+      <span class="vp-weight-chip" style="--w-color:#3b82f6">量比 20%</span>
+      <span class="vp-weight-chip" style="--w-color:#06b6d4">趋势 20%</span>
+      <span class="vp-weight-chip" style="--w-color:#22c55e">上涨 15%</span>
+      <span class="vp-weight-chip" style="--w-color:#f59e0b">突破 15%</span>
+      <span class="vp-weight-chip" style="--w-color:#ec4899">龙头 5%</span>
     </div>
   </div>
-  <div class="vp-formula-usage">
-    <strong>使用说明</strong>
-    <p>
-      ① 选择<strong>已有 VP 数据的交易日</strong>（需先跑 <code>run_vp_batch</code>），默认展示<strong>行业+概念合并池</strong>全市场排名，<code>rank_vp</code> 为合并池位次。
-      ② 日常盯盘：优先看 <strong>VP≥60</strong> 且「连续强度 + 行业量比」同步抬升的板块；VP≥80 为<strong>主线爆发</strong>档，可结合信号列「主升」筛选。
-      ③ 点击「<strong>数据分析</strong>」查看六维原始指标、子分与 K 线走势，确认<strong>趋势（20日）、突破占比、上涨占比</strong>是否共振，避免单一维度冲高。
-      ④ 排序可切换为连续强度 / 量比 / 趋势等，用于从不同维度找强势板块；板块搜索可限定行业或概念子集。
-      ⑤ 本页为<strong>板块级</strong>量价评分，成分股严格突破、形态等明细在数据分析区；勿将 VP 分等同于个股买卖信号，需结合行情与风控自行决策。
-    </p>
+
+  <dl class="vp-def-grid">
+    <div class="vp-def-item"><dt>VP 综合分</dt><dd>六维子分按上表权重加总，合并池内排名见榜单 # 列</dd></div>
+    <div class="vp-def-item"><dt>状态 / 信号</dt><dd>VP 五档：≥80 主线爆发 · ≥60 趋势上升 · ≥40 震荡 · ≥20 弱势 · &lt;20 退潮；爆发→主升，退潮→退潮</dd></div>
+    <div class="vp-def-item"><dt>行业量比</dt><dd>板块当日总成交额 ÷ 近 20 日板块成交额均值</dd></div>
+    <div class="vp-def-item"><dt>上涨占比</dt><dd>上涨成分股流通市值之和 ÷ 板块有效成分流通市值之和</dd></div>
+    <div class="vp-def-item"><dt>突破占比</dt><dd>严格突破股成交额 ÷ 板块总成交额（60 日新高且收盘突破、放量 1.5 倍）</dd></div>
+    <div class="vp-def-item"><dt>连续放量</dt><dd>强度 = Σ(天数×超额×衰减)；超额 = 成交额/均值 − 1，第 6 天起每日 ×0.8</dd></div>
+    <div class="vp-def-item"><dt>20 日趋势</dt><dd>板块指数 20 交易日收益率(%)；负值参与打分时归零</dd></div>
+    <div class="vp-def-item"><dt>龙头强度</dt><dd>流通市值 Top3 成分股的 (涨幅均值 + 量比均值) ÷ 2</dd></div>
+  </dl>
+
+  <div class="vp-guide-foot">
+    <h3 class="vp-guide-foot-title">怎么用这份报表</h3>
+    <ul class="vp-guide-steps">
+      <li><span class="vp-step-num">1</span>选已有 VP 数据的交易日，默认看<strong>行业+概念合并池</strong>全市场排名。</li>
+      <li><span class="vp-step-num">2</span>日常优先关注 <strong>VP ≥ 60</strong> 且连续强度、行业量比同步抬升的板块；<strong>VP ≥ 80</strong> 为主线爆发档。</li>
+      <li><span class="vp-step-num">3</span>点「数据分析」看六维子分与 K 线，确认趋势、突破、上涨是否共振，避免单指标冲高。</li>
+      <li><span class="vp-step-num">4</span>可切换排序维度或搜索板块；本页为板块级评分，个股明细见数据分析区，不构成投资建议。</li>
+    </ul>
   </div>
 </div>
 
