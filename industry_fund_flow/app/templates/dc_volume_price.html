@@ -6,39 +6,53 @@
 </div>
 
 <div class="card vp-formula-card">
-  <div class="vp-formula-list">
-    <div class="vp-formula-item">
-      <strong>VP 分</strong>
-      <span>行业+概念合并池升序百分位加权：连续放量 25% · 量比 20% · 趋势 20% · 上涨 15% · 突破 15% · 龙头 5%</span>
+  <div class="vp-formula-rows">
+    <div class="vp-formula-list vp-formula-list--row">
+      <div class="vp-formula-item">
+        <strong>VP 分</strong>
+        <span>行业+概念合并池升序百分位加权：连续放量 25% · 量比 20% · 趋势 20% · 上涨 15% · 突破 15% · 龙头 5%</span>
+      </div>
+      <div class="vp-formula-item">
+        <strong>状态</strong>
+        <span>按 VP 分五档：≥80 主线爆发 · ≥60 趋势上升 · ≥40 震荡 · ≥20 弱势 · &lt;20 退潮；信号：主线爆发→主升，退潮→退潮</span>
+      </div>
+      <div class="vp-formula-item">
+        <strong>行业量比</strong>
+        <span>板块当日总成交额 ÷ 近 20 日板块成交额均值</span>
+      </div>
+      <div class="vp-formula-item">
+        <strong>上涨占比</strong>
+        <span>上涨成分股流通市值之和 ÷ 板块有效成分流通市值之和</span>
+      </div>
     </div>
-    <div class="vp-formula-item">
-      <strong>状态</strong>
-      <span>按 VP 分五档：≥80 主线爆发 · ≥60 趋势上升 · ≥40 震荡 · ≥20 弱势 · &lt;20 退潮；信号：主线爆发→主升，退潮→退潮</span>
+    <div class="vp-formula-list vp-formula-list--row">
+      <div class="vp-formula-item">
+        <strong>突破占比</strong>
+        <span>严格突破股成交额之和 ÷ 板块总成交额（60 日新高 + 收盘&gt;前 60 日最高 + 成交额&gt;5 日均×1.5）</span>
+      </div>
+      <div class="vp-formula-item">
+        <strong>连续放量</strong>
+        <span>强度=Σ(天数×超额倍数×衰减)；超额=成交额/均值−1；超 5 天每天衰减×0.8</span>
+      </div>
+      <div class="vp-formula-item">
+        <strong>20日趋势</strong>
+        <span>板块指数 20 交易日收益率(%)；负值参与打分时归零</span>
+      </div>
+      <div class="vp-formula-item">
+        <strong>龙头强度</strong>
+        <span>流通市值 Top3 成分 (涨幅均值 + 量比均值) ÷ 2</span>
+      </div>
     </div>
-    <div class="vp-formula-item">
-      <strong>行业量比</strong>
-      <span>板块当日总成交额 ÷ 近 20 日板块成交额均值</span>
-    </div>
-    <div class="vp-formula-item">
-      <strong>上涨占比</strong>
-      <span>上涨成分股流通市值之和 ÷ 板块有效成分流通市值之和</span>
-    </div>
-    <div class="vp-formula-item">
-      <strong>突破占比</strong>
-      <span>严格突破股成交额之和 ÷ 板块总成交额（60 日新高 + 收盘&gt;前 60 日最高 + 成交额&gt;5 日均×1.5）</span>
-    </div>
-    <div class="vp-formula-item">
-      <strong>连续放量</strong>
-      <span>强度=Σ(天数×超额倍数×衰减)；超额=成交额/均值−1；超 5 天每天衰减×0.8</span>
-    </div>
-    <div class="vp-formula-item">
-      <strong>20日趋势</strong>
-      <span>板块指数 20 交易日收益率(%)；负值参与打分时归零</span>
-    </div>
-    <div class="vp-formula-item">
-      <strong>龙头强度</strong>
-      <span>流通市值 Top3 成分 (涨幅均值 + 量比均值) ÷ 2</span>
-    </div>
+  </div>
+  <div class="vp-formula-usage">
+    <strong>使用说明</strong>
+    <p>
+      ① 选择<strong>已有 VP 数据的交易日</strong>（需先跑 <code>run_vp_batch</code>），默认展示<strong>行业+概念合并池</strong>全市场排名，<code>rank_vp</code> 为合并池位次。
+      ② 日常盯盘：优先看 <strong>VP≥60</strong> 且「连续强度 + 行业量比」同步抬升的板块；VP≥80 为<strong>主线爆发</strong>档，可结合信号列「主升」筛选。
+      ③ 点击「<strong>数据分析</strong>」查看六维原始指标、子分与 K 线走势，确认<strong>趋势（20日）、突破占比、上涨占比</strong>是否共振，避免单一维度冲高。
+      ④ 排序可切换为连续强度 / 量比 / 趋势等，用于从不同维度找强势板块；板块搜索可限定行业或概念子集。
+      ⑤ 本页为<strong>板块级</strong>量价评分，成分股严格突破、形态等明细在数据分析区；勿将 VP 分等同于个股买卖信号，需结合行情与风控自行决策。
+    </p>
   </div>
 </div>
 
@@ -161,5 +175,5 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260712b"></script>
 <script src="/static/js/dc_kline_chart.js?v=20260712i"></script>
-<script src="/static/js/dc_volume_price.js?v=20260712j"></script>
+<script src="/static/js/dc_volume_price.js?v=20260712k"></script>
 {% endblock %}

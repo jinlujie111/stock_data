@@ -98,6 +98,23 @@
       .join("");
   }
 
+  function metricGridRows(pairs, perRow) {
+    const chunks = [];
+    for (let i = 0; i < pairs.length; i += perRow) {
+      chunks.push(pairs.slice(i, i + perRow));
+    }
+    return (
+      `<div class="vp-metric-rows">` +
+      chunks
+        .map(
+          (chunk) =>
+            `<div class="metric-grid metric-grid--vp-row metric-grid--vp-fixed">${metricItems(chunk)}</div>`
+        )
+        .join("") +
+      `</div>`
+    );
+  }
+
   function renderDetailMetrics(s) {
     const raw = [
       ["VP 综合分", fmt(s.vp_score, 1)],
@@ -123,9 +140,10 @@
     ];
     elDetailMetrics.innerHTML =
       `<div class="vp-metric-block"><div class="vp-metric-block-title">原始指标</div>` +
-      `<div class="metric-grid metric-grid--vp-row">${metricItems(raw)}</div></div>` +
+      metricGridRows(raw, 6) +
+      `</div>` +
       `<div class="vp-metric-block"><div class="vp-metric-block-title">六维子分</div>` +
-      `<div class="metric-grid metric-grid--vp-row">${metricItems(subs)}</div></div>`;
+      `<div class="metric-grid metric-grid--vp-row metric-grid--vp-fixed">${metricItems(subs)}</div></div>`;
   }
 
   async function apiGet(path) {

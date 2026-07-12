@@ -465,6 +465,22 @@ body {
   font-size: 1.0625rem;
 }
 
+.metric-grid--vp-fixed {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.vp-metric-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (max-width: 960px) {
+  .metric-grid--vp-fixed {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .vp-metric-block {
   margin-bottom: 0.75rem;
 }
@@ -486,17 +502,58 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.vp-formula-list {
+.vp-formula-rows {
   display: flex;
-  flex-wrap: nowrap;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vp-formula-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
+}
+
+.vp-formula-list--row {
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .vp-formula-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.vp-formula-usage {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.vp-formula-usage strong {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+
+.vp-formula-usage p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.vp-formula-usage code {
+  font-size: 0.6875rem;
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.12);
 }
 
 .vp-formula-item {
-  flex: 1 1 0;
-  min-width: 160px;
+  min-width: 0;
   background: #0f1419;
   border: 1px solid var(--border);
   border-radius: 8px;
