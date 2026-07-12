@@ -201,7 +201,7 @@
 
   function renderSelectedBoards() {
     if (!selectedBoards.size) {
-      elBoardSelected.innerHTML = '<span class="board-placeholder">未选择板块（展示全部）</span>';
+      elBoardSelected.innerHTML = "";
       return;
     }
     elBoardSelected.innerHTML = "";

@@ -43,8 +43,8 @@
   </div>
 </div>
 
-<div class="card filters-card">
-  <div class="filters">
+<div class="card filters-card vp-filters-card">
+  <div class="filters vp-filters">
     <label class="filter-field">
       <span>交易日期</span>
       <select id="trade-date"></select>
@@ -78,16 +78,16 @@
       </select>
     </label>
     <label class="filter-field filter-field--grow">
-      <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
+      <span>板块</span>
       <div class="board-picker" id="board-picker">
         <div class="board-selected" id="board-selected"></div>
-        <input type="text" id="board-search" class="board-search" placeholder="输入板块名称或代码，模糊匹配…" autocomplete="off" />
+        <input type="text" id="board-search" class="board-search" placeholder="搜索板块名称或代码" autocomplete="off" />
         <div class="board-dropdown hidden" id="board-dropdown"></div>
       </div>
     </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>
-      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空</button>
     </div>
   </div>
 </div>
@@ -162,5 +162,5 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260712b"></script>
 <script src="/static/js/dc_kline_chart.js?v=20260712i"></script>
-<script src="/static/js/dc_volume_price.js?v=20260712k"></script>
+<script src="/static/js/dc_volume_price.js?v=20260712l"></script>
 {% endblock %}
