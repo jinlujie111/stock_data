@@ -1,17 +1,23 @@
 -- =============================================================================
--- VP 六维指标校验 SQL（20260710 或任意交易日）
+-- VP 六维指标校验 SQL — 仅核查 20260710（2026-07-10）单日 batch 产出
 -- 用法: mysql -u... -p stock_data < mysql_tables/migrations/check_vp_indicators_20260710.sql
+-- 范围:
+--   · 校验对象: dwm_* 表中 trade_date = 2026-07-10 且 vp_window = 20 的行
+--   · 辅助读取: trade_date <= 2026-07-10 的历史仅用于 MA20 / lag 重算，不校验其他交易日
+--   · 换日期请复制本文件并改 @td，勿在本文件改日期（文件名与用途绑定）
 -- 说明:
 --   · 与 ETL 逻辑对齐: etl/volume_price/industry_agg.py + industry_score.py
---   · 百分位为 pandas rank(pct=True)*100，MySQL 用 PERCENT_RANK 近似，允许 ±1.5 误差
+--   · 子分百分位为 pandas rank(pct=True, method=average)*100，不可用 PERCENT_RANK 对数值
+--   · CHK-10 仅校验六维「原始值大 → 子分不低」升序单调性
 --   · continuity_strength 含衰减递推，SQL 仅做量级/符号抽检，精确值请用 Python 脚本
 -- 判定:
 --   · 每条校验 SELECT 含 expected（预期）与 status（PASS/FAIL/INFO）
---   · status = PASS 表示达到预期；末尾 FINAL-SUMMARY 全 PASS 即认为 batch 无误
+--   · status = PASS 表示达到预期；末尾 FINAL-SUMMARY 全 PASS 即认为 20260710 batch 无误
 -- =============================================================================
 
 USE stock_data;
 
+-- 固定为 run_vp_batch 20260710 的核查日，勿改
 SET @td = '2026-07-10';
 SET @w   = 20;
 SET @tol = 0.02;          -- 原始指标相对误差容忍
@@ -44,8 +50,11 @@ SET @lag_td = (
 SELECT @td AS check_trade_date,
        @lag_td AS lag_trade_date_20d,
        @w AS vp_window,
+       '2026-07-10 only' AS verify_scope,
        'NOT NULL' AS expected_lag,
-       CASE WHEN @lag_td IS NOT NULL THEN 'PASS' ELSE 'FAIL' END AS status;
+       CASE WHEN @td = '2026-07-10' AND @lag_td IS NOT NULL THEN 'PASS'
+            WHEN @td <> '2026-07-10' THEN 'FAIL'
+            ELSE 'FAIL' END AS status;
 
 -- =============================================================================
 -- CHK-0 基础产出
@@ -629,7 +638,7 @@ JOIN dwm_industry_vp_score_di b
   ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
  AND a.industry_code < b.industry_code
 WHERE a.trade_date = @td AND a.vp_window = @w
-  AND a.continuity_strength > b.continuity_strength + 1e-9
+  AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
   AND a.score_continuity + 0.01 < b.score_continuity;
 
 SELECT 'CHK-8' AS chk, 'trend_zero_floor_spread' AS item,
@@ -708,45 +717,166 @@ ORDER BY tie_cnt DESC, vp_score DESC
 LIMIT 10;
 
 -- =============================================================================
--- CHK-10 子分与 PERCENT_RANK 近似对比（六维，允许 @pct_tol）
--- 预期: 各维 diff 计数均为 0（或极少数边界并列可忽略）
+-- CHK-10 六维子分升序单调性（与 ETL ascending_percentile_score 一致）
+-- ETL: rank(pct=True, method=average)*100；大量并列时与 PERCENT_RANK 数值不可比
+-- 预期: 各维 ascending_violation = 0（原始值更大 → 子分不应明显更低）
 -- =============================================================================
-WITH pool AS (
-    SELECT industry_code, industry_name,
-           continuity_strength,
-           industry_vol_ratio_20,
-           GREATEST(COALESCE(trend_return_20d, 0), 0) AS trend_for_score,
-           rising_ratio,
-           breakout_ratio,
-           leader_strength,
-           score_continuity, score_vol, score_trend,
-           score_breadth, score_breakout, score_leader,
-           ROUND(PERCENT_RANK() OVER (ORDER BY continuity_strength) * 100, 2) AS pct_cont,
-           ROUND(PERCENT_RANK() OVER (ORDER BY industry_vol_ratio_20) * 100, 2) AS pct_vol,
-           ROUND(PERCENT_RANK() OVER (ORDER BY GREATEST(COALESCE(trend_return_20d,0),0)) * 100, 2) AS pct_trend,
-           ROUND(PERCENT_RANK() OVER (ORDER BY rising_ratio) * 100, 2) AS pct_breadth,
-           ROUND(PERCENT_RANK() OVER (ORDER BY breakout_ratio) * 100, 2) AS pct_breakout,
-           ROUND(PERCENT_RANK() OVER (ORDER BY leader_strength) * 100, 2) AS pct_leader
-    FROM dwm_industry_vp_score_di
-    WHERE trade_date = @td AND vp_window = @w
-)
-SELECT 'CHK-10' AS chk, 'percentile_approx_diff' AS item,
-       SUM(CASE WHEN ABS(score_continuity - pct_cont) > @pct_tol THEN 1 ELSE 0 END) AS cont_diff,
-       SUM(CASE WHEN ABS(score_vol - pct_vol) > @pct_tol THEN 1 ELSE 0 END) AS vol_diff,
-       SUM(CASE WHEN ABS(score_trend - pct_trend) > @pct_tol THEN 1 ELSE 0 END) AS trend_diff,
-       SUM(CASE WHEN ABS(score_breadth - pct_breadth) > @pct_tol THEN 1 ELSE 0 END) AS breadth_diff,
-       SUM(CASE WHEN ABS(score_breakout - pct_breakout) > @pct_tol THEN 1 ELSE 0 END) AS breakout_diff,
-       SUM(CASE WHEN ABS(score_leader - pct_leader) > @pct_tol THEN 1 ELSE 0 END) AS leader_diff,
-       0 AS expected_each_dim,
-       CASE WHEN
-           SUM(CASE WHEN ABS(score_continuity - pct_cont) > @pct_tol THEN 1 ELSE 0 END) = 0
-        AND SUM(CASE WHEN ABS(score_vol - pct_vol) > @pct_tol THEN 1 ELSE 0 END) = 0
-        AND SUM(CASE WHEN ABS(score_trend - pct_trend) > @pct_tol THEN 1 ELSE 0 END) = 0
-        AND SUM(CASE WHEN ABS(score_breadth - pct_breadth) > @pct_tol THEN 1 ELSE 0 END) = 0
-        AND SUM(CASE WHEN ABS(score_breakout - pct_breakout) > @pct_tol THEN 1 ELSE 0 END) = 0
-        AND SUM(CASE WHEN ABS(score_leader - pct_leader) > @pct_tol THEN 1 ELSE 0 END) = 0
-       THEN 'PASS' ELSE 'FAIL' END AS status
-FROM pool;
+SELECT 'CHK-10' AS chk, 'score_continuity_ascending_violation' AS item,
+       COUNT(*) AS actual, 0 AS expected,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM dwm_industry_vp_score_di a
+JOIN dwm_industry_vp_score_di b
+  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+ AND a.industry_code < b.industry_code
+WHERE a.trade_date = @td AND a.vp_window = @w
+  AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
+  AND a.score_continuity + 0.01 < b.score_continuity;
+
+SELECT 'CHK-10' AS chk, 'score_vol_ascending_violation' AS item,
+       COUNT(*) AS actual, 0 AS expected,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM dwm_industry_vp_score_di a
+JOIN dwm_industry_vp_score_di b
+  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+ AND a.industry_code < b.industry_code
+WHERE a.trade_date = @td AND a.vp_window = @w
+  AND COALESCE(a.industry_vol_ratio_20, 0) > COALESCE(b.industry_vol_ratio_20, 0) + 1e-9
+  AND a.score_vol + 0.01 < b.score_vol;
+
+SELECT 'CHK-10' AS chk, 'score_trend_ascending_violation' AS item,
+       COUNT(*) AS actual, 0 AS expected,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM dwm_industry_vp_score_di a
+JOIN dwm_industry_vp_score_di b
+  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+ AND a.industry_code < b.industry_code
+WHERE a.trade_date = @td AND a.vp_window = @w
+  AND GREATEST(COALESCE(a.trend_return_20d, 0), 0) > GREATEST(COALESCE(b.trend_return_20d, 0), 0) + 1e-9
+  AND a.score_trend + 0.01 < b.score_trend;
+
+SELECT 'CHK-10' AS chk, 'score_breadth_ascending_violation' AS item,
+       COUNT(*) AS actual, 0 AS expected,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM dwm_industry_vp_score_di a
+JOIN dwm_industry_vp_score_di b
+  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+ AND a.industry_code < b.industry_code
+WHERE a.trade_date = @td AND a.vp_window = @w
+  AND COALESCE(a.rising_ratio, 0) > COALESCE(b.rising_ratio, 0) + 1e-9
+  AND a.score_breadth + 0.01 < b.score_breadth;
+
+SELECT 'CHK-10' AS chk, 'score_breakout_ascending_violation' AS item,
+       COUNT(*) AS actual, 0 AS expected,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM dwm_industry_vp_score_di a
+JOIN dwm_industry_vp_score_di b
+  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+ AND a.industry_code < b.industry_code
+WHERE a.trade_date = @td AND a.vp_window = @w
+  AND COALESCE(a.breakout_ratio, 0) > COALESCE(b.breakout_ratio, 0) + 1e-9
+  AND a.score_breakout + 0.01 < b.score_breakout;
+
+SELECT 'CHK-10' AS chk, 'score_leader_ascending_violation' AS item,
+       COUNT(*) AS actual, 0 AS expected,
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
+FROM dwm_industry_vp_score_di a
+JOIN dwm_industry_vp_score_di b
+  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+ AND a.industry_code < b.industry_code
+WHERE a.trade_date = @td AND a.vp_window = @w
+  AND COALESCE(a.leader_strength, 0) > COALESCE(b.leader_strength, 0) + 1e-9
+  AND a.score_leader + 0.01 < b.score_leader;
+
+SELECT 'CHK-10' AS chk, 'ascending_violation_total' AS item,
+       (
+           (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
+              AND a.score_continuity + 0.01 < b.score_continuity)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.industry_vol_ratio_20, 0) > COALESCE(b.industry_vol_ratio_20, 0) + 1e-9
+              AND a.score_vol + 0.01 < b.score_vol)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND GREATEST(COALESCE(a.trend_return_20d, 0), 0) > GREATEST(COALESCE(b.trend_return_20d, 0), 0) + 1e-9
+              AND a.score_trend + 0.01 < b.score_trend)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.rising_ratio, 0) > COALESCE(b.rising_ratio, 0) + 1e-9
+              AND a.score_breadth + 0.01 < b.score_breadth)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.breakout_ratio, 0) > COALESCE(b.breakout_ratio, 0) + 1e-9
+              AND a.score_breakout + 0.01 < b.score_breakout)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.leader_strength, 0) > COALESCE(b.leader_strength, 0) + 1e-9
+              AND a.score_leader + 0.01 < b.score_leader)
+       ) AS actual,
+       0 AS expected,
+       CASE WHEN (
+           (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
+              AND a.score_continuity + 0.01 < b.score_continuity)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.industry_vol_ratio_20, 0) > COALESCE(b.industry_vol_ratio_20, 0) + 1e-9
+              AND a.score_vol + 0.01 < b.score_vol)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND GREATEST(COALESCE(a.trend_return_20d, 0), 0) > GREATEST(COALESCE(b.trend_return_20d, 0), 0) + 1e-9
+              AND a.score_trend + 0.01 < b.score_trend)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.rising_ratio, 0) > COALESCE(b.rising_ratio, 0) + 1e-9
+              AND a.score_breadth + 0.01 < b.score_breadth)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.breakout_ratio, 0) > COALESCE(b.breakout_ratio, 0) + 1e-9
+              AND a.score_breakout + 0.01 < b.score_breakout)
+         + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+            JOIN dwm_industry_vp_score_di b
+              ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+             AND a.industry_code < b.industry_code
+            WHERE a.trade_date = @td AND a.vp_window = @w
+              AND COALESCE(a.leader_strength, 0) > COALESCE(b.leader_strength, 0) + 1e-9
+              AND a.score_leader + 0.01 < b.score_leader)
+       ) = 0 THEN 'PASS' ELSE 'FAIL' END AS status;
 
 -- =============================================================================
 -- 汇总：Top10 全指标一览（INFO，人工对照）
@@ -773,7 +903,7 @@ ORDER BY rank_vp
 LIMIT 10;
 
 -- =============================================================================
--- FINAL-SUMMARY：全部 status=PASS 即认为 run_vp_batch 执行正确
+-- FINAL-SUMMARY：20260710 全部 status=PASS 即认为 run_vp_batch 20260710 执行正确
 -- =============================================================================
 SELECT chk, item, actual, expected, status
 FROM (
@@ -1196,7 +1326,7 @@ FROM (
                    ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
                   AND a.industry_code < b.industry_code
                  WHERE a.trade_date = @td AND a.vp_window = @w
-                   AND a.continuity_strength > b.continuity_strength + 1e-9
+                   AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
                    AND a.score_continuity + 0.01 < b.score_continuity) AS CHAR),
            '0',
            CASE WHEN (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
@@ -1204,7 +1334,7 @@ FROM (
                         ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
                        AND a.industry_code < b.industry_code
                       WHERE a.trade_date = @td AND a.vp_window = @w
-                        AND a.continuity_strength > b.continuity_strength + 1e-9
+                        AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
                         AND a.score_continuity + 0.01 < b.score_continuity) = 0
                 THEN 'PASS' ELSE 'FAIL' END
 
@@ -1269,51 +1399,95 @@ FROM (
                 THEN 'PASS' ELSE 'FAIL' END
 
     UNION ALL
-    SELECT 'CHK-10', 'percentile_approx_all_dims',
+    SELECT 'CHK-10', 'ascending_violation_total',
            CAST((
-               WITH pool AS (
-                   SELECT score_continuity, score_vol, score_trend,
-                          score_breadth, score_breakout, score_leader,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY continuity_strength) * 100, 2) AS pct_cont,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY industry_vol_ratio_20) * 100, 2) AS pct_vol,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY GREATEST(COALESCE(trend_return_20d,0),0)) * 100, 2) AS pct_trend,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY rising_ratio) * 100, 2) AS pct_breadth,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY breakout_ratio) * 100, 2) AS pct_breakout,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY leader_strength) * 100, 2) AS pct_leader
-                   FROM dwm_industry_vp_score_di
-                   WHERE trade_date = @td AND vp_window = @w
-               )
-               SELECT
-                   SUM(CASE WHEN ABS(score_continuity - pct_cont) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_vol - pct_vol) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_trend - pct_trend) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_breadth - pct_breadth) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_breakout - pct_breakout) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_leader - pct_leader) > @pct_tol THEN 1 ELSE 0 END)
-               FROM pool
+               (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
+                  AND a.score_continuity + 0.01 < b.score_continuity)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.industry_vol_ratio_20, 0) > COALESCE(b.industry_vol_ratio_20, 0) + 1e-9
+                  AND a.score_vol + 0.01 < b.score_vol)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND GREATEST(COALESCE(a.trend_return_20d, 0), 0) > GREATEST(COALESCE(b.trend_return_20d, 0), 0) + 1e-9
+                  AND a.score_trend + 0.01 < b.score_trend)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.rising_ratio, 0) > COALESCE(b.rising_ratio, 0) + 1e-9
+                  AND a.score_breadth + 0.01 < b.score_breadth)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.breakout_ratio, 0) > COALESCE(b.breakout_ratio, 0) + 1e-9
+                  AND a.score_breakout + 0.01 < b.score_breakout)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.leader_strength, 0) > COALESCE(b.leader_strength, 0) + 1e-9
+                  AND a.score_leader + 0.01 < b.score_leader)
            ) AS CHAR),
            '0',
            CASE WHEN (
-               WITH pool AS (
-                   SELECT score_continuity, score_vol, score_trend,
-                          score_breadth, score_breakout, score_leader,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY continuity_strength) * 100, 2) AS pct_cont,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY industry_vol_ratio_20) * 100, 2) AS pct_vol,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY GREATEST(COALESCE(trend_return_20d,0),0)) * 100, 2) AS pct_trend,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY rising_ratio) * 100, 2) AS pct_breadth,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY breakout_ratio) * 100, 2) AS pct_breakout,
-                          ROUND(PERCENT_RANK() OVER (ORDER BY leader_strength) * 100, 2) AS pct_leader
-                   FROM dwm_industry_vp_score_di
-                   WHERE trade_date = @td AND vp_window = @w
-               )
-               SELECT
-                   SUM(CASE WHEN ABS(score_continuity - pct_cont) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_vol - pct_vol) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_trend - pct_trend) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_breadth - pct_breadth) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_breakout - pct_breakout) > @pct_tol THEN 1 ELSE 0 END)
-                 + SUM(CASE WHEN ABS(score_leader - pct_leader) > @pct_tol THEN 1 ELSE 0 END)
-               FROM pool
+               (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.continuity_strength, 0) > COALESCE(b.continuity_strength, 0) + 1e-9
+                  AND a.score_continuity + 0.01 < b.score_continuity)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.industry_vol_ratio_20, 0) > COALESCE(b.industry_vol_ratio_20, 0) + 1e-9
+                  AND a.score_vol + 0.01 < b.score_vol)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND GREATEST(COALESCE(a.trend_return_20d, 0), 0) > GREATEST(COALESCE(b.trend_return_20d, 0), 0) + 1e-9
+                  AND a.score_trend + 0.01 < b.score_trend)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.rising_ratio, 0) > COALESCE(b.rising_ratio, 0) + 1e-9
+                  AND a.score_breadth + 0.01 < b.score_breadth)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.breakout_ratio, 0) > COALESCE(b.breakout_ratio, 0) + 1e-9
+                  AND a.score_breakout + 0.01 < b.score_breakout)
+             + (SELECT COUNT(*) FROM dwm_industry_vp_score_di a
+                JOIN dwm_industry_vp_score_di b
+                  ON b.trade_date = a.trade_date AND b.vp_window = a.vp_window
+                 AND a.industry_code < b.industry_code
+                WHERE a.trade_date = @td AND a.vp_window = @w
+                  AND COALESCE(a.leader_strength, 0) > COALESCE(b.leader_strength, 0) + 1e-9
+                  AND a.score_leader + 0.01 < b.score_leader)
            ) = 0 THEN 'PASS' ELSE 'FAIL' END
 ) final_summary
 ORDER BY chk, item;
