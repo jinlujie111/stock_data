@@ -527,9 +527,31 @@
       {
         backgroundColor: "transparent",
         animation: false,
+        axisPointer: {
+          link: [{ xAxisIndex: [0, 1, 2] }],
+          label: {
+            show: true,
+            backgroundColor: "#334155",
+            color: "#e2e8f0",
+            fontSize: 10,
+          },
+          lineStyle: {
+            color: "#64748b",
+            width: 1,
+            type: "dashed",
+          },
+          crossStyle: {
+            color: "#64748b",
+            width: 1,
+            type: "dashed",
+          },
+        },
         tooltip: {
           trigger: "axis",
-          axisPointer: { type: "cross" },
+          axisPointer: {
+            type: "cross",
+            animation: false,
+          },
           backgroundColor: "#1a2332",
           borderColor: "#2d3748",
           textStyle: { color: "#e2e8f0", fontSize: 12 },
@@ -571,6 +593,7 @@
             boundaryGap: true,
             axisLine: { lineStyle: { color: "#334155" } },
             axisLabel: { color: "#94a3b8", fontSize: 10 },
+            axisPointer: { show: true, snap: true },
             gridIndex: 0,
           },
           {
@@ -580,6 +603,7 @@
             axisLabel: { show: false },
             axisLine: { show: false },
             axisTick: { show: false },
+            axisPointer: { show: true, snap: true },
           },
           {
             type: "category",
@@ -587,6 +611,7 @@
             gridIndex: 2,
             axisLabel: { color: "#94a3b8", fontSize: 10 },
             axisLine: { lineStyle: { color: "#334155" } },
+            axisPointer: { show: true, snap: true },
           },
         ],
         yAxis: [
@@ -595,6 +620,7 @@
             gridIndex: 0,
             splitLine: { lineStyle: { color: "#1e293b" } },
             axisLabel: { color: "#94a3b8", fontSize: 10 },
+            axisPointer: { show: true, snap: false },
           },
           {
             scale: true,
@@ -604,6 +630,7 @@
             axisLine: { show: false },
             axisTick: { show: false },
             splitLine: { show: false },
+            axisPointer: { show: true, snap: false, label: { show: false } },
           },
           {
             min: 0,
@@ -612,6 +639,7 @@
             position: "left",
             splitLine: { lineStyle: { color: "#1e293b" } },
             axisLabel: { color: "#94a3b8", fontSize: 10, formatter: "{value}" },
+            axisPointer: { show: true, snap: false },
           },
           {
             min: 0,
@@ -619,6 +647,7 @@
             position: "right",
             splitLine: { show: false },
             axisLabel: { color: "#a855f7", fontSize: 10 },
+            axisPointer: { show: true, snap: false, label: { show: false } },
           },
         ],
         dataZoom: [
