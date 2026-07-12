@@ -516,7 +516,7 @@
     if (v === null || v === undefined || v === "") return "—";
     const n = Number(v);
     if (Number.isNaN(n)) return "—";
-    return (n > 0 ? "+" : "") + n.toFixed(2);
+    return (n > 0 ? "+" : "") + n.toFixed(2) + "%";
   }
 
   function renderStockHead() {
