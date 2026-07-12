@@ -9,6 +9,7 @@ from typing import Any
 from app.db import fetch_all_stock, fetch_one_stock
 from app.dc_service import parse_trade_date
 from app import chart_service as chart_svc
+from app.sector_service import _board_code_variants
 
 SCORE_TABLE = "dwm_industry_vp_score_di"
 AGG_TABLE = "dwm_industry_vp_agg_di"
@@ -396,6 +397,12 @@ def get_industry_vp_kline(
     code = industry_code.strip()
     window = max(3, min(window, 120))
     start, end = resolve_vp_date_range(trade_date, start_date=start_date, days=days)
+    codes = _board_code_variants(code)
+    latest_bar = chart_svc._latest_board_bar_date(codes)
+    if latest_bar and end > latest_bar:
+        end = latest_bar
+    if start > end:
+        start = end
 
     kline = chart_svc.get_board_kline(code, end, days=days, start_date=start)
     vp_rows = fetch_all_stock(
@@ -426,6 +433,7 @@ def get_industry_vp_kline(
         "industry_code": code,
         "start_date": start,
         "end_date": end,
+        "latest_bar_date": latest_bar,
         "window": window,
         "vp_series": vp_series,
     }

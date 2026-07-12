@@ -468,6 +468,11 @@
     const vpSeries = payload.vp_series || [];
     const existingChart = opts.existingChart || null;
 
+    if (typeof echarts === "undefined") {
+      chartEl.innerHTML = '<div class="table-empty kline-error">ECharts 未加载</div>';
+      return null;
+    }
+
     if (!bars.length) {
       if (existingChart && !existingChart.isDisposed()) existingChart.dispose();
       chartEl.innerHTML = '<div class="table-empty">暂无 K 线数据</div>';

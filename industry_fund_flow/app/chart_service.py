@@ -164,6 +164,22 @@ def _fetch_cyq_chips(ts_code: str, trade_date: str) -> list[dict]:
     return [_serialize_row(r) for r in rows]
 
 
+def _latest_board_bar_date(codes: list[str]) -> str | None:
+    if not codes:
+        return None
+    placeholders = ", ".join(f":c{i}" for i in range(len(codes)))
+    params = {f"c{i}": c for i, c in enumerate(codes)}
+    row = fetch_one_stock(
+        f"""
+        SELECT MAX(trade_date) AS d
+        FROM {BOARD_DAILY}
+        WHERE ts_code IN ({placeholders})
+        """,
+        params,
+    )
+    return _serialize(row["d"]) if row and row.get("d") else None
+
+
 def _attach_pre_close(bars: list[dict], pct_key: str) -> None:
     for i, bar in enumerate(bars):
         if i == 0:
@@ -191,9 +207,19 @@ def get_board_kline(
     end = _resolve_end_date(trade_date)
     days = max(20, min(days, 365))
     codes = _board_code_variants(code)
+    latest = _latest_board_bar_date(codes)
+    if latest and end > latest:
+        end = latest
+    if start_date and start_date > end:
+        start_date = None
     bars = _fetch_board_bars(codes, end, days, start_date=start_date)
+    if not bars and start_date:
+        bars = _fetch_board_bars(codes, end, days, start_date=None)
     if not bars:
-        raise ValueError(f"板块 {code} 暂无 K 线数据")
+        raise ValueError(
+            f"板块 {code} 暂无 K 线数据，请确认 ods_dc_daily_di 已同步（run_data_sync dc_daily）"
+        )
+    end = str(bars[-1].get("trade_date") or end)
     _attach_pre_close(bars, "pct_change")
     snap = _board_snapshot(codes, end) or {}
     if bars:

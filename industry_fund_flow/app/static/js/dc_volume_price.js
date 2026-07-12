@@ -96,6 +96,30 @@
     elError.classList.add("hidden");
   }
 
+  function showKlineStatus(html, className) {
+    if (!elVpKlineChart) return;
+    if (vpChartInstance && !vpChartInstance.isDisposed()) {
+      vpChartInstance.dispose();
+      vpChartInstance = null;
+    }
+    elVpKlineChart.innerHTML = `<div class="${className || "kline-status"}">${html}</div>`;
+  }
+
+  function syncKlineDateBounds() {
+    if (!vpTradeDates.length) return;
+    const maxIso = vpTradeDates[vpTradeDates.length - 1];
+    const minIso = vpTradeDates[0];
+    if (elKlineEnd) {
+      elKlineEnd.max = maxIso;
+      if (elKlineEnd.value && elKlineEnd.value > maxIso) elKlineEnd.value = maxIso;
+    }
+    if (elKlineStart) {
+      elKlineStart.max = maxIso;
+      elKlineStart.min = minIso;
+      if (elKlineStart.value && elKlineStart.value > maxIso) elKlineStart.value = maxIso;
+    }
+  }
+
   function boardLabel(item) {
     return `[${item.content_type}] ${item.industry_name} (${item.industry_code})`;
   }
@@ -192,6 +216,7 @@
       elDate.appendChild(opt);
     });
     if (data.latest) elDate.value = data.latest;
+    syncKlineDateBounds();
   }
 
   function isoFromTradeDate(raw) {
@@ -241,7 +266,19 @@
   }
 
   async function loadVpKline(code) {
-    if (!code || !kline.renderVpKlineChart || !elVpKlineChart) return;
+    if (!code || !elVpKlineChart) return;
+    if (typeof echarts === "undefined") {
+      showKlineStatus("ECharts 未加载，请检查网络或刷新页面", "table-empty kline-error");
+      throw new Error("ECharts 未加载");
+    }
+    if (!kline.renderVpKlineChart) {
+      showKlineStatus(
+        "K 线组件未加载，请 Ctrl+F5 硬刷新；若仍无效请确认服务器已部署最新 industry_fund_flow 代码",
+        "table-empty kline-error"
+      );
+      throw new Error("dc_kline_chart.js 未加载 renderVpKlineChart");
+    }
+    showKlineStatus("加载 K 线…", "kline-loading");
     const startIso = elKlineStart ? elKlineStart.value : "";
     const endIso = elKlineEnd ? elKlineEnd.value : isoFromTradeDate(elDate.value);
     const startQ = startIso ? `&start_date=${encodeURIComponent(apiDateFromIso(startIso))}` : "";
@@ -250,6 +287,9 @@
     const data = await apiGet(
       `/api/v1/vp/industries/${encodeURIComponent(code)}/kline?window=${encodeURIComponent(elWindow.value)}${endQ}${startQ}${daysQ}`
     );
+    if (data.start_date && elKlineStart) elKlineStart.value = isoFromTradeDate(data.start_date);
+    if (data.end_date && elKlineEnd) elKlineEnd.value = isoFromTradeDate(data.end_date);
+    if (data.latest_bar_date && elKlineEnd) elKlineEnd.max = isoFromTradeDate(data.latest_bar_date);
     vpChartInstance = kline.renderVpKlineChart(elVpKlineChart, data, {
       existingChart: vpChartInstance,
     });
@@ -360,7 +400,9 @@
     try {
       await loadVpKline(code);
     } catch (e) {
-      showError("K 线加载失败: " + (e.message || String(e)));
+      const msg = "K 线加载失败: " + (e.message || String(e));
+      showKlineStatus(msg, "table-empty kline-error");
+      showError(msg);
     }
 
     const stocks = await apiGet(
@@ -442,7 +484,11 @@
       if (!chip) return;
       setKlineRangeByDays(Number(chip.dataset.days) || 60);
       if (detailIndustryCode) {
-        loadVpKline(detailIndustryCode).catch((err) => showError(err.message || String(err)));
+        loadVpKline(detailIndustryCode).catch((err) => {
+          const msg = err.message || String(err);
+          showKlineStatus(msg, "table-empty kline-error");
+          showError(msg);
+        });
       }
     });
   }
@@ -453,7 +499,11 @@
         showError("请先在榜单中点击「详情」选择板块");
         return;
       }
-      loadVpKline(detailIndustryCode).catch((err) => showError(err.message || String(err)));
+      loadVpKline(detailIndustryCode).catch((err) => {
+        const msg = err.message || String(err);
+        showKlineStatus(msg, "table-empty kline-error");
+        showError(msg);
+      });
     });
   }
 

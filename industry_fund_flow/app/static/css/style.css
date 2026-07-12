@@ -1535,6 +1535,19 @@ body {
   min-height: 560px;
 }
 
+.kline-loading,
+.kline-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 560px;
+  color: var(--muted, #94a3b8);
+}
+
+.kline-error {
+  color: #f87171;
+}
+
 .ladder-card-kline {
   margin-top: 0.35rem;
 }
