@@ -32,6 +32,42 @@ _VP_KLINE_COLUMNS = """
     rank_vp
 """
 
+_STOCK_SORT_KEYS = frozenset({
+    "pct_chg",
+    "vol_ratio_20",
+    "vol_streak_days",
+    "is_breakout_strict",
+    "vp_pattern",
+    "vp_pattern_score",
+    "circ_mv",
+})
+
+_STOCK_SORT_EXPR = {
+    "pct_chg": "f.pct_chg",
+    "vol_ratio_20": "f.vol_ratio_20",
+    "vol_streak_days": "f.vol_streak_days",
+    "is_breakout_strict": "f.is_breakout_strict",
+    "vp_pattern_score": "f.vp_pattern_score",
+    "circ_mv": "b.circ_mv",
+    "vp_pattern": """
+        CASE f.vp_pattern
+            WHEN 'trend_confirm' THEN 4
+            WHEN 'weak_rise' THEN 3
+            WHEN 'consolidation' THEN 2
+            WHEN 'distribution' THEN 1
+            ELSE 0
+        END
+    """,
+}
+
+
+def _stock_order_sql(sort: str, order: str) -> str:
+    sort_key = sort if sort in _STOCK_SORT_KEYS else "vol_ratio_20"
+    direction = "ASC" if order and order.lower() == "asc" else "DESC"
+    expr = _STOCK_SORT_EXPR[sort_key]
+    return f"{expr} {direction}, f.ts_code ASC"
+
+
 _RANK_SORT_KEYS = frozenset({
     "vp_score",
     "industry_vol_ratio_20",
@@ -247,14 +283,14 @@ def list_industry_stocks(
     window: int = 20,
     limit: int = 100,
     sort: str = "vol_ratio_20",
+    order: str = "desc",
 ) -> dict[str, Any]:
     td = _resolve_trade_date(trade_date)
     window = max(3, min(window, 120))
     limit = max(1, min(limit, 500))
-    sort_key = sort if sort in ("vol_ratio_20", "vp_pattern_score", "pct_chg", "vol_streak_days") else "vol_ratio_20"
+    order_sql = _stock_order_sql(sort, order)
 
     detail = get_industry_detail(industry_code, td, window=window)
-    member_date = td
     rows = fetch_all_stock(
         f"""
         SELECT m.con_code, m.name
@@ -296,13 +332,16 @@ def list_industry_stocks(
 
     factors = fetch_all_stock(
         f"""
-        SELECT ts_code, close, vol, amount, pct_chg, turnover_rate,
-               vol_ratio_20, vol_streak_days, is_breakout_60, is_breakout_strict,
-               vp_pattern, vp_pattern_score
-        FROM {FACTOR_TABLE}
-        WHERE trade_date = :td AND vp_window = :w
-          AND ts_code IN ({placeholders})
-        ORDER BY {sort_key} DESC
+        SELECT f.ts_code, f.close, f.vol, f.amount, f.pct_chg, f.turnover_rate,
+               f.vol_ratio_20, f.vol_streak_days, f.is_breakout_60, f.is_breakout_strict,
+               f.vp_pattern, f.vp_pattern_score,
+               b.circ_mv
+        FROM {FACTOR_TABLE} f
+        LEFT JOIN ods_daily_basic_di b
+          ON b.trade_date = f.trade_date AND b.ts_code = f.ts_code
+        WHERE f.trade_date = :td AND f.vp_window = :w
+          AND f.ts_code IN ({placeholders})
+        ORDER BY {order_sql}
         LIMIT :lim
         """,
         params,
@@ -311,12 +350,16 @@ def list_industry_stocks(
     for f in factors:
         row = _serialize_row(f)
         row["stock_name"] = names.get(f["ts_code"], "")
+        circ = row.get("circ_mv")
+        row["circ_mv_yi"] = round(float(circ) / 10000, 2) if circ is not None else None
         items.append(row)
     return {
         "trade_date": td,
         "industry_code": industry_code,
         "industry_name": detail["score"].get("industry_name"),
         "window": window,
+        "sort": sort if sort in _STOCK_SORT_KEYS else "vol_ratio_20",
+        "order": "asc" if order and order.lower() == "asc" else "desc",
         "items": items,
     }
 

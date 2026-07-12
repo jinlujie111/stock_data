@@ -20,6 +20,7 @@
   const elDetailTitle = document.getElementById("detail-title");
   const elDetailMetrics = document.getElementById("detail-metrics");
   const elDetailStocks = document.getElementById("detail-stocks");
+  const elDetailStocksHead = document.getElementById("detail-stocks-head");
   const elBoardSelected = document.getElementById("board-selected");
   const elBoardSearch = document.getElementById("board-search");
   const elBoardDropdown = document.getElementById("board-dropdown");
@@ -34,6 +35,20 @@
   let vpChartInstance = null;
   let vpTradeDates = [];
   let klineRangeDays = 60;
+  let stockSortKey = "vol_ratio_20";
+  let stockSortDir = "desc";
+
+  const STOCK_COLUMNS = [
+    { key: "ts_code", label: "代码", sortable: false },
+    { key: "stock_name", label: "名称", sortable: false },
+    { key: "pct_chg", label: "涨跌幅%", sortable: true },
+    { key: "vol_ratio_20", label: "量比", sortable: true },
+    { key: "vol_streak_days", label: "连续放量", sortable: true },
+    { key: "is_breakout_strict", label: "严格突破", sortable: true },
+    { key: "vp_pattern", label: "量价形态", sortable: true },
+    { key: "vp_pattern_score", label: "形态分", sortable: true },
+    { key: "circ_mv", label: "市值", sortable: true },
+  ];
 
   const EMPTY_MSG_RANK = "暂无数据，请先运行 run_vp_batch";
 
@@ -474,6 +489,92 @@
     setKlineRangeByDays(rangeDays);
   }
 
+  function fmtMvYi(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    return n.toFixed(2) + "亿";
+  }
+
+  function pctChgClass(v) {
+    const n = Number(v);
+    if (Number.isNaN(n)) return "";
+    if (n > 0) return "cell-rise";
+    if (n < 0) return "cell-fall";
+    return "";
+  }
+
+  function volRatioClass(v) {
+    const n = Number(v);
+    if (Number.isNaN(n)) return "";
+    if (n > 1) return "cell-rise";
+    if (n < 1) return "cell-fall";
+    return "";
+  }
+
+  function fmtPctSigned(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    return (n > 0 ? "+" : "") + n.toFixed(2);
+  }
+
+  function renderStockHead() {
+    if (!elDetailStocksHead) return;
+    elDetailStocksHead.innerHTML =
+      "<tr>" +
+      STOCK_COLUMNS.map((col) => {
+        if (!col.sortable) return `<th>${col.label}</th>`;
+        const active = col.key === stockSortKey;
+        const arrow = active ? (stockSortDir === "asc" ? " ▲" : " ▼") : "";
+        return `<th class="sortable-th" data-sort="${col.key}" title="点击排序">${col.label}${arrow}</th>`;
+      }).join("") +
+      "</tr>";
+  }
+
+  function renderStockRows(items) {
+    if (!elDetailStocks) return;
+    elDetailStocks.innerHTML = "";
+    (items || []).forEach((row) => {
+      const tr = document.createElement("tr");
+      const pctCls = pctChgClass(row.pct_chg);
+      const volCls = volRatioClass(row.vol_ratio_20);
+      tr.innerHTML =
+        `<td>${row.ts_code}</td>` +
+        `<td>${row.stock_name || "—"}</td>` +
+        `<td class="${pctCls}">${fmtPctSigned(row.pct_chg)}</td>` +
+        `<td class="${volCls}">${fmt(row.vol_ratio_20, 2)}</td>` +
+        `<td>${vpVal(row.vol_streak_days ?? "—", streakDaysTone(row.vol_streak_days))}</td>` +
+        `<td>${row.is_breakout_strict ? vpVal("是", "vp-l5", true) : "—"}</td>` +
+        `<td>${vpVal(labelPattern(row.vp_pattern), patternTone(row.vp_pattern), true)}</td>` +
+        `<td>${vpVal(fmt(row.vp_pattern_score, 0), scoreTier(row.vp_pattern_score))}</td>` +
+        `<td>${fmtMvYi(row.circ_mv_yi)}</td>`;
+      elDetailStocks.appendChild(tr);
+    });
+  }
+
+  function patternTone(key) {
+    return (
+      {
+        trend_confirm: "vp-st-mainline",
+        weak_rise: "vp-st-trend",
+        consolidation: "vp-st-range",
+        distribution: "vp-st-ebbing",
+      }[key] || "vp-sig-none"
+    );
+  }
+
+  async function loadDetailStocks(code) {
+    if (!code) return;
+    const { td, w } = queryParams();
+    const stocks = await apiGet(
+      `/api/v1/vp/industries/${encodeURIComponent(code)}/stocks?trade_date=${encodeURIComponent(td)}` +
+        `&window=${w}&limit=50&sort=${encodeURIComponent(stockSortKey)}&order=${encodeURIComponent(stockSortDir)}`
+    );
+    renderStockHead();
+    renderStockRows(stocks.items || []);
+  }
+
   function scrollToVpKline() {
     const section = document.querySelector(".vp-kline-section");
     if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -605,25 +706,32 @@
       showError(msg);
     }
 
-    const stocks = await apiGet(
-      `/api/v1/vp/industries/${encodeURIComponent(code)}/stocks?trade_date=${encodeURIComponent(td)}&window=${w}&limit=30`
-    );
-    elDetailStocks.innerHTML = "";
-    (stocks.items || []).forEach((row) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML =
-        `<td>${row.ts_code}</td>` +
-        `<td>${row.stock_name || "—"}</td>` +
-        `<td>${fmt(row.pct_chg, 2)}</td>` +
-        `<td>${fmt(row.vol_ratio_20, 2)}</td>` +
-        `<td>${row.vol_streak_days ?? "—"}</td>` +
-        `<td>${row.is_breakout_strict ? "是" : "—"}</td>` +
-        `<td>${labelPattern(row.vp_pattern)}</td>` +
-        `<td>${fmt(row.vp_pattern_score, 0)}</td>`;
-      elDetailStocks.appendChild(tr);
-    });
+    try {
+      await loadDetailStocks(code);
+    } catch (e) {
+      showError("成分股加载失败: " + (e.message || String(e)));
+    }
     scrollToVpKline();
   }
+
+  if (elDetailStocksHead) {
+    elDetailStocksHead.addEventListener("click", (e) => {
+      const th = e.target.closest(".sortable-th[data-sort]");
+      if (!th || !detailIndustryCode) return;
+      const key = th.dataset.sort;
+      if (stockSortKey === key) {
+        stockSortDir = stockSortDir === "desc" ? "asc" : "desc";
+      } else {
+        stockSortKey = key;
+        stockSortDir = "desc";
+      }
+      loadDetailStocks(detailIndustryCode).catch((err) =>
+        showError("成分股加载失败: " + (err.message || String(err)))
+      );
+    });
+  }
+
+  renderStockHead();
 
   elBoardSearch.addEventListener("input", () => {
     clearTimeout(boardSearchTimer);

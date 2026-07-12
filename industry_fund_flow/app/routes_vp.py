@@ -116,6 +116,7 @@ def api_vp_industry_stocks(
     window: int = Query(20, ge=3, le=120),
     limit: int = Query(100, ge=1, le=500),
     sort: str = Query("vol_ratio_20"),
+    order: str = Query("desc", description="asc 或 desc"),
     _user: dict = Depends(require_user),
 ):
     try:
@@ -125,6 +126,7 @@ def api_vp_industry_stocks(
             window=window,
             limit=limit,
             sort=sort,
+            order=order,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

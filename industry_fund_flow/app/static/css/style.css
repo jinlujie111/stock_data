@@ -1101,6 +1101,11 @@ body {
   font-weight: 500;
 }
 
+#detail-stocks-table td.cell-rise,
+#detail-stocks-table td.cell-fall {
+  font-variant-numeric: tabular-nums;
+}
+
 .table-empty {
   padding: 2rem;
   text-align: center;
@@ -2014,6 +2019,48 @@ body {
 .btn-vp-detail.is-active::before {
   opacity: 1;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.vp-stock-def {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 1.25rem;
+  margin: 0 0 0.875rem;
+  padding: 0.65rem 0.875rem;
+  border-radius: 8px;
+  background: rgba(15, 20, 25, 0.55);
+  border: 1px solid rgba(45, 58, 79, 0.45);
+}
+
+.vp-stock-def-item {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.vp-stock-def-item dt {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.vp-stock-def-item dd {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+@media (max-width: 768px) {
+  .vp-stock-def {
+    grid-template-columns: 1fr;
+  }
+}
+
+#detail-stocks-table .sortable-th.active {
+  color: var(--text);
 }
 
 .vp-kline-section {

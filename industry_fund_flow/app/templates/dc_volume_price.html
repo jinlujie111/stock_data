@@ -136,20 +136,15 @@
   </div>
 
   <h3>成分股量价 Top</h3>
+  <dl class="vp-stock-def">
+    <div class="vp-stock-def-item"><dt>连续放量</dt><dd>当日成交量 &gt; 近 20 日均量的连续交易日数</dd></div>
+    <div class="vp-stock-def-item"><dt>严格突破</dt><dd>60 日新高且收盘突破前高，且成交额 &gt; 5 日均 × 1.5</dd></div>
+    <div class="vp-stock-def-item"><dt>量价形态</dt><dd>价涨量增→趋势确认 · 价涨量缩→缩量上涨 · 价跌量增→出货 · 价跌量缩→低迷筑底</dd></div>
+    <div class="vp-stock-def-item"><dt>形态分</dt><dd>0–100，按量价配合分类并结合涨跌幅、量比微调</dd></div>
+  </dl>
   <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>代码</th>
-          <th>名称</th>
-          <th>涨跌幅%</th>
-          <th>量比</th>
-          <th>连续放量</th>
-          <th>严格突破</th>
-          <th>量价形态</th>
-          <th>形态分</th>
-        </tr>
-      </thead>
+    <table class="data-table" id="detail-stocks-table">
+      <thead id="detail-stocks-head"></thead>
       <tbody id="detail-stocks"></tbody>
     </table>
   </div>
@@ -160,5 +155,5 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260712b"></script>
 <script src="/static/js/dc_kline_chart.js?v=20260712i"></script>
-<script src="/static/js/dc_volume_price.js?v=20260712m"></script>
+<script src="/static/js/dc_volume_price.js?v=20260712o"></script>
 {% endblock %}
