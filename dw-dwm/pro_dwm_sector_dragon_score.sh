@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_sector_stock_dragon_score_di, dwm_sector_dragon_summary_di
 # 板块成分股龙头 MVP 评分（需求2：行业+概念全量批处理）

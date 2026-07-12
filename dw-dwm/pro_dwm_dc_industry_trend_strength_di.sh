@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_dc_industry_trend_strength_di
 # source_table: ods_dc_daily_di, ods_dc_index_di, ods_index_daily_di

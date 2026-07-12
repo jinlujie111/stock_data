@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_market_breadth_di
 # source_table: ods_stock_detail_di, ods_limit_list_di

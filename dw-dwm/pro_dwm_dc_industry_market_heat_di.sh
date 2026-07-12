@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_dc_industry_market_heat_di
 # source_table: ods_dc_daily_di, ods_dc_index_di, ods_dc_member_di,

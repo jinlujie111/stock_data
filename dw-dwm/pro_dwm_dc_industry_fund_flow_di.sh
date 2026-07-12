@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_dc_industry_fund_flow_di
 # source_table: ods_industry_fund_flow_di, ods_dc_daily_di

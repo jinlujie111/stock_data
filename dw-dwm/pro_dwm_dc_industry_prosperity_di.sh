@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_dc_industry_prosperity_di
 # source_table: ods_dc_member_di, ods_dc_index_di, ods_fina_indicator, ods_report_rc_di

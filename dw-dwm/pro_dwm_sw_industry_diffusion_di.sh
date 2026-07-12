@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # =============================================================================
 # target_table: dwm_sw_industry_diffusion_di
 # source_table: ods_index_member_all, ods_stock_detail_di, ods_limit_list_di,
