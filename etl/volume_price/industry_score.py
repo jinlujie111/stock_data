@@ -67,7 +67,7 @@ def score_industries(agg_rows: list[dict[str, Any]], cfg: VpConfig) -> list[dict
         + g["score_leader"] * cfg.weight_leader
     ).round(2)
 
-    g = g.sort_values("vp_score", ascending=False)
+    g = g.sort_values(["vp_score", "industry_code"], ascending=[False, True])
     g["rank_vp"] = range(1, len(g) + 1)
 
     out_rows: list[dict[str, Any]] = []
