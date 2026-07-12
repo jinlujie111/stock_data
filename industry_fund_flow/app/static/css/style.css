@@ -446,15 +446,13 @@ body {
 }
 
 .metric-grid--vp-row {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
   gap: 0.65rem;
-  overflow-x: auto;
 }
 
 .metric-grid--vp-row .metric-item {
-  flex: 1 1 0;
-  min-width: 96px;
+  min-width: 0;
   padding: 0.65rem 0.75rem;
 }
 
