@@ -467,6 +467,22 @@ body {
   font-size: 1.0625rem;
 }
 
+.vp-metric-block {
+  margin-bottom: 0.75rem;
+}
+
+.vp-metric-block:last-child {
+  margin-bottom: 0;
+}
+
+.vp-metric-block-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+}
+
 .vp-formula-card {
   padding: 0.875rem 1rem;
   margin-bottom: 0.75rem;

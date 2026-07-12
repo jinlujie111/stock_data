@@ -516,6 +516,9 @@
     const streakDays = vpSeries.map((v) =>
       v && v.amount_streak_days != null ? Number(v.amount_streak_days) : null
     );
+    const trendRet20 = vpSeries.map((v) =>
+      v && v.trend_return_20d != null ? Number(v.trend_return_20d) : null
+    );
 
     const markPoints = [];
     vpSeries.forEach((v, i) => {
@@ -558,7 +561,9 @@
         `VP分 <strong>${vp.vp_score != null ? Number(vp.vp_score).toFixed(1) : "—"}</strong>`,
         `状态 ${vpLabelStatus(vp.vp_status)} · 信号 ${vpLabelSignal(vp.signal_type)}`,
         `上涨占比 ${vpPct(vp.rising_ratio)} · 突破占比 ${vpPct(vp.breakout_ratio)}`,
-        `连续放量 ${vp.amount_streak_days != null ? vp.amount_streak_days + "天" : "—"}`,
+        `连续强度 ${vp.continuity_strength != null ? Number(vp.continuity_strength).toFixed(2) : "—"} · 连续 ${vp.amount_streak_days != null ? vp.amount_streak_days + "天" : "—"}`,
+        vp.trend_return_20d != null ? `20日趋势 ${Number(vp.trend_return_20d).toFixed(2)}%` : "",
+        vp.leader_strength != null ? `龙头强度 ${Number(vp.leader_strength).toFixed(2)}` : "",
         vp.industry_vol_ratio_20 != null ? `行业量比 ${Number(vp.industry_vol_ratio_20).toFixed(2)}` : "",
       ]
         .filter(Boolean)
@@ -669,7 +674,7 @@
           },
         },
         legend: {
-          data: ["K线", "VP分", "上涨占比", "突破占比", "连续放量"],
+          data: ["K线", "VP分", "上涨占比", "突破占比", "连续放量天数", "20日趋势"],
           top: 0,
           textStyle: { color: "#94a3b8", fontSize: 11 },
           inactiveColor: "#64748b",
@@ -841,7 +846,7 @@
             emphasis: { focus: "none", scale: false },
           },
           {
-            name: "连续放量",
+            name: "连续放量天数",
             type: "line",
             xAxisIndex: 2,
             yAxisIndex: 3,
@@ -851,6 +856,18 @@
             symbolSize: 4,
             lineStyle: { width: 1.5, color: "#a855f7" },
             itemStyle: { color: "#a855f7" },
+            emphasis: { focus: "none", scale: false },
+          },
+          {
+            name: "20日趋势",
+            type: "line",
+            xAxisIndex: 2,
+            yAxisIndex: 3,
+            data: trendRet20,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: { width: 1.2, color: "#06b6d4", type: "dotted" },
+            itemStyle: { color: "#06b6d4" },
             emphasis: { focus: "none", scale: false },
           },
         ],

@@ -1,7 +1,7 @@
 (function () {
   const board = window.DcBoard || {};
   const kline = window.DcKline || {};
-  const { klineLink, normalizeIsoDate, toApiTradeDate } = board;
+  const { normalizeIsoDate, toApiTradeDate } = board;
 
   const elDate = document.getElementById("trade-date");
   const elKlineStart = document.getElementById("kline-start");
@@ -11,6 +11,7 @@
   const elVpKlineChart = document.getElementById("vp-kline-chart");
   const elTypes = document.getElementById("content-types");
   const elWindow = document.getElementById("window");
+  const elRankSort = document.getElementById("rank-sort");
   const elThead = document.getElementById("vp-thead");
   const elBody = document.getElementById("vp-body");
   const elEmpty = document.getElementById("vp-empty");
@@ -25,7 +26,6 @@
   const elBoardPicker = document.getElementById("board-picker");
   const btnQuery = document.getElementById("btn-query");
   const btnResetBoards = document.getElementById("btn-reset-boards");
-  let activeTab = "rank";
 
   const selectedBoards = new Map();
   const boardSearchResults = new Map();
@@ -36,7 +36,6 @@
   let klineRangeDays = 60;
 
   const EMPTY_MSG_RANK = "暂无数据，请先运行 run_vp_batch";
-  const EMPTY_MSG_SIGNALS = "暂无信号";
 
   const STATUS_LABEL = {
     mainline_burst: "主线爆发",
@@ -81,6 +80,52 @@
   function pct(v) {
     if (v === null || v === undefined) return "—";
     return (Number(v) * 100).toFixed(1) + "%";
+  }
+
+  function retPct(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+  }
+
+  function metricItems(pairs) {
+    return pairs
+      .map(
+        ([k, v]) =>
+          `<div class="metric-item"><span class="metric-label">${k}</span><span class="metric-value">${v ?? "—"}</span></div>`
+      )
+      .join("");
+  }
+
+  function renderDetailMetrics(s) {
+    const raw = [
+      ["VP 综合分", fmt(s.vp_score, 1)],
+      ["排名", s.rank_vp != null ? "#" + s.rank_vp : "—"],
+      ["状态", STATUS_LABEL[s.vp_status] || s.vp_status],
+      ["信号", labelSignal(s.signal_type)],
+      ["行业量比", fmt(s.industry_vol_ratio_20, 2)],
+      ["上涨占比", pct(s.rising_ratio)],
+      ["突破占比", pct(s.breakout_ratio)],
+      ["连续放量强度", fmt(s.continuity_strength, 2)],
+      ["连续放量天数", s.amount_streak_days ?? "—"],
+      ["20日趋势", retPct(s.trend_return_20d)],
+      ["龙头强度", fmt(s.leader_strength, 2)],
+      ["成分数", s.member_cnt],
+    ];
+    const subs = [
+      ["子分·连续", fmt(s.score_continuity, 1)],
+      ["子分·量比", fmt(s.score_vol, 1)],
+      ["子分·趋势", fmt(s.score_trend, 1)],
+      ["子分·上涨", fmt(s.score_breadth, 1)],
+      ["子分·突破", fmt(s.score_breakout, 1)],
+      ["子分·龙头", fmt(s.score_leader, 1)],
+    ];
+    elDetailMetrics.innerHTML =
+      `<div class="vp-metric-block"><div class="vp-metric-block-title">原始指标</div>` +
+      `<div class="metric-grid metric-grid--vp-row">${metricItems(raw)}</div></div>` +
+      `<div class="vp-metric-block"><div class="vp-metric-block-title">六维子分</div>` +
+      `<div class="metric-grid metric-grid--vp-row">${metricItems(subs)}</div></div>`;
   }
 
   async function apiGet(path) {
@@ -323,7 +368,7 @@
   function renderRank(items) {
     elThead.innerHTML =
       "<tr><th>#</th><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th>" +
-      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续放量</th><th>K线分析</th><th>操作</th></tr>";
+      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续强度</th><th>20日趋势</th><th>龙头</th><th>操作</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {
       showTableEmpty(EMPTY_MSG_RANK);
@@ -342,36 +387,9 @@
         `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
         `<td>${pct(row.rising_ratio)}</td>` +
         `<td>${pct(row.breakout_ratio)}</td>` +
-        `<td>${row.amount_streak_days ?? "—"}</td>` +
-        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>` +
-        `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">数据分析</button></td>`;
-      elBody.appendChild(tr);
-    });
-    elBody.querySelectorAll(".btn-detail").forEach((btn) => {
-      btn.addEventListener("click", () => loadDetail(btn.dataset.code));
-    });
-  }
-
-  function renderSignals(items) {
-    elThead.innerHTML =
-      "<tr><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th><th>行业量比</th><th>连续放量</th><th>K线分析</th><th>操作</th></tr>";
-    elBody.innerHTML = "";
-    if (!items.length) {
-      showTableEmpty(EMPTY_MSG_SIGNALS);
-      return;
-    }
-    hideTableEmpty();
-    items.forEach((row) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML =
-        `<td>${row.industry_name || row.industry_code}</td>` +
-        `<td>${row.content_type || "—"}</td>` +
-        `<td>${fmt(row.vp_score, 1)}</td>` +
-        `<td>${STATUS_LABEL[row.vp_status] || row.vp_status || "—"}</td>` +
-        `<td>${labelSignal(row.signal_type)}</td>` +
-        `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
-        `<td>${row.amount_streak_days ?? "—"}</td>` +
-        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>` +
+        `<td>${fmt(row.continuity_strength, 2)}</td>` +
+        `<td>${retPct(row.trend_return_20d)}</td>` +
+        `<td>${fmt(row.leader_strength, 2)}</td>` +
         `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">数据分析</button></td>`;
       elBody.appendChild(tr);
     });
@@ -383,21 +401,25 @@
   async function loadRank() {
     clearError();
     const { td, types, w, codes } = queryParams();
+    const sort = elRankSort ? elRankSort.value : "vp_score";
     let url =
       `/api/v1/vp/industries/rank?trade_date=${encodeURIComponent(td)}` +
-      `&content_types=${encodeURIComponent(types)}&window=${w}&top=50`;
+      `&content_types=${encodeURIComponent(types)}&window=${w}&top=50&sort=${encodeURIComponent(sort)}`;
     if (codes) url += `&industry_codes=${encodeURIComponent(codes)}`;
     const data = await apiGet(url);
     renderRank(data.items || []);
   }
 
-  async function loadSignals() {
-    clearError();
-    const { td, w, codes } = queryParams();
-    let url = `/api/v1/vp/signals?trade_date=${encodeURIComponent(td)}&window=${w}&top=50`;
-    if (codes) url += `&industry_codes=${encodeURIComponent(codes)}`;
-    const data = await apiGet(url);
-    renderSignals(data.items || []);
+  async function refresh() {
+    try {
+      await loadRank();
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  if (elRankSort) {
+    elRankSort.addEventListener("change", refresh);
   }
 
   async function loadDetail(code) {
@@ -413,21 +435,7 @@
     );
     const s = data.score || {};
     elDetailTitle.textContent = `${s.industry_name || code} · VP ${fmt(s.vp_score, 1)}`;
-    elDetailMetrics.innerHTML = [
-      ["VP 综合分", fmt(s.vp_score, 1)],
-      ["状态", STATUS_LABEL[s.vp_status] || s.vp_status],
-      ["信号", labelSignal(s.signal_type)],
-      ["行业量比", fmt(s.industry_vol_ratio_20, 2)],
-      ["上涨占比", pct(s.rising_ratio)],
-      ["突破占比", pct(s.breakout_ratio)],
-      ["连续放量", s.amount_streak_days],
-      ["成分数", s.member_cnt],
-    ]
-      .map(
-        ([k, v]) =>
-          `<div class="metric-item"><span class="metric-label">${k}</span><span class="metric-value">${v ?? "—"}</span></div>`
-      )
-      .join("");
+    renderDetailMetrics(s);
 
     try {
       await loadVpKline(code);
@@ -449,32 +457,13 @@
         `<td>${fmt(row.pct_chg, 2)}</td>` +
         `<td>${fmt(row.vol_ratio_20, 2)}</td>` +
         `<td>${row.vol_streak_days ?? "—"}</td>` +
-        `<td>${row.is_breakout_60 ? "是" : "—"}</td>` +
+        `<td>${row.is_breakout_strict ? "是" : "—"}</td>` +
         `<td>${labelPattern(row.vp_pattern)}</td>` +
-        `<td>${fmt(row.vp_pattern_score, 0)}</td>` +
-        `<td>${klineLink ? klineLink("stock", row.ts_code, td) : "—"}</td>`;
+        `<td>${fmt(row.vp_pattern_score, 0)}</td>`;
       elDetailStocks.appendChild(tr);
     });
     scrollToVpKline();
   }
-
-  async function refresh() {
-    try {
-      if (activeTab === "signals") await loadSignals();
-      else await loadRank();
-    } catch (e) {
-      showError(e.message || String(e));
-    }
-  }
-
-  document.querySelectorAll(".tab").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
-      activeTab = tab.dataset.tab;
-      refresh();
-    });
-  });
 
   elBoardSearch.addEventListener("input", () => {
     clearTimeout(boardSearchTimer);

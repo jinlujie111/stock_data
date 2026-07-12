@@ -31,6 +31,14 @@
       <strong>连续放量</strong>
       <span>强度=Σ(天数×超额倍数×衰减)；超额=成交额/均值−1；超 5 天每天衰减×0.8</span>
     </div>
+    <div class="vp-formula-item">
+      <strong>20日趋势</strong>
+      <span>板块指数 20 交易日收益率(%)；负值参与打分时归零</span>
+    </div>
+    <div class="vp-formula-item">
+      <strong>龙头强度</strong>
+      <span>流通市值 Top3 成分 (涨幅均值 + 量比均值) ÷ 2</span>
+    </div>
   </div>
 </div>
 
@@ -52,6 +60,20 @@
       <span>周期</span>
       <select id="window">
         <option value="20" selected>20日</option>
+        <option value="60">60日</option>
+        <option value="120">120日</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>排序</span>
+      <select id="rank-sort">
+        <option value="vp_score" selected>VP分</option>
+        <option value="continuity_strength">连续放量强度</option>
+        <option value="industry_vol_ratio_20">行业量比</option>
+        <option value="trend_return_20d">20日趋势</option>
+        <option value="rising_ratio">上涨占比</option>
+        <option value="breakout_ratio">突破占比</option>
+        <option value="leader_strength">龙头强度</option>
       </select>
     </label>
     <label class="filter-field filter-field--grow">
@@ -72,10 +94,6 @@
 <div id="page-error" class="alert alert-error hidden"></div>
 
 <div class="card">
-  <div class="tabs">
-    <button type="button" class="tab active" data-tab="rank">VP 评分榜</button>
-    <button type="button" class="tab" data-tab="signals">信号</button>
-  </div>
   <div class="table-wrap">
     <table class="data-table" id="vp-table">
       <thead id="vp-thead"></thead>
@@ -128,10 +146,9 @@
           <th>涨跌幅%</th>
           <th>量比</th>
           <th>连续放量</th>
-          <th>突破60</th>
+          <th>严格突破</th>
           <th>量价形态</th>
           <th>形态分</th>
-          <th>K线分析</th>
         </tr>
       </thead>
       <tbody id="detail-stocks"></tbody>
@@ -143,6 +160,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260712b"></script>
-<script src="/static/js/dc_kline_chart.js?v=20260712h"></script>
-<script src="/static/js/dc_volume_price.js?v=20260712g"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260712i"></script>
+<script src="/static/js/dc_volume_price.js?v=20260712j"></script>
 {% endblock %}

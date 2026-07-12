@@ -15,6 +15,35 @@ SCORE_TABLE = "dwm_industry_vp_score_di"
 AGG_TABLE = "dwm_industry_vp_agg_di"
 FACTOR_TABLE = "dwm_stock_vp_factor_di"
 
+_VP_SCORE_COLUMNS = """
+    industry_code, industry_name, content_type, vp_score, vp_status,
+    signal_type, industry_vol_ratio_20, rising_ratio, breakout_ratio,
+    amount_streak_days, continuity_strength, trend_return_20d, leader_strength,
+    rank_vp, member_cnt,
+    score_vol, score_trend, score_continuity, score_breadth, score_breakout, score_leader
+"""
+
+_VP_KLINE_COLUMNS = """
+    trade_date, vp_score, vp_status, signal_type,
+    rising_ratio, breakout_ratio, amount_streak_days,
+    continuity_strength, trend_return_20d, leader_strength,
+    industry_vol_ratio_20,
+    score_vol, score_trend, score_continuity, score_breadth, score_breakout, score_leader,
+    rank_vp
+"""
+
+_RANK_SORT_KEYS = frozenset({
+    "vp_score",
+    "industry_vol_ratio_20",
+    "rising_ratio",
+    "breakout_ratio",
+    "amount_streak_days",
+    "continuity_strength",
+    "trend_return_20d",
+    "leader_strength",
+    "score_leader",
+})
+
 
 def _serialize(value: Any) -> Any:
     if isinstance(value, (date, datetime)):
@@ -131,7 +160,7 @@ def rank_industries(
     ctypes = _parse_content_types(content_types)
     top = max(1, min(top, 200))
     window = max(3, min(window, 120))
-    sort_key = sort if sort in ("vp_score", "industry_vol_ratio_20", "breakout_ratio", "amount_streak_days") else "vp_score"
+    sort_key = sort if sort in _RANK_SORT_KEYS else "vp_score"
 
     placeholders = ", ".join(f":ct{i}" for i in range(len(ctypes)))
     params: dict[str, Any] = {"td": td, "w": window, "lim": top}
@@ -147,10 +176,7 @@ def rank_industries(
     rows = fetch_all_stock(
         f"""
         SELECT
-            industry_code, industry_name, content_type, vp_score, vp_status,
-            signal_type, industry_vol_ratio_20, rising_ratio, breakout_ratio,
-            amount_streak_days, rank_vp, member_cnt,
-            score_vol, score_trend, score_continuity, score_breadth, score_breakout
+            {_VP_SCORE_COLUMNS}
         FROM {SCORE_TABLE}
         WHERE trade_date = :td AND vp_window = :w
           AND content_type IN ({placeholders})
@@ -271,7 +297,7 @@ def list_industry_stocks(
     factors = fetch_all_stock(
         f"""
         SELECT ts_code, close, vol, amount, pct_chg, turnover_rate,
-               vol_ratio_20, vol_streak_days, is_breakout_60,
+               vol_ratio_20, vol_streak_days, is_breakout_60, is_breakout_strict,
                vp_pattern, vp_pattern_score
         FROM {FACTOR_TABLE}
         WHERE trade_date = :td AND vp_window = :w
@@ -319,9 +345,8 @@ def list_signals(
 
     rows = fetch_all_stock(
         f"""
-        SELECT industry_code, industry_name, content_type, vp_score, vp_status,
-               signal_type, industry_vol_ratio_20, rising_ratio, breakout_ratio,
-               amount_streak_days, rank_vp
+        SELECT
+            {_VP_SCORE_COLUMNS}
         FROM {SCORE_TABLE}
         WHERE trade_date = :td AND vp_window = :w
           AND signal_type IS NOT NULL AND signal_type <> 'none'
@@ -407,10 +432,8 @@ def get_industry_vp_kline(
     kline = chart_svc.get_board_kline(code, end, days=days, start_date=start)
     vp_rows = fetch_all_stock(
         f"""
-        SELECT trade_date, vp_score, vp_status, signal_type,
-               rising_ratio, breakout_ratio, amount_streak_days,
-               industry_vol_ratio_20, score_vol, score_trend,
-               score_breadth, score_breakout, score_continuity, rank_vp
+        SELECT
+            {_VP_KLINE_COLUMNS}
         FROM {SCORE_TABLE}
         WHERE industry_code = :ic AND vp_window = :w
           AND trade_date >= :start AND trade_date <= :end
