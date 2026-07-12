@@ -5,6 +5,35 @@
   <p class="muted">东财行业/概念 · 量比 · 量价配合 · VP 评分榜</p>
 </div>
 
+<div class="card vp-formula-card">
+  <div class="vp-formula-list">
+    <div class="vp-formula-item">
+      <strong>VP 分</strong>
+      <span>同板块类型内，行业量比、趋势、连续放量、上涨占比、突破占比转为百分位子分后加权（30% / 25% / 15% / 15% / 15%）</span>
+    </div>
+    <div class="vp-formula-item">
+      <strong>状态</strong>
+      <span>按 VP 分五档：≥80 主线爆发 · ≥60 趋势上升 · ≥40 震荡 · ≥20 弱势 · &lt;20 退潮；信号：主线爆发→主升，退潮→退潮</span>
+    </div>
+    <div class="vp-formula-item">
+      <strong>行业量比</strong>
+      <span>板块当日总成交额 ÷ 近 20 日板块成交额均值</span>
+    </div>
+    <div class="vp-formula-item">
+      <strong>上涨占比</strong>
+      <span>成分股上涨家数 ÷ 有效成分股数（默认 ≥5 只）</span>
+    </div>
+    <div class="vp-formula-item">
+      <strong>突破占比</strong>
+      <span>满足「收盘 ≥ 60 日新高且成交量 &gt; 20 日均量 × 1.5」的成分股占比</span>
+    </div>
+    <div class="vp-formula-item">
+      <strong>连续放量</strong>
+      <span>板块成交额连续高于其移动均值的天数，纳入 VP 连续性子分（权重 15%）</span>
+    </div>
+  </div>
+</div>
+
 <div class="card filters-card">
   <div class="filters">
     <label class="filter-field">
@@ -58,12 +87,12 @@
 
 <div class="card hidden" id="detail-card">
   <h2 id="detail-title">板块详情</h2>
-  <div id="detail-metrics" class="metric-grid"></div>
+  <div id="detail-metrics" class="metric-grid metric-grid--vp-row"></div>
 
   <div class="vp-kline-section">
     <div class="vp-kline-head">
       <h3>板块 K 线 · VP 指标</h3>
-      <p class="muted filter-hint">默认展示结束日前 60 个交易日；调整区间后点击「刷新 K 线」</p>
+      <p class="muted filter-hint">点击「数据分析」自动加载近 60 交易日 K 线与 VP 指标；调整区间后点击「刷新 K 线」</p>
     </div>
     <div class="filters kline-range-filters">
       <label class="filter-field">
@@ -114,6 +143,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260712b"></script>
-<script src="/static/js/dc_kline_chart.js?v=20260712c"></script>
-<script src="/static/js/dc_volume_price.js?v=20260712b"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260712e"></script>
+<script src="/static/js/dc_volume_price.js?v=20260712f"></script>
 {% endblock %}

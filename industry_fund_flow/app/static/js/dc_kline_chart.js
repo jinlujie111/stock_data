@@ -53,6 +53,15 @@
     return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
   }
 
+  function fmtVol(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (Number.isNaN(n)) return "—";
+    if (n >= 1e8) return (n / 1e8).toFixed(2) + "亿";
+    if (n >= 1e4) return (n / 1e4).toFixed(2) + "万";
+    return n.toFixed(0);
+  }
+
   function cellCls(v) {
     const n = Number(v);
     if (Number.isNaN(n) || v === null || v === "") return "";
@@ -483,6 +492,7 @@
     if (chart && chart.isDisposed()) chart = null;
     if (!chart) {
       chartEl.innerHTML = "";
+      chartEl._vpPointerBound = false;
       chartEl.style.height = opts.height || "560px";
       chart = echarts.init(chartEl);
       if (!chartEl._vpResizeBound) {
@@ -523,6 +533,103 @@
       });
     });
 
+    function resolveDataIndex(params, axisValue) {
+      if (axisValue != null && axisValue !== "") {
+        const idx = dates.indexOf(String(axisValue));
+        if (idx >= 0) return idx;
+      }
+      if (params && params.length) {
+        for (const p of params) {
+          if (p.dataIndex != null && p.dataIndex >= 0) return p.dataIndex;
+        }
+      }
+      return -1;
+    }
+
+    function buildVpTooltipHtml(idx) {
+      if (idx < 0 || idx >= dates.length) return "";
+      const bar = bars[idx] || {};
+      const vp = vpSeries[idx] || {};
+      const pctChg = bar.pct_change != null ? fmtPct(bar.pct_change) : "—";
+      return [
+        `<strong>${dates[idx]}</strong>`,
+        `收 ${fmtPrice(bar.close)} (${pctChg})`,
+        `成交量 ${fmtVol(bar.vol != null ? bar.vol : vols[idx])}`,
+        `VP分 <strong>${vp.vp_score != null ? Number(vp.vp_score).toFixed(1) : "—"}</strong>`,
+        `状态 ${vpLabelStatus(vp.vp_status)} · 信号 ${vpLabelSignal(vp.signal_type)}`,
+        `上涨占比 ${vpPct(vp.rising_ratio)} · 突破占比 ${vpPct(vp.breakout_ratio)}`,
+        `连续放量 ${vp.amount_streak_days != null ? vp.amount_streak_days + "天" : "—"}`,
+        vp.industry_vol_ratio_20 != null ? `行业量比 ${Number(vp.industry_vol_ratio_20).toFixed(2)}` : "",
+      ]
+        .filter(Boolean)
+        .join("<br/>");
+    }
+
+    function vpSubChartHints(idx) {
+      if (idx < 0 || idx >= dates.length) return [];
+      const vp = vpSeries[idx] || {};
+      const volText = `成交量 ${fmtVol(vols[idx])}`;
+      const vpText = `VP分 ${vp.vp_score != null ? Number(vp.vp_score).toFixed(1) : "—"}`;
+      return [
+        {
+          type: "text",
+          id: "vp-vol-hint",
+          left: 58,
+          top: "57%",
+          z: 100,
+          style: { text: volText, fill: "#e2e8f0", fontSize: 11 },
+        },
+        {
+          type: "text",
+          id: "vp-score-hint",
+          left: 58,
+          top: "73%",
+          z: 100,
+          style: { text: vpText, fill: "#3b82f6", fontSize: 12, fontWeight: "bold" },
+        },
+      ];
+    }
+
+    function bindVpCrosshairSync(chart, chartEl, ctx) {
+      if (chartEl._vpPointerBound) return;
+      chartEl._vpPointerBound = true;
+      const { dates: dts } = ctx;
+      let lastIdx = -1;
+
+      function clearHints() {
+        lastIdx = -1;
+        chart.setOption({ graphic: [] });
+      }
+
+      function syncPointer(idx) {
+        if (idx < 0 || idx >= dts.length) {
+          clearHints();
+          return;
+        }
+        if (idx === lastIdx) return;
+        lastIdx = idx;
+        chart.setOption({ graphic: vpSubChartHints(idx) });
+        chart.dispatchAction({ type: "showTip", seriesIndex: 0, dataIndex: idx });
+        chart.dispatchAction({ type: "highlight", seriesIndex: 1, dataIndex: idx });
+        chart.dispatchAction({ type: "highlight", seriesIndex: 2, dataIndex: idx });
+      }
+
+      chart.on("updateAxisPointer", (event) => {
+        const xInfo = (event.axesInfo || []).find((a) => a.axisDim === "x");
+        if (!xInfo || xInfo.value == null) {
+          clearHints();
+          return;
+        }
+        syncPointer(Number(xInfo.value));
+      });
+
+      chart.on("globalout", () => {
+        clearHints();
+        chart.dispatchAction({ type: "downplay", seriesIndex: 1 });
+        chart.dispatchAction({ type: "downplay", seriesIndex: 2 });
+      });
+    }
+
     chart.setOption(
       {
         backgroundColor: "transparent",
@@ -555,25 +662,14 @@
           backgroundColor: "#1a2332",
           borderColor: "#2d3748",
           textStyle: { color: "#e2e8f0", fontSize: 12 },
+          position(point, _params, _dom, _rect, size) {
+            const x = Math.min(Math.max(point[0], 80), size.viewSize[0] - 160);
+            return [x, 36];
+          },
           formatter(params) {
             if (!params || !params.length) return "";
-            const idx = params[0].dataIndex;
-            const bar = bars[idx] || {};
-            const vp = vpSeries[idx] || {};
-            const pctChg = bar.pct_change != null ? fmtPct(bar.pct_change) : "—";
-            return [
-              `<strong>${dates[idx]}</strong>`,
-              `收 ${fmtPrice(bar.close)} (${pctChg})`,
-              `VP分 <strong>${vp.vp_score != null ? Number(vp.vp_score).toFixed(1) : "—"}</strong>`,
-              `状态 ${vpLabelStatus(vp.vp_status)} · 信号 ${vpLabelSignal(vp.signal_type)}`,
-              `上涨占比 ${vpPct(vp.rising_ratio)} · 突破占比 ${vpPct(vp.breakout_ratio)}`,
-              `连续放量 ${vp.amount_streak_days != null ? vp.amount_streak_days + "天" : "—"}`,
-              vp.industry_vol_ratio_20 != null
-                ? `行业量比 ${Number(vp.industry_vol_ratio_20).toFixed(2)}`
-                : "",
-            ]
-              .filter(Boolean)
-              .join("<br/>");
+            const idx = resolveDataIndex(params, params[0].axisValue);
+            return buildVpTooltipHtml(idx);
           },
         },
         legend: {
@@ -630,7 +726,17 @@
             axisLine: { show: false },
             axisTick: { show: false },
             splitLine: { show: false },
-            axisPointer: { show: true, snap: false, label: { show: false } },
+            axisPointer: {
+              show: true,
+              snap: true,
+              label: {
+                show: true,
+                backgroundColor: "#334155",
+                color: "#e2e8f0",
+                fontSize: 10,
+                formatter: (p) => fmtVol(p.value),
+              },
+            },
           },
           {
             min: 0,
@@ -639,7 +745,17 @@
             position: "left",
             splitLine: { lineStyle: { color: "#1e293b" } },
             axisLabel: { color: "#94a3b8", fontSize: 10, formatter: "{value}" },
-            axisPointer: { show: true, snap: false },
+            axisPointer: {
+              show: true,
+              snap: true,
+              label: {
+                show: true,
+                backgroundColor: "#334155",
+                color: "#3b82f6",
+                fontSize: 10,
+                formatter: (p) => (p.value != null ? Number(p.value).toFixed(1) : ""),
+              },
+            },
           },
           {
             min: 0,
@@ -688,6 +804,10 @@
                 color: ohlc[i][1] >= ohlc[i][0] ? "rgba(239,68,68,0.55)" : "rgba(34,197,94,0.55)",
               },
             })),
+            emphasis: {
+              focus: "self",
+              itemStyle: { opacity: 1, borderColor: "#e2e8f0", borderWidth: 1 },
+            },
           },
           {
             name: "VP分",
@@ -699,6 +819,11 @@
             showSymbol: false,
             lineStyle: { width: 2, color: "#3b82f6" },
             itemStyle: { color: "#3b82f6" },
+            emphasis: {
+              focus: "series",
+              scale: true,
+              itemStyle: { borderColor: "#fff", borderWidth: 2 },
+            },
           },
           {
             name: "上涨占比",
@@ -736,6 +861,7 @@
       },
       true
     );
+    bindVpCrosshairSync(chart, chartEl, { dates });
     return chart;
   }
 

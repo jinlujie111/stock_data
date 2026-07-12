@@ -35,6 +35,9 @@
   let vpTradeDates = [];
   let klineRangeDays = 60;
 
+  const EMPTY_MSG_RANK = "暂无数据，请先运行 run_vp_batch";
+  const EMPTY_MSG_SIGNALS = "暂无信号";
+
   const STATUS_LABEL = {
     mainline_burst: "主线爆发",
     trend_up: "趋势上升",
@@ -120,7 +123,14 @@
     }
   }
 
-  function boardLabel(item) {
+  function showTableEmpty(msg) {
+    elEmpty.textContent = msg;
+    elEmpty.classList.remove("hidden");
+  }
+
+  function hideTableEmpty() {
+    elEmpty.classList.add("hidden");
+  }
     return `[${item.content_type}] ${item.industry_name} (${item.industry_code})`;
   }
 
@@ -265,6 +275,19 @@
     setKlineRangeByDays(klineRangeDays);
   }
 
+  /** 打开数据分析时：结束日=当前查询日，区间固定为近 60 个交易日并立即拉 K 线 */
+  function prepareKlineRangeForAnalysis(days) {
+    const rangeDays = days == null ? 60 : days;
+    const endIso = isoFromTradeDate(elDate.value);
+    if (elKlineEnd) elKlineEnd.value = endIso;
+    setKlineRangeByDays(rangeDays);
+  }
+
+  function scrollToVpKline() {
+    const section = document.querySelector(".vp-kline-section");
+    if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function loadVpKline(code) {
     if (!code || !elVpKlineChart) return;
     if (typeof echarts === "undefined") {
@@ -301,10 +324,10 @@
       "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续放量</th><th>K线分析</th><th>操作</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {
-      elEmpty.classList.remove("hidden");
+      showTableEmpty(EMPTY_MSG_RANK);
       return;
     }
-    elEmpty.classList.add("hidden");
+    hideTableEmpty();
     items.forEach((row, idx) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
@@ -319,7 +342,7 @@
         `<td>${pct(row.breakout_ratio)}</td>` +
         `<td>${row.amount_streak_days ?? "—"}</td>` +
         `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>` +
-        `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">详情</button></td>`;
+        `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">数据分析</button></td>`;
       elBody.appendChild(tr);
     });
     elBody.querySelectorAll(".btn-detail").forEach((btn) => {
@@ -329,13 +352,13 @@
 
   function renderSignals(items) {
     elThead.innerHTML =
-      "<tr><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th><th>行业量比</th><th>连续放量</th><th>K线分析</th></tr>";
+      "<tr><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th><th>行业量比</th><th>连续放量</th><th>K线分析</th><th>操作</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {
-      elEmpty.classList.remove("hidden");
+      showTableEmpty(EMPTY_MSG_SIGNALS);
       return;
     }
-    elEmpty.classList.add("hidden");
+    hideTableEmpty();
     items.forEach((row) => {
       const tr = document.createElement("tr");
       tr.innerHTML =
@@ -346,8 +369,12 @@
         `<td>${labelSignal(row.signal_type)}</td>` +
         `<td>${fmt(row.industry_vol_ratio_20, 2)}</td>` +
         `<td>${row.amount_streak_days ?? "—"}</td>` +
-        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>`;
+        `<td>${klineLink ? klineLink("board", row.industry_code, elDate.value) : "—"}</td>` +
+        `<td><button type="button" class="btn btn-link btn-detail" data-code="${row.industry_code}">数据分析</button></td>`;
       elBody.appendChild(tr);
+    });
+    elBody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadDetail(btn.dataset.code));
     });
   }
 
@@ -374,6 +401,10 @@
   async function loadDetail(code) {
     clearError();
     detailIndustryCode = code;
+    elDetailCard.classList.remove("hidden");
+    prepareKlineRangeForAnalysis(60);
+    showKlineStatus("加载 K 线…", "kline-loading");
+
     const { td, w } = queryParams();
     const data = await apiGet(
       `/api/v1/vp/industries/${encodeURIComponent(code)}?trade_date=${encodeURIComponent(td)}&window=${w}`
@@ -396,7 +427,6 @@
       )
       .join("");
 
-    initKlineRangeDefaults();
     try {
       await loadVpKline(code);
     } catch (e) {
@@ -423,7 +453,7 @@
         `<td>${klineLink ? klineLink("stock", row.ts_code, td) : "—"}</td>`;
       elDetailStocks.appendChild(tr);
     });
-    elDetailCard.classList.remove("hidden");
+    scrollToVpKline();
   }
 
   async function refresh() {
@@ -496,7 +526,7 @@
   if (btnKlineRefresh) {
     btnKlineRefresh.addEventListener("click", () => {
       if (!detailIndustryCode) {
-        showError("请先在榜单中点击「详情」选择板块");
+        showError("请先在榜单中点击「数据分析」选择板块");
         return;
       }
       loadVpKline(detailIndustryCode).catch((err) => {
