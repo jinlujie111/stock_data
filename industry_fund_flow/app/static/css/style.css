@@ -1809,7 +1809,7 @@ body {
 }
 
 .vp-l5 {
-  color: #e879f9;
+  color: #f87171;
 }
 
 .vp-l4 {
@@ -1840,9 +1840,9 @@ body {
 
 .vp-badge.vp-l5,
 .metric-value.vp-l5.metric-value--badge {
-  color: #f5d0fe;
-  background: rgba(168, 85, 247, 0.18);
-  border-color: rgba(168, 85, 247, 0.35);
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 .vp-badge.vp-l4,
@@ -1874,9 +1874,9 @@ body {
 }
 
 .vp-st-mainline {
-  color: #f5d0fe;
-  background: rgba(168, 85, 247, 0.2);
-  border-color: rgba(168, 85, 247, 0.4);
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 .vp-st-trend {
