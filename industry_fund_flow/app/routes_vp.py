@@ -132,6 +132,29 @@ def api_vp_industry_stocks(
         raise HTTPException(status_code=500, detail=f"查询成分股失败: {exc}") from exc
 
 
+@api_router.get("/industries/{industry_code}/kline")
+def api_vp_industry_kline(
+    industry_code: str,
+    trade_date: str | None = Query(None, description="区间结束日 YYYYMMDD"),
+    start_date: str | None = Query(None, description="区间开始日 YYYYMMDD"),
+    days: int = Query(60, ge=5, le=365, description="未指定 start_date 时向前交易日数"),
+    window: int = Query(20, ge=3, le=120),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return vp_svc.get_industry_vp_kline(
+            industry_code,
+            trade_date,
+            start_date=start_date,
+            days=days,
+            window=window,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询 K 线失败: {exc}") from exc
+
+
 @api_router.get("/signals")
 def api_vp_signals(
     trade_date: str | None = Query(None),

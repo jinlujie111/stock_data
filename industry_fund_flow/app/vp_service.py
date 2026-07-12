@@ -8,6 +8,7 @@ from typing import Any
 
 from app.db import fetch_all_stock, fetch_one_stock
 from app.dc_service import parse_trade_date
+from app import chart_service as chart_svc
 
 SCORE_TABLE = "dwm_industry_vp_score_di"
 AGG_TABLE = "dwm_industry_vp_agg_di"
@@ -335,4 +336,96 @@ def list_signals(
         "window": window,
         "signal_type": signal_type,
         "items": [_serialize_row(r) for r in rows],
+    }
+
+
+def resolve_vp_date_range(
+    end_date: str | None = None,
+    *,
+    start_date: str | None = None,
+    days: int = 60,
+) -> tuple[str, str]:
+    """解析 K 线区间：默认 end 为最新/指定交易日，start 为 end 前 days 个 VP 有数据的交易日。"""
+    end = _resolve_trade_date(end_date)
+    if start_date and start_date.strip():
+        start = parse_trade_date(start_date)
+        if start > end:
+            raise ValueError("开始日期不能晚于结束日期")
+        return start, end
+    days = max(1, min(days, 365))
+    rows = fetch_all_stock(
+        f"""
+        SELECT DISTINCT trade_date AS d
+        FROM {SCORE_TABLE}
+        WHERE trade_date <= :end
+        ORDER BY d DESC
+        LIMIT {days}
+        """,
+        {"end": end},
+    )
+    if rows:
+        dates = sorted(_serialize(r["d"]) for r in rows)
+        return dates[0], end
+    rows = fetch_all_stock(
+        """
+        SELECT DISTINCT trade_date AS d
+        FROM ods_trading_day_di
+        WHERE is_open = 1 AND trade_date <= :end
+        ORDER BY d DESC
+        LIMIT :days
+        """,
+        {"end": end, "days": days},
+    )
+    if rows:
+        dates = sorted(_serialize(r["d"]) for r in rows)
+        return dates[0], end
+    return end, end
+
+
+def get_industry_vp_kline(
+    industry_code: str,
+    trade_date: str | None = None,
+    *,
+    start_date: str | None = None,
+    days: int = 60,
+    window: int = 20,
+) -> dict[str, Any]:
+    """板块 K 线 + 同期 VP 指标序列（用于量价页叠加展示）。"""
+    if not industry_code or not industry_code.strip():
+        raise ValueError("industry_code 必填")
+    code = industry_code.strip()
+    window = max(3, min(window, 120))
+    start, end = resolve_vp_date_range(trade_date, start_date=start_date, days=days)
+
+    kline = chart_svc.get_board_kline(code, end, days=days, start_date=start)
+    vp_rows = fetch_all_stock(
+        f"""
+        SELECT trade_date, vp_score, vp_status, signal_type,
+               rising_ratio, breakout_ratio, amount_streak_days,
+               industry_vol_ratio_20, score_vol, score_trend,
+               score_breadth, score_breakout, score_continuity, rank_vp
+        FROM {SCORE_TABLE}
+        WHERE industry_code = :ic AND vp_window = :w
+          AND trade_date >= :start AND trade_date <= :end
+        ORDER BY trade_date ASC
+        """,
+        {"ic": code, "w": window, "start": start, "end": end},
+    )
+    vp_map = {_serialize(r["trade_date"]): _serialize_row(r) for r in vp_rows}
+    vp_series: list[dict] = []
+    for bar in kline.get("bars") or []:
+        td = bar.get("trade_date")
+        row = vp_map.get(td)
+        if row:
+            vp_series.append(row)
+        else:
+            vp_series.append({"trade_date": td})
+
+    return {
+        **kline,
+        "industry_code": code,
+        "start_date": start,
+        "end_date": end,
+        "window": window,
+        "vp_series": vp_series,
     }

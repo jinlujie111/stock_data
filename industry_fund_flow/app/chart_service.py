@@ -33,16 +33,35 @@ def _resolve_end_date(trade_date: str | None) -> str:
     )
 
 
-def _fetch_board_bars(codes: list[str], end_date: str, days: int) -> list[dict]:
+def _fetch_board_bars(
+    codes: list[str],
+    end_date: str,
+    days: int = 60,
+    *,
+    start_date: str | None = None,
+) -> list[dict]:
     placeholders = ", ".join(f":c{i}" for i in range(len(codes)))
     params: dict[str, Any] = {"end": end_date, **{f"c{i}": c for i, c in enumerate(codes)}}
+    if start_date:
+        params["start"] = start_date
+        rows = fetch_all_stock(
+            f"""
+            SELECT trade_date, open, high, low, close, pct_change, vol, amount, turnover_rate
+            FROM {BOARD_DAILY}
+            WHERE ts_code IN ({placeholders})
+              AND trade_date >= :start AND trade_date <= :end
+            ORDER BY trade_date ASC
+            """,
+            params,
+        )
+        return [_serialize_row(r) for r in rows]
     rows = fetch_all_stock(
         f"""
         SELECT trade_date, open, high, low, close, pct_change, vol, amount, turnover_rate
         FROM {BOARD_DAILY}
         WHERE ts_code IN ({placeholders}) AND trade_date <= :end
         ORDER BY trade_date DESC
-        LIMIT {days}
+        LIMIT {max(20, min(days, 365))}
         """,
         params,
     )
@@ -163,6 +182,8 @@ def get_board_kline(
     industry_code: str,
     trade_date: str | None = None,
     days: int = 60,
+    *,
+    start_date: str | None = None,
 ) -> dict[str, Any]:
     if not industry_code or not industry_code.strip():
         raise ValueError("industry_code 必填")
@@ -170,7 +191,7 @@ def get_board_kline(
     end = _resolve_end_date(trade_date)
     days = max(20, min(days, 365))
     codes = _board_code_variants(code)
-    bars = _fetch_board_bars(codes, end, days)
+    bars = _fetch_board_bars(codes, end, days, start_date=start_date)
     if not bars:
         raise ValueError(f"板块 {code} 暂无 K 线数据")
     _attach_pre_close(bars, "pct_change")

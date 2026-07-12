@@ -59,6 +59,36 @@
 <div class="card hidden" id="detail-card">
   <h2 id="detail-title">板块详情</h2>
   <div id="detail-metrics" class="metric-grid"></div>
+
+  <div class="vp-kline-section">
+    <div class="vp-kline-head">
+      <h3>板块 K 线 · VP 指标</h3>
+      <p class="muted filter-hint">默认展示结束日前 60 个交易日；调整区间后点击「刷新 K 线」</p>
+    </div>
+    <div class="filters kline-range-filters">
+      <label class="filter-field">
+        <span>开始日期</span>
+        <input type="date" id="kline-start" class="date-input" />
+      </label>
+      <label class="filter-field">
+        <span>结束日期</span>
+        <input type="date" id="kline-end" class="date-input" />
+      </label>
+      <div class="filter-field">
+        <span>快捷</span>
+        <div class="chip-group" id="kline-range-presets">
+          <button type="button" class="chip" data-days="20">20日</button>
+          <button type="button" class="chip active" data-days="60">60日</button>
+          <button type="button" class="chip" data-days="120">120日</button>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-primary" id="btn-kline-refresh">刷新 K 线</button>
+      </div>
+    </div>
+    <div id="vp-kline-chart" class="kline-chart-host vp-kline-chart"></div>
+  </div>
+
   <h3>成分股量价 Top</h3>
   <div class="table-wrap">
     <table class="data-table">
@@ -82,6 +112,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/dc_board_common.js?v=20260710d"></script>
-<script src="/static/js/dc_volume_price.js?v=20260710d"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="/static/js/dc_board_common.js?v=20260712a"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260712a"></script>
+<script src="/static/js/dc_volume_price.js?v=20260712a"></script>
 {% endblock %}

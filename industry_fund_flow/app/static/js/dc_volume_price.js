@@ -1,7 +1,14 @@
 (function () {
-  const { klineLink } = window.DcBoard || {};
+  const board = window.DcBoard || {};
+  const kline = window.DcKline || {};
+  const { klineLink, normalizeIsoDate, toApiTradeDate } = board;
 
   const elDate = document.getElementById("trade-date");
+  const elKlineStart = document.getElementById("kline-start");
+  const elKlineEnd = document.getElementById("kline-end");
+  const elKlinePresets = document.getElementById("kline-range-presets");
+  const btnKlineRefresh = document.getElementById("btn-kline-refresh");
+  const elVpKlineChart = document.getElementById("vp-kline-chart");
   const elTypes = document.getElementById("content-types");
   const elWindow = document.getElementById("window");
   const elThead = document.getElementById("vp-thead");
@@ -23,6 +30,10 @@
   const selectedBoards = new Map();
   const boardSearchResults = new Map();
   let boardSearchTimer = null;
+  let detailIndustryCode = "";
+  let vpChartInstance = null;
+  let vpTradeDates = [];
+  let klineRangeDays = 60;
 
   const STATUS_LABEL = {
     mainline_burst: "主线爆发",
@@ -161,7 +172,8 @@
   }
 
   async function loadDates() {
-    const data = await apiGet("/api/v1/vp/trade-dates?limit=60");
+    const data = await apiGet("/api/v1/vp/trade-dates?limit=365");
+    vpTradeDates = (data.dates || []).slice().sort();
     elDate.innerHTML = "";
     const dates = data.dates || [];
     if (!dates.length) {
@@ -180,6 +192,67 @@
       elDate.appendChild(opt);
     });
     if (data.latest) elDate.value = data.latest;
+  }
+
+  function isoFromTradeDate(raw) {
+    if (!raw) return "";
+    if (normalizeIsoDate) return normalizeIsoDate(raw);
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+    return s;
+  }
+
+  function apiDateFromIso(iso) {
+    if (!iso) return "";
+    if (toApiTradeDate) return toApiTradeDate(iso);
+    return String(iso).replace(/-/g, "");
+  }
+
+  function setKlineRangeByDays(days) {
+    klineRangeDays = days;
+    const endIso = isoFromTradeDate(elKlineEnd && elKlineEnd.value ? elKlineEnd.value : elDate.value);
+    if (!endIso || !vpTradeDates.length) return;
+    const sorted = vpTradeDates.slice().sort();
+    let endIdx = sorted.indexOf(endIso);
+    if (endIdx < 0) {
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        if (sorted[i] <= endIso) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+    if (endIdx < 0) endIdx = sorted.length - 1;
+    const startIdx = Math.max(0, endIdx - days + 1);
+    if (elKlineEnd) elKlineEnd.value = sorted[endIdx];
+    if (elKlineStart) elKlineStart.value = sorted[startIdx];
+    if (elKlinePresets) {
+      elKlinePresets.querySelectorAll(".chip").forEach((c) => {
+        c.classList.toggle("active", Number(c.dataset.days) === days);
+      });
+    }
+  }
+
+  function initKlineRangeDefaults() {
+    const endIso = isoFromTradeDate(elDate.value);
+    if (elKlineEnd) elKlineEnd.value = endIso;
+    setKlineRangeByDays(klineRangeDays);
+  }
+
+  async function loadVpKline(code) {
+    if (!code || !kline.renderVpKlineChart || !elVpKlineChart) return;
+    const startIso = elKlineStart ? elKlineStart.value : "";
+    const endIso = elKlineEnd ? elKlineEnd.value : isoFromTradeDate(elDate.value);
+    const startQ = startIso ? `&start_date=${encodeURIComponent(apiDateFromIso(startIso))}` : "";
+    const endQ = endIso ? `&trade_date=${encodeURIComponent(apiDateFromIso(endIso))}` : "";
+    const daysQ = startIso ? "" : `&days=${klineRangeDays}`;
+    const data = await apiGet(
+      `/api/v1/vp/industries/${encodeURIComponent(code)}/kline?window=${encodeURIComponent(elWindow.value)}${endQ}${startQ}${daysQ}`
+    );
+    vpChartInstance = kline.renderVpKlineChart(elVpKlineChart, data, {
+      existingChart: vpChartInstance,
+    });
   }
 
   function renderRank(items) {
@@ -260,6 +333,7 @@
 
   async function loadDetail(code) {
     clearError();
+    detailIndustryCode = code;
     const { td, w } = queryParams();
     const data = await apiGet(
       `/api/v1/vp/industries/${encodeURIComponent(code)}?trade_date=${encodeURIComponent(td)}&window=${w}`
@@ -281,6 +355,13 @@
           `<div class="metric-item"><span class="metric-label">${k}</span><span class="metric-value">${v ?? "—"}</span></div>`
       )
       .join("");
+
+    initKlineRangeDefaults();
+    try {
+      await loadVpKline(code);
+    } catch (e) {
+      showError("K 线加载失败: " + (e.message || String(e)));
+    }
 
     const stocks = await apiGet(
       `/api/v1/vp/industries/${encodeURIComponent(code)}/stocks?trade_date=${encodeURIComponent(td)}&window=${w}&limit=30`
@@ -354,6 +435,27 @@
   });
 
   btnQuery.addEventListener("click", refresh);
+
+  if (elKlinePresets) {
+    elKlinePresets.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip[data-days]");
+      if (!chip) return;
+      setKlineRangeByDays(Number(chip.dataset.days) || 60);
+      if (detailIndustryCode) {
+        loadVpKline(detailIndustryCode).catch((err) => showError(err.message || String(err)));
+      }
+    });
+  }
+
+  if (btnKlineRefresh) {
+    btnKlineRefresh.addEventListener("click", () => {
+      if (!detailIndustryCode) {
+        showError("请先在榜单中点击「详情」选择板块");
+        return;
+      }
+      loadVpKline(detailIndustryCode).catch((err) => showError(err.message || String(err)));
+    });
+  }
 
   renderSelectedBoards();
   loadDates()

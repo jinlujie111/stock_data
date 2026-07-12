@@ -1514,6 +1514,27 @@ body {
   text-decoration: underline;
 }
 
+.vp-kline-section {
+  margin: 1.25rem 0 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #1e293b);
+}
+
+.vp-kline-head h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.kline-range-filters {
+  margin: 0.75rem 0 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.vp-kline-chart {
+  min-height: 560px;
+}
+
 .ladder-card-kline {
   margin-top: 0.35rem;
 }

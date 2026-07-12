@@ -430,12 +430,290 @@
     return chart;
   }
 
+  const VP_STATUS_LABEL = {
+    mainline_burst: "主线爆发",
+    trend_up: "趋势上升",
+    range_bound: "震荡",
+    weak: "弱势",
+    ebbing: "退潮",
+  };
+
+  const VP_SIGNAL_LABEL = {
+    main_rise: "主升",
+    ebbing: "退潮",
+    none: "无",
+    launch: "启动",
+    distribution: "派发",
+  };
+
+  function vpLabelStatus(v) {
+    if (!v) return "—";
+    return VP_STATUS_LABEL[v] || v;
+  }
+
+  function vpLabelSignal(v) {
+    if (!v || v === "none") return "—";
+    return VP_SIGNAL_LABEL[v] || v;
+  }
+
+  function vpPct(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    return (Number(v) * 100).toFixed(1) + "%";
+  }
+
+  /** 板块量价页：K 线 + 成交量 + VP 指标叠加 */
+  function renderVpKlineChart(chartEl, payload, options) {
+    const opts = options || {};
+    const bars = payload.bars || [];
+    const vpSeries = payload.vp_series || [];
+    const existingChart = opts.existingChart || null;
+
+    if (!bars.length) {
+      if (existingChart && !existingChart.isDisposed()) existingChart.dispose();
+      chartEl.innerHTML = '<div class="table-empty">暂无 K 线数据</div>';
+      return null;
+    }
+
+    let chart = existingChart;
+    if (chart && chart.isDisposed()) chart = null;
+    if (!chart) {
+      chartEl.innerHTML = "";
+      chartEl.style.height = opts.height || "560px";
+      chart = echarts.init(chartEl);
+      if (!chartEl._vpResizeBound) {
+        chartEl._vpResizeBound = true;
+        window.addEventListener("resize", () => chart && !chart.isDisposed() && chart.resize());
+      }
+    }
+
+    const dates = bars.map((b) => b.trade_date);
+    const ohlc = bars.map((b) => [Number(b.open), Number(b.close), Number(b.low), Number(b.high)]);
+    const vols = bars.map((b) => Number(b.vol || 0));
+    const vpScores = vpSeries.map((v) =>
+      v && v.vp_score != null && v.vp_score !== "" ? Number(v.vp_score) : null
+    );
+    const risingPcts = vpSeries.map((v) =>
+      v && v.rising_ratio != null ? +(Number(v.rising_ratio) * 100).toFixed(2) : null
+    );
+    const breakoutPcts = vpSeries.map((v) =>
+      v && v.breakout_ratio != null ? +(Number(v.breakout_ratio) * 100).toFixed(2) : null
+    );
+    const streakDays = vpSeries.map((v) =>
+      v && v.amount_streak_days != null ? Number(v.amount_streak_days) : null
+    );
+
+    const markPoints = [];
+    vpSeries.forEach((v, i) => {
+      if (!v || !v.signal_type || v.signal_type === "none") return;
+      const high = ohlc[i] ? ohlc[i][3] : null;
+      if (high == null) return;
+      markPoints.push({
+        name: vpLabelSignal(v.signal_type),
+        coord: [dates[i], high],
+        value: vpLabelSignal(v.signal_type),
+        symbol: "pin",
+        symbolSize: 36,
+        itemStyle: { color: v.signal_type === "launch" || v.signal_type === "main_rise" ? "#f59e0b" : "#94a3b8" },
+        label: { show: true, formatter: vpLabelSignal(v.signal_type), fontSize: 9, color: "#fff" },
+      });
+    });
+
+    chart.setOption(
+      {
+        backgroundColor: "transparent",
+        animation: false,
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "cross" },
+          backgroundColor: "#1a2332",
+          borderColor: "#2d3748",
+          textStyle: { color: "#e2e8f0", fontSize: 12 },
+          formatter(params) {
+            if (!params || !params.length) return "";
+            const idx = params[0].dataIndex;
+            const bar = bars[idx] || {};
+            const vp = vpSeries[idx] || {};
+            const pctChg = bar.pct_change != null ? fmtPct(bar.pct_change) : "—";
+            return [
+              `<strong>${dates[idx]}</strong>`,
+              `收 ${fmtPrice(bar.close)} (${pctChg})`,
+              `VP分 <strong>${vp.vp_score != null ? Number(vp.vp_score).toFixed(1) : "—"}</strong>`,
+              `状态 ${vpLabelStatus(vp.vp_status)} · 信号 ${vpLabelSignal(vp.signal_type)}`,
+              `上涨占比 ${vpPct(vp.rising_ratio)} · 突破占比 ${vpPct(vp.breakout_ratio)}`,
+              `连续放量 ${vp.amount_streak_days != null ? vp.amount_streak_days + "天" : "—"}`,
+              vp.industry_vol_ratio_20 != null
+                ? `行业量比 ${Number(vp.industry_vol_ratio_20).toFixed(2)}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join("<br/>");
+          },
+        },
+        legend: {
+          data: ["K线", "VP分", "上涨占比", "突破占比", "连续放量"],
+          top: 0,
+          textStyle: { color: "#94a3b8", fontSize: 11 },
+        },
+        grid: [
+          { left: 56, right: 48, top: 32, height: "42%" },
+          { left: 56, right: 48, top: "56%", height: "12%" },
+          { left: 56, right: 48, top: "72%", height: "18%" },
+        ],
+        xAxis: [
+          {
+            type: "category",
+            data: dates,
+            boundaryGap: true,
+            axisLine: { lineStyle: { color: "#334155" } },
+            axisLabel: { color: "#94a3b8", fontSize: 10 },
+            gridIndex: 0,
+          },
+          {
+            type: "category",
+            data: dates,
+            gridIndex: 1,
+            axisLabel: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+          },
+          {
+            type: "category",
+            data: dates,
+            gridIndex: 2,
+            axisLabel: { color: "#94a3b8", fontSize: 10 },
+            axisLine: { lineStyle: { color: "#334155" } },
+          },
+        ],
+        yAxis: [
+          {
+            scale: true,
+            gridIndex: 0,
+            splitLine: { lineStyle: { color: "#1e293b" } },
+            axisLabel: { color: "#94a3b8", fontSize: 10 },
+          },
+          {
+            scale: true,
+            gridIndex: 1,
+            splitNumber: 2,
+            axisLabel: { show: false },
+            axisLine: { show: false },
+            axisTick: { show: false },
+            splitLine: { show: false },
+          },
+          {
+            min: 0,
+            max: 100,
+            gridIndex: 2,
+            position: "left",
+            splitLine: { lineStyle: { color: "#1e293b" } },
+            axisLabel: { color: "#94a3b8", fontSize: 10, formatter: "{value}" },
+          },
+          {
+            min: 0,
+            gridIndex: 2,
+            position: "right",
+            splitLine: { show: false },
+            axisLabel: { color: "#a855f7", fontSize: 10 },
+          },
+        ],
+        dataZoom: [
+          { type: "inside", xAxisIndex: [0, 1, 2], start: 0, end: 100 },
+          {
+            show: true,
+            xAxisIndex: [0, 1, 2],
+            type: "slider",
+            bottom: 4,
+            height: 18,
+            borderColor: "#334155",
+            textStyle: { color: "#64748b" },
+          },
+        ],
+        series: [
+          {
+            name: "K线",
+            type: "candlestick",
+            data: ohlc,
+            xAxisIndex: 0,
+            yAxisIndex: 0,
+            itemStyle: {
+              color: "#ef4444",
+              color0: "#22c55e",
+              borderColor: "#ef4444",
+              borderColor0: "#22c55e",
+            },
+            markPoint: markPoints.length ? { data: markPoints, symbolKeepAspect: true } : undefined,
+          },
+          {
+            name: "成交量",
+            type: "bar",
+            xAxisIndex: 1,
+            yAxisIndex: 1,
+            data: vols.map((v, i) => ({
+              value: v,
+              itemStyle: {
+                color: ohlc[i][1] >= ohlc[i][0] ? "rgba(239,68,68,0.55)" : "rgba(34,197,94,0.55)",
+              },
+            })),
+          },
+          {
+            name: "VP分",
+            type: "line",
+            xAxisIndex: 2,
+            yAxisIndex: 2,
+            data: vpScores,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: { width: 2, color: "#3b82f6" },
+            itemStyle: { color: "#3b82f6" },
+          },
+          {
+            name: "上涨占比",
+            type: "line",
+            xAxisIndex: 2,
+            yAxisIndex: 2,
+            data: risingPcts,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: { width: 1.2, color: "#22c55e", type: "dashed" },
+          },
+          {
+            name: "突破占比",
+            type: "line",
+            xAxisIndex: 2,
+            yAxisIndex: 2,
+            data: breakoutPcts,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: { width: 1.2, color: "#f59e0b", type: "dashed" },
+          },
+          {
+            name: "连续放量",
+            type: "line",
+            xAxisIndex: 2,
+            yAxisIndex: 3,
+            data: streakDays,
+            smooth: false,
+            showSymbol: true,
+            symbolSize: 4,
+            lineStyle: { width: 1.5, color: "#a855f7" },
+            itemStyle: { color: "#a855f7" },
+          },
+        ],
+      },
+      true
+    );
+    return chart;
+  }
+
   window.DcKline = {
     renderSnapshotHeader,
     renderKlineChart,
+    renderVpKlineChart,
     renderLevelPanel,
     cellCls,
     fmtPct,
+    vpLabelStatus,
+    vpLabelSignal,
     INDICATOR_LABELS,
   };
 })();
