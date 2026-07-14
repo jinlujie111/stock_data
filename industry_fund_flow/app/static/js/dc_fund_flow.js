@@ -1,5 +1,5 @@
 (function () {
-  const { apiGet, initTradeDateCalendar, klineLink } = window.DcBoard;
+  const { apiGet, initTradeDateCalendar, klineLink, funnelBoardLinks } = window.DcBoard;
   const cfg = window.__DC_PAGE__;
   const slug = cfg.slug;
   const columns = cfg.columns;
@@ -348,13 +348,13 @@
             `${c.label}${arrow}</th>`
           );
         })
-        .join("") + `<th>K线分析</th>`;
+        .join("") + `<th>下一步</th>`;
   }
 
-  function boardKlineCell(row) {
+  function boardNextCell(row) {
     const code = row.industry_code;
-    if (!code || !klineLink) return "<td>—</td>";
-    return `<td>${klineLink("board", code, elDate.value)}</td>`;
+    if (!code || !funnelBoardLinks) return "<td>—</td>";
+    return `<td>${funnelBoardLinks(code, row.industry_name, elDate.value, { primary: "vp" })}</td>`;
   }
 
   function renderRows(items) {
@@ -365,7 +365,7 @@
     }
     elEmpty.classList.add("hidden");
     elBody.innerHTML = items
-      .map((row) => "<tr>" + columns.map((c) => renderCell(row, c)).join("") + boardKlineCell(row) + "</tr>")
+      .map((row) => "<tr>" + columns.map((c) => renderCell(row, c)).join("") + boardNextCell(row) + "</tr>")
       .join("");
   }
 

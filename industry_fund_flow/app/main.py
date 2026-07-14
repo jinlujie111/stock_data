@@ -17,17 +17,14 @@ from app import (
     routes_hot_stocks,
     routes_limit_up,
     routes_mainline,
-    routes_quant_mainline,
     routes_sentiment,
     routes_sectors,
-    routes_start_signal,
-    routes_volatility,
     routes_vp,
 )
 from app.config import APP_TITLE, COOKIE_NAME
 from app.db import init_schema
 from app.deps import current_user, require_user
-from app.dc_registry import NAV_ITEMS, NAV_SECTIONS
+from app.dc_registry import NAV_ITEMS, NAV_SECTIONS, NAV_TOP_ITEMS
 from app import market_breadth_service as mb_svc
 
 logger = logging.getLogger(__name__)
@@ -36,6 +33,7 @@ _BASE = Path(__file__).resolve().parent
 _STATIC = _BASE / "static"
 _TEMPLATES = Jinja2Templates(directory=str(_BASE / "templates"))
 _TEMPLATES.env.globals["nav_sections"] = NAV_SECTIONS
+_TEMPLATES.env.globals["nav_top_items"] = NAV_TOP_ITEMS
 
 app = FastAPI(title=APP_TITLE)
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
@@ -43,19 +41,14 @@ app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 routes_dc.init_dc_routes(_TEMPLATES)
 routes_dragon.init_dragon_routes(_TEMPLATES)
 routes_mainline.init_mainline_routes(_TEMPLATES)
-routes_quant_mainline.init_quant_mainline_routes(_TEMPLATES)
 routes_sentiment.init_sentiment_routes(_TEMPLATES)
 routes_sectors.init_sectors_routes(_TEMPLATES)
 routes_hot_stocks.init_hot_stocks_routes(_TEMPLATES)
 routes_limit_up.init_limit_up_routes(_TEMPLATES)
 routes_vp.init_vp_routes(_TEMPLATES)
-routes_volatility.init_volatility_routes(_TEMPLATES)
-routes_start_signal.init_start_signal_routes(_TEMPLATES)
 routes_chart.init_chart_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
-app.include_router(routes_quant_mainline.page_router)
-app.include_router(routes_quant_mainline.api_router)
 app.include_router(routes_sentiment.page_router)
 app.include_router(routes_sentiment.api_router)
 app.include_router(routes_sectors.page_router)
@@ -69,10 +62,6 @@ app.include_router(routes_dragon.page_router)
 app.include_router(routes_dragon.api_router)
 app.include_router(routes_vp.page_router)
 app.include_router(routes_vp.api_router)
-app.include_router(routes_volatility.page_router)
-app.include_router(routes_volatility.api_router)
-app.include_router(routes_start_signal.page_router)
-app.include_router(routes_start_signal.api_router)
 app.include_router(routes_chart.page_router)
 app.include_router(routes_chart.api_router)
 app.include_router(routes_dc.page_router)

@@ -61,6 +61,15 @@ def _level_filter(levels: list[str] | None) -> tuple[str, dict]:
     return f" AND mainline_level IN ({placeholders})", params
 
 
+def _industry_codes_filter(industry_codes: list[str] | None) -> tuple[str, dict]:
+    codes = [c.strip() for c in (industry_codes or []) if c and str(c).strip()]
+    if not codes:
+        return "", {}
+    placeholders = ", ".join(f":ic{i}" for i in range(len(codes)))
+    params = {f"ic{i}": c for i, c in enumerate(codes)}
+    return f" AND industry_code IN ({placeholders})", params
+
+
 def _row_to_rank_item(row: dict, ma_window: int) -> dict:
     item = serialize_row(row)
     ma_col = _ma_column(ma_window)
@@ -102,15 +111,18 @@ def get_rank(
     top: int = 20,
     ma_window: int = 5,
     top20_only: bool = False,
+    industry_codes: list[str] | None = None,
 ) -> dict:
     td = _resolve_trade_date(trade_date)
     ma_window = ma_window if ma_window in MA_COLUMNS else 5
     top = max(1, min(top, 200))
     ct_sql, ct_params = _content_type_filter(content_types)
     lv_sql, lv_params = _level_filter(levels)
-    top20_sql = " AND is_top20 = 1" if top20_only else ""
+    ic_sql, ic_params = _industry_codes_filter(industry_codes)
+    # 指定板块时不再限制 Top20 监控池
+    top20_sql = " AND is_top20 = 1" if top20_only and not ic_params else ""
     ma_col = _ma_column(ma_window)
-    params: dict[str, Any] = {"td": td, **ct_params, **lv_params}
+    params: dict[str, Any] = {"td": td, **ct_params, **lv_params, **ic_params}
     rows = fetch_all_stock(
         f"""
         SELECT
@@ -121,7 +133,7 @@ def get_rank(
             score_fund, score_trend, score_heat, score_prosperity, score_diffusion,
             is_top20
         FROM {MONITOR_TABLE}
-        WHERE trade_date = :td {ct_sql} {lv_sql} {top20_sql}
+        WHERE trade_date = :td {ct_sql} {lv_sql} {ic_sql} {top20_sql}
         ORDER BY {ma_col} IS NULL, {ma_col} DESC, rank_no ASC
         LIMIT {top}
         """,
@@ -132,6 +144,33 @@ def get_rank(
         "ma_window": ma_window,
         "items": [_row_to_rank_item(r, ma_window) for r in rows],
     }
+
+
+def search_boards(
+    trade_date: str | None = None,
+    content_types: list[str] | None = None,
+    keyword: str | None = None,
+    limit: int = 30,
+) -> dict:
+    td = _resolve_trade_date(trade_date)
+    ct_sql, ct_params = _content_type_filter(content_types)
+    limit = max(1, min(limit, 100))
+    params: dict[str, Any] = {"td": td, **ct_params}
+    kw_sql = ""
+    if keyword and keyword.strip():
+        params["kw"] = f"%{keyword.strip()}%"
+        kw_sql = " AND (industry_name LIKE :kw OR industry_code LIKE :kw)"
+    rows = fetch_all_stock(
+        f"""
+        SELECT industry_code, industry_name, content_type, mainline_level, rank_no
+        FROM {MONITOR_TABLE}
+        WHERE trade_date = :td {ct_sql} {kw_sql}
+        ORDER BY rank_no ASC, industry_name ASC
+        LIMIT {limit}
+        """,
+        params,
+    )
+    return {"trade_date": td, "items": [serialize_row(r) for r in rows]}
 
 
 def get_industry_history(

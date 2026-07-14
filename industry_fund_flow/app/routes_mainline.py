@@ -57,12 +57,14 @@ def api_mainline_rank(
     top: int = Query(20, ge=1, le=200),
     ma_window: int = Query(5, ge=3, le=10),
     top20_only: bool = Query(False),
+    industry_codes: str | None = Query(None, description="板块代码，逗号分隔"),
     _user: dict = Depends(require_user),
 ):
     try:
         if ma_window not in (3, 5, 10):
             raise ValueError("ma_window 仅支持 3、5、10")
         ctypes = parse_csv_list(content_types) or None
+        codes = parse_csv_list(industry_codes) or None
         return ml_svc.get_rank(
             trade_date,
             ctypes,
@@ -70,11 +72,29 @@ def api_mainline_rank(
             top,
             ma_window,
             top20_only,
+            codes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail=f"查询主线榜失败: {exc}") from exc
+
+
+@api_router.get("/boards/search")
+def api_mainline_boards_search(
+    trade_date: str | None = Query(None),
+    content_types: str | None = Query(None),
+    keyword: str | None = Query(None),
+    limit: int = Query(30, ge=1, le=100),
+    _user: dict = Depends(require_user),
+):
+    try:
+        ctypes = parse_csv_list(content_types) or None
+        return ml_svc.search_boards(trade_date, ctypes, keyword, limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"搜索板块失败: {exc}") from exc
 
 
 @api_router.get("/history")

@@ -3,7 +3,7 @@
   const kline = window.DcKline;
   if (!board || !kline) return;
 
-  const { apiGet, toApiTradeDate, initTradeDateCalendar, normalizeIsoDate } = board;
+  const { apiGet, toApiTradeDate, initTradeDateCalendar, normalizeIsoDate, setDecisionCtx } = board;
 
   const elDate = document.getElementById("trade-date");
   const kindChips = document.getElementById("kind-chips");
@@ -165,6 +165,23 @@
         `/api/v1/chart/kline?kind=${kind}&code=${encodeURIComponent(code)}&days=${days}${tdQ}`
       );
       selectedCode = payload.code;
+      if (setDecisionCtx) {
+        if (kind === "board") {
+          setDecisionCtx({
+            industry_code: payload.code,
+            industry_name: payload.name || "",
+            trade_date: tdParam() || "",
+            ts_code: "",
+            stock_name: "",
+          });
+        } else {
+          setDecisionCtx({
+            ts_code: payload.code,
+            stock_name: payload.name || "",
+            trade_date: tdParam() || "",
+          });
+        }
+      }
       refreshChart(payload);
     } catch (err) {
       showError(err.message || "加载 K 线失败");

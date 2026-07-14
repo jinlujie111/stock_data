@@ -10,9 +10,13 @@
   const elMarketSentimentSummary = document.getElementById("market-sentiment-summary");
   const elMarketSentimentChart = document.getElementById("market-sentiment-chart");
   const elMarketSentimentEmpty = document.getElementById("market-sentiment-empty");
+  const elRegimeBadge = document.getElementById("market-regime-badge");
+  const elRegimeDesc = document.getElementById("market-regime-desc");
+  const elSentimentDims = document.getElementById("market-sentiment-dims");
 
   let trendChart = null;
   let marketSentimentChart = null;
+  let marketItemsByDate = {};
 
   const SENTIMENT_BANDS = [
     { min: 0, max: 10, label: "0~10 躺平", color: "rgba(100, 116, 139, 0.12)" },
@@ -22,6 +26,15 @@
     { min: 60, max: 80, label: "60~80 偏强", color: "rgba(249, 115, 22, 0.07)" },
     { min: 80, max: 90, label: "80~90 高潮", color: "rgba(239, 68, 68, 0.08)" },
     { min: 90, max: 100, label: "90~100 极度高潮", color: "rgba(168, 85, 247, 0.09)" },
+  ];
+
+  const DIM_META = [
+    { key: "breadth_score", label: "上涨广度", weight: "25%" },
+    { key: "limit_up_score", label: "涨停强度", weight: "20%" },
+    { key: "volume_score", label: "成交活跃", weight: "20%" },
+    { key: "trend_score", label: "指数趋势", weight: "15%" },
+    { key: "capital_score", label: "北向资金", weight: "10%" },
+    { key: "consecutive_score", label: "连板情绪", weight: "10%" },
   ];
 
   function sentimentMarkAreas() {
@@ -67,7 +80,20 @@
       const pct = n <= 1 && n >= -1 ? n * 100 : n;
       return pct.toLocaleString("zh-CN", { maximumFractionDigits: 2 }) + "%";
     }
+    if (fmt === "num") {
+      const n = Number(val);
+      if (Number.isNaN(n)) return val;
+      return n.toLocaleString("zh-CN", { maximumFractionDigits: 1 });
+    }
     return val;
+  }
+
+  function scoreTone(score) {
+    const n = Number(score);
+    if (Number.isNaN(n)) return "";
+    if (n >= 75) return "metric-up";
+    if (n <= 35) return "metric-down";
+    return "";
   }
 
   function renderMetrics(payload) {
@@ -211,8 +237,79 @@
     });
   }
 
-  function renderMarketSentiment(items) {
-    if (!items || !items.length) {
+  function renderRegime(regime) {
+    if (!regime || !regime.label) {
+      elRegimeBadge.classList.add("hidden");
+      elRegimeBadge.textContent = "";
+      elRegimeDesc.textContent = "";
+      return;
+    }
+    elRegimeBadge.className = `regime-badge regime-${regime.code || ""}`;
+    elRegimeBadge.textContent = regime.label;
+    elRegimeBadge.classList.remove("hidden");
+
+    const m = regime.metrics || {};
+    const parts = [];
+    if (m.avg_advance_ratio_20d != null) {
+      parts.push(`近20日平均上涨占比 ${fmtValue(m.avg_advance_ratio_20d, "pct")}`);
+    }
+    if (m.index_return_20d != null) {
+      parts.push(`沪深300近20日 ${fmtValue(m.index_return_20d, "pct")}`);
+    }
+    if (m.index_return_60d != null) {
+      parts.push(`近60日 ${fmtValue(m.index_return_60d, "pct")}`);
+    }
+    const maBits = [];
+    if (m.above_ma60) maBits.push("站上MA60");
+    else if (m.above_ma60 === false) maBits.push("跌破MA60");
+    if (m.above_ma120) maBits.push("站上MA120");
+    else if (m.above_ma120 === false) maBits.push("跌破MA120");
+    if (maBits.length) parts.push(maBits.join(" · "));
+    elRegimeDesc.textContent = parts.length
+      ? `状态依据：${parts.join("；")}。情绪为日度温度，状态为中期趋势×广度。`
+      : "情绪为日度温度，状态为中期趋势×广度。";
+  }
+
+  function renderDims(detail) {
+    if (!detail) {
+      elSentimentDims.innerHTML = "";
+      return;
+    }
+    elSentimentDims.innerHTML = DIM_META.map((d) => {
+      const val = detail[d.key];
+      return (
+        `<div class="sentiment-dim-card">` +
+        `<span class="dim-label">${d.label}</span>` +
+        `<span class="dim-value ${scoreTone(val)}">${fmtValue(val, "num")}</span>` +
+        `<span class="dim-weight">权重 ${d.weight}</span>` +
+        `</div>`
+      );
+    }).join("");
+  }
+
+  function tooltipDetail(date) {
+    const row = marketItemsByDate[date];
+    if (!row) return `${date}<br/>大盘情绪：—`;
+    const d = row.detail || {};
+    const regimeLabel = (row.regime && row.regime.label) || "—";
+    const lines = [
+      `${date}`,
+      `大盘情绪：${Number(row.score).toFixed(1)}`,
+      `市场状态：${regimeLabel}`,
+      `广度 ${fmtValue(d.breadth_score, "num")} · 涨停 ${fmtValue(d.limit_up_score, "num")} · 成交 ${fmtValue(d.volume_score, "num")}`,
+      `趋势 ${fmtValue(d.trend_score, "num")} · 资金 ${fmtValue(d.capital_score, "num")} · 连板 ${fmtValue(d.consecutive_score, "num")}`,
+    ];
+    return lines.join("<br/>");
+  }
+
+  function renderMarketSentiment(payload) {
+    const items = (payload.market && payload.market.items) || [];
+    marketItemsByDate = {};
+    items.forEach((r) => {
+      marketItemsByDate[r.trade_date] = r;
+    });
+
+    if (!items.length) {
       if (marketSentimentChart) {
         marketSentimentChart.dispose();
         marketSentimentChart = null;
@@ -220,11 +317,20 @@
       elMarketSentimentChart.style.display = "none";
       elMarketSentimentEmpty.classList.remove("hidden");
       elMarketSentimentSummary.textContent = "暂无大盘情绪数据";
+      renderRegime(null);
+      renderDims(null);
       return;
     }
 
     const latest = items[items.length - 1];
-    elMarketSentimentSummary.textContent = `最新交易日 ${latest.trade_date} · 大盘情绪 ${fmtValue(latest.score, "num")} 分`;
+    const regime = (payload.market && payload.market.regime) || latest.regime;
+    const detail = (payload.market && payload.market.latest_detail) || latest.detail;
+    renderRegime(regime);
+    renderDims(detail);
+
+    const regimeText = regime && regime.label ? ` · ${regime.label}` : "";
+    elMarketSentimentSummary.textContent =
+      `最新交易日 ${latest.trade_date} · 大盘情绪 ${fmtValue(latest.score, "num")} 分${regimeText}`;
     elMarketSentimentEmpty.classList.add("hidden");
     elMarketSentimentChart.style.display = "block";
 
@@ -235,66 +341,65 @@
 
     marketSentimentChart.setOption(
       {
-      backgroundColor: "transparent",
-      tooltip: {
-        trigger: "axis",
-        backgroundColor: "#1a2332",
-        borderColor: "#2d3748",
-        textStyle: { color: "#e2e8f0", fontSize: 12 },
-        formatter(params) {
-          const item = params[0];
-          return `${item.axisValue}<br/>${item.marker}大盘情绪：${Number(item.value).toFixed(1)}`;
+        backgroundColor: "transparent",
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: "#1a2332",
+          borderColor: "#2d3748",
+          textStyle: { color: "#e2e8f0", fontSize: 12 },
+          formatter(params) {
+            return tooltipDetail(params[0].axisValue);
+          },
         },
-      },
-      grid: { left: 48, right: 16, top: 20, bottom: 28 },
-      xAxis: {
-        type: "category",
-        data: items.map((r) => r.trade_date),
-        boundaryGap: false,
-        axisLine: { lineStyle: { color: "#334155" } },
-        axisLabel: { color: "#94a3b8", fontSize: 11 },
-      },
-      yAxis: {
-        type: "value",
-        min: 0,
-        max: 100,
-        splitLine: { lineStyle: { color: "#1e293b" } },
-        axisLabel: { color: "#94a3b8", fontSize: 11 },
-      },
-      series: [
-        {
-          name: "大盘情绪",
-          type: "line",
-          smooth: true,
-          symbol: "circle",
-          symbolSize: 5,
-          data: items.map((r) => r.score),
-          lineStyle: { width: 2, color: "#60a5fa" },
-          itemStyle: { color: "#60a5fa" },
-          areaStyle: {
-            color: {
-              type: "linear",
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [
-                { offset: 0, color: "rgba(96, 165, 250, 0.25)" },
-                { offset: 1, color: "rgba(96, 165, 250, 0)" },
-              ],
+        grid: { left: 48, right: 16, top: 20, bottom: 28 },
+        xAxis: {
+          type: "category",
+          data: items.map((r) => r.trade_date),
+          boundaryGap: false,
+          axisLine: { lineStyle: { color: "#334155" } },
+          axisLabel: { color: "#94a3b8", fontSize: 11 },
+        },
+        yAxis: {
+          type: "value",
+          min: 0,
+          max: 100,
+          splitLine: { lineStyle: { color: "#1e293b" } },
+          axisLabel: { color: "#94a3b8", fontSize: 11 },
+        },
+        series: [
+          {
+            name: "大盘情绪",
+            type: "line",
+            smooth: true,
+            symbol: "circle",
+            symbolSize: 5,
+            data: items.map((r) => r.score),
+            lineStyle: { width: 2, color: "#60a5fa" },
+            itemStyle: { color: "#60a5fa" },
+            areaStyle: {
+              color: {
+                type: "linear",
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: "rgba(96, 165, 250, 0.25)" },
+                  { offset: 1, color: "rgba(96, 165, 250, 0)" },
+                ],
+              },
+            },
+            markLine: {
+              symbol: "none",
+              silent: true,
+              data: sentimentMarkLines(),
+            },
+            markArea: {
+              silent: true,
+              data: sentimentMarkAreas(),
             },
           },
-          markLine: {
-            symbol: "none",
-            silent: true,
-            data: sentimentMarkLines(),
-          },
-          markArea: {
-            silent: true,
-            data: sentimentMarkAreas(),
-          },
-        },
-      ],
+        ],
       },
       true
     );
@@ -310,6 +415,8 @@
     elMarketSentimentEmpty.classList.remove("hidden");
     elMarketSentimentEmpty.textContent = message || "大盘情绪数据加载失败";
     elMarketSentimentSummary.textContent = "大盘情绪加载失败";
+    renderRegime(null);
+    renderDims(null);
   }
 
   async function loadBreadth() {
@@ -333,8 +440,12 @@
 
   async function loadMarketSentiment() {
     try {
-      const res = await apiGet("/api/v1/sentiment/history?days=30");
-      renderMarketSentiment((res.market && res.market.items) || []);
+      const td = elDate.value;
+      const qs = td
+        ? `days=30&trade_date=${encodeURIComponent(td)}`
+        : "days=30";
+      const res = await apiGet(`/api/v1/sentiment/history?${qs}`);
+      renderMarketSentiment(res);
     } catch (err) {
       showMarketSentimentError(err.message || String(err));
     }
@@ -344,6 +455,9 @@
     loadBreadth().catch((err) => {
       elError.textContent = err.message;
       elError.classList.remove("hidden");
+    });
+    loadMarketSentiment().catch((err) => {
+      showMarketSentimentError(err.message || String(err));
     });
   });
 

@@ -8,7 +8,6 @@
     fibonacci: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
     volume_price: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
     trendline: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
-    chip: { support: SUPPORT_COLOR, resistance: RESISTANCE_COLOR },
   };
 
   const INDICATOR_LABELS = {
@@ -16,7 +15,6 @@
     fibonacci: "斐波那契",
     volume_price: "量价关系",
     trendline: "趋势线",
-    chip: "筹码分布",
   };
 
   const MA_COLORS = {
@@ -195,26 +193,12 @@
 
   function renderLevelPanel(container, activeIndicators, levels) {
     if (!container) return;
-    const chipBlocks = [];
     const allResistances = [];
     const allSupports = [];
 
     activeIndicators.forEach((key) => {
       const data = levels[key];
       if (!data) return;
-      if (key === "chip" && (data.profile || []).length) {
-        const profile = data.profile.slice().sort((a, b) => a.price - b.price);
-        const maxPct = Math.max(...profile.map((x) => x.pct), 1);
-        const bars = profile
-          .map(
-            (p) =>
-              `<div class="chip-bar-row"><span class="chip-bar-price">${fmtPrice(p.price)}</span><div class="chip-bar-track"><div class="chip-bar-fill" style="width:${(p.pct / maxPct) * 100}%"></div></div></div>`
-          )
-          .join("");
-        chipBlocks.push(
-          `<div class="kline-level-block"><div class="kline-level-title">${INDICATOR_LABELS.chip}${data.meta && data.meta.source === "cyq_chips" ? " (CYQ)" : ""}</div><div class="chip-profile">${bars}</div></div>`
-        );
-      }
       (data.resistances || []).forEach((lv) => {
         allResistances.push({ ...lv, indicator: key });
       });
@@ -226,7 +210,7 @@
     allResistances.sort((a, b) => b.price - a.price);
     allSupports.sort((a, b) => b.price - a.price);
 
-    const blocks = [...chipBlocks];
+    const blocks = [];
 
     if (allResistances.length) {
       blocks.push(`

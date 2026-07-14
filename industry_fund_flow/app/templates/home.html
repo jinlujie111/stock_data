@@ -30,10 +30,13 @@
 <section class="card breadth-card">
   <div class="breadth-head">
     <div>
-      <h2 class="section-title">大盘情绪</h2>
+      <h2 class="section-title">大盘情绪与市场状态</h2>
       <p id="market-sentiment-summary" class="muted section-desc">加载中…</p>
     </div>
+    <div id="market-regime-badge" class="regime-badge hidden"></div>
   </div>
+  <div id="market-sentiment-dims" class="sentiment-dim-grid"></div>
+  <p id="market-regime-desc" class="muted section-desc" style="margin-top:0.5rem"></p>
   <div class="breadth-trend">
     <h3 class="breadth-trend-title">近30天大盘情绪</h3>
     <div id="market-sentiment-empty" class="table-empty hidden">暂无大盘情绪数据</div>
@@ -43,6 +46,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="/static/js/dc_board_common.js?v=20260626"></script>
-<script src="/static/js/home.js?v=20260709"></script>
+<script src="/static/js/dc_board_common.js?v=20260714b"></script>
+<script src="/static/js/home.js?v=20260714"></script>
 {% endblock %}

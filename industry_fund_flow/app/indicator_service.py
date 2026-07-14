@@ -1,11 +1,11 @@
-"""K 线支撑/阻力位计算：均线、斐波那契、量价、趋势线、筹码分布（成交量轮廓近似）。"""
+"""K 线支撑/阻力位计算：均线、斐波那契、量价、趋势线。"""
 from __future__ import annotations
 
 from typing import Any
 
 MA_PERIODS = (5, 10, 20, 30, 60)
 FIB_RATIOS = (0.236, 0.382, 0.5, 0.618, 0.786)
-INDICATOR_KEYS = ("ma", "fibonacci", "volume_price", "trendline", "chip")
+INDICATOR_KEYS = ("ma", "fibonacci", "volume_price", "trendline")
 
 
 def _f(v: Any) -> float | None:
@@ -374,148 +374,10 @@ def compute_trendline_levels(bars: list[dict]) -> dict[str, Any]:
     return {"supports": supports, "resistances": resistances, "lines": lines}
 
 
-def compute_chip_levels(bars: list[dict], cyq_rows: list[dict] | None = None) -> dict[str, Any]:
-    """筹码分布：优先 ods_cyq_chips_di；无数据时回退成交量轮廓近似。"""
-    last_close = _f(bars[-1].get("close")) if bars else 0.0
-    if cyq_rows:
-        return _compute_chip_from_cyq(cyq_rows, last_close)
-    return _compute_chip_from_volume(bars)
-
-
-def _compute_chip_from_cyq(cyq_rows: list[dict], last_close: float) -> dict[str, Any]:
-    pairs: list[tuple[float, float]] = []
-    for row in cyq_rows:
-        price = _f(row.get("price"))
-        pct = _f(row.get("percent"))
-        if price is None or pct is None or pct <= 0:
-            continue
-        pairs.append((price, pct))
-    if not pairs:
-        return {"supports": [], "resistances": [], "profile": [], "meta": {"source": "cyq_chips", "empty": True}}
-
-    poc_price, poc_pct = max(pairs, key=lambda x: x[1])
-    sorted_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)
-    va_acc = 0.0
-    va_prices: list[float] = []
-    for price, pct in sorted_pairs:
-        va_acc += pct
-        va_prices.append(price)
-        if va_acc >= 70.0:
-            break
-    va_low = min(va_prices)
-    va_high = max(va_prices)
-
-    supports: list[dict] = []
-    resistances: list[dict] = []
-    if poc_price < last_close:
-        supports.append(_level(poc_price, "筹码峰支撑(POC)", "support"))
-    elif poc_price > last_close:
-        resistances.append(_level(poc_price, "筹码峰阻力(POC)", "resistance"))
-    else:
-        supports.append(_level(poc_price, "筹码峰(POC)", "support"))
-
-    if va_low < last_close:
-        supports.append(_level(va_low, "筹码VA下沿支撑", "support"))
-    if va_high > last_close:
-        resistances.append(_level(va_high, "筹码VA上沿阻力", "resistance"))
-
-    for price, pct in sorted_pairs[1:4]:
-        if pct < poc_pct * 0.55:
-            continue
-        if price < last_close:
-            supports.append(_level(price, "次级筹码峰支撑", "support", percent=pct))
-        elif price > last_close:
-            resistances.append(_level(price, "次级筹码峰阻力", "resistance", percent=pct))
-
-    supports.sort(key=lambda x: x["price"], reverse=True)
-    resistances.sort(key=lambda x: x["price"])
-    profile_out = [
-        {"price": _round_price(p), "volume": 0, "pct": _round_price(pct, 2)}
-        for p, pct in sorted(pairs, key=lambda x: x[0])
-        if pct >= 0.01
-    ]
-    return {
-        "supports": supports[:6],
-        "resistances": resistances[:6],
-        "profile": profile_out,
-        "meta": {
-            "source": "cyq_chips",
-            "poc": _round_price(poc_price),
-            "va_low": _round_price(va_low),
-            "va_high": _round_price(va_high),
-        },
-    }
-
-
-def _compute_chip_from_volume(bars: list[dict]) -> dict[str, Any]:
-    """筹码分布：用成交量价格轮廓近似（板块或无 CYQ 数据时）。"""
-    if len(bars) < 20:
-        return {"supports": [], "resistances": [], "profile": []}
-    profile = _volume_bins(bars, bins=50)
-    total_vol = sum(v for _, v in profile)
-    if total_vol <= 0:
-        return {"supports": [], "resistances": [], "profile": []}
-    poc_price, poc_vol = max(profile, key=lambda x: x[1])
-    last_close = _f(bars[-1].get("close")) or 0.0
-
-    sorted_bins = sorted(profile, key=lambda x: x[1], reverse=True)
-    va_vol = 0.0
-    va_prices: list[float] = []
-    for price, vol in sorted_bins:
-        va_vol += vol
-        va_prices.append(price)
-        if va_vol >= total_vol * 0.7:
-            break
-    va_low = min(va_prices)
-    va_high = max(va_prices)
-
-    supports: list[dict] = []
-    resistances: list[dict] = []
-    if poc_price < last_close:
-        supports.append(_level(poc_price, "筹码峰支撑(POC)", "support"))
-    elif poc_price > last_close:
-        resistances.append(_level(poc_price, "筹码峰阻力(POC)", "resistance"))
-    else:
-        supports.append(_level(poc_price, "筹码峰(POC)", "support"))
-
-    if va_low < last_close:
-        supports.append(_level(va_low, "筹码VA下沿支撑", "support"))
-    if va_high > last_close:
-        resistances.append(_level(va_high, "筹码VA上沿阻力", "resistance"))
-
-    for price, vol in sorted(profile, key=lambda x: x[1], reverse=True)[1:4]:
-        if vol < poc_vol * 0.55:
-            continue
-        if price < last_close:
-            supports.append(_level(price, "次级筹码峰支撑", "support", volume=vol))
-        elif price > last_close:
-            resistances.append(_level(price, "次级筹码峰阻力", "resistance", volume=vol))
-
-    supports.sort(key=lambda x: x["price"], reverse=True)
-    resistances.sort(key=lambda x: x["price"])
-    profile_out = [
-        {"price": p, "volume": _round_price(v, 0), "pct": _round_price(v / total_vol * 100, 2)}
-        for p, v in profile
-        if v > 0
-    ]
-    return {
-        "supports": supports[:6],
-        "resistances": resistances[:6],
-        "profile": profile_out,
-        "meta": {
-            "source": "volume_profile",
-            "poc": _round_price(poc_price),
-            "va_low": _round_price(va_low),
-            "va_high": _round_price(va_high),
-        },
-    }
-
-
-def compute_all_levels(bars: list[dict], cyq_rows: list[dict] | None = None) -> dict[str, Any]:
+def compute_all_levels(bars: list[dict]) -> dict[str, Any]:
     return {
         "ma": compute_ma_levels(bars),
         "fibonacci": compute_fibonacci_levels(bars),
         "volume_price": compute_volume_price_levels(bars),
         "trendline": compute_trendline_levels(bars),
-        "chip": compute_chip_levels(bars, cyq_rows),
     }

@@ -141,38 +141,31 @@ DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "d
 RESERVED_DC_PAGE_SLUGS = frozenset(
     {
         "mainline",
-        "quant-mainline",
         "dragon",
         "sectors",
         "kline",
         "sentiment",
         "volume-price",
-        "volatility",
         "hot-stocks",
         "limit-up",
     }
 )
 
+# 决策链路：资金 → 主线 → 量价确认 → 龙头/成分 → K线
 _NAV_RAW: list[dict[str, str]] = [
-    # 主线决策
-    {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "主线决策"},
-    {"slug": "quant-mainline", "label": "量化主线", "href": "/dc/quant-mainline", "section": "主线决策"},
-    {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "主线决策"},
-    # 板块分析
-    {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "板块分析"},
-    {"slug": "kline", "label": "K线分析", "href": "/dc/kline", "section": "板块分析"},
-    {"slug": "sentiment", "label": "板块情绪", "href": "/dc/sentiment", "section": "板块分析"},
-    {"slug": "volume-price", "label": "板块量价", "href": "/dc/volume-price", "section": "板块分析"},
-    {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow", "section": "板块分析"},
-    {"slug": "volatility", "label": "波动率", "href": "/dc/volatility", "section": "板块分析"},
-    # 短线雷达
-    {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks", "section": "短线雷达"},
-    {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up", "section": "短线雷达"},
-    # 我的自选
+    {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow", "section": "决策链路"},
+    {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "决策链路"},
+    {"slug": "volume-price", "label": "板块量价", "href": "/dc/volume-price", "section": "决策链路"},
+    {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "决策链路"},
+    {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "决策链路"},
+    {"slug": "kline", "label": "K线分析", "href": "/dc/kline", "section": "决策链路"},
+    # 辅助
+    {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up", "section": "辅助雷达"},
+    {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks", "section": "辅助雷达"},
+    {"slug": "sentiment", "label": "板块情绪", "href": "/dc/sentiment", "section": "辅助雷达"},
+    # 自选
     {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
     {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks", "section": "我的自选"},
-    {"slug": "vip-start-short", "label": "VIP-短期板块启动", "href": "/vip/start-short", "section": "我的自选"},
-    {"slug": "vip-start-mid", "label": "VIP-中期板块启动", "href": "/vip/start-mid", "section": "我的自选"},
 ]
 
 
@@ -190,6 +183,7 @@ def _build_nav_sections(raw: list[dict[str, str]]) -> list[dict]:
     return sections
 
 
+NAV_TOP_ITEMS: list[dict[str, str]] = []
 NAV_ITEMS = [{k: v for k, v in item.items() if k != "section"} for item in _NAV_RAW]
 NAV_SECTIONS = _build_nav_sections(_NAV_RAW)
 

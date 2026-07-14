@@ -2,7 +2,15 @@
   const board = window.DcBoard;
   if (!board) return;
 
-  const { fmtNum, apiGet, toApiTradeDate, initTradeDateCalendar, klineLink } = board;
+  const {
+    fmtNum,
+    apiGet,
+    toApiTradeDate,
+    initTradeDateCalendar,
+    stockKlineLink,
+    consumeFunnelParams,
+    pickBoard,
+  } = board;
 
   function sectorTable() {
     return window.DcSectorTable;
@@ -203,7 +211,10 @@
 
   function bindSectorActions() {
     elSectorBody.querySelectorAll("[data-action=members]").forEach((btn) => {
-      btn.addEventListener("click", () => loadMembers(btn.dataset.code, btn.dataset.name));
+      btn.addEventListener("click", () => {
+        if (pickBoard) pickBoard(btn.dataset.code, btn.dataset.name, elDate.value);
+        loadMembers(btn.dataset.code, btn.dataset.name);
+      });
     });
     elSectorBody.querySelectorAll("[data-action=fav-board]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -217,10 +228,12 @@
     clearError();
     const st = requireSectorTable();
     try {
+      if (pickBoard) pickBoard(code, name, elDate.value);
       const td = tdParam();
       const q = td ? `?trade_date=${td}` : "";
       const data = await apiGet(`/api/v1/sectors/${encodeURIComponent(code)}/members${q}`);
-      elMembersTitle.textContent = `${name || data.industry_name || code} · 成分股（${data.trade_date}）`;
+      const boardName = name || data.industry_name || code;
+      elMembersTitle.textContent = `${boardName} · 成分股（${data.trade_date}）`;
       if (!data.items.length) {
         elMembersBody.innerHTML = "";
         elMembersEmpty.classList.remove("hidden");
@@ -229,6 +242,9 @@
         elMembersBody.innerHTML = data.items
           .map((row) => {
             const isFav = stockFavCodes.has(row.ts_code);
+            const next = stockKlineLink
+              ? stockKlineLink(row.ts_code, row.stock_name, elDate.value, code, boardName)
+              : "—";
             return `
           <tr>
             <td>${row.ts_code || "—"}</td>
@@ -240,7 +256,7 @@
             <td>${row.pe_ttm != null ? fmtNum(row.pe_ttm, 2) : "—"}</td>
             <td class="${st.cellClass(row.net_mf_yi)}">${row.net_mf_yi != null ? st.fmtYi(row.net_mf_yi) : "—"}</td>
             <td><button type="button" class="star-btn${isFav ? " is-fav" : ""}" data-ts="${row.ts_code}" data-name="${row.stock_name || ""}">★</button></td>
-            <td>${klineLink("stock", row.ts_code, elDate.value)}</td>
+            <td>${next}</td>
           </tr>`;
           })
           .join("");
@@ -403,9 +419,21 @@
       sortState.sortKey = sectorTable().DEFAULT_SORT.key;
       sortState.sortDir = sectorTable().DEFAULT_SORT.dir;
       await initTradeDateCalendar(elDate, "/api/v1/sectors/trade-dates?limit=90");
+      const funnel = consumeFunnelParams ? consumeFunnelParams({ dateEl: elDate }) : null;
       await loadBoardOptions();
+      if (funnel && funnel.industry_code) {
+        selectedBoards.set(funnel.industry_code, {
+          industry_code: funnel.industry_code,
+          industry_name: funnel.industry_name || funnel.industry_code,
+          content_type: contentType,
+        });
+        renderSelectedTags();
+      }
       await querySectors();
       refreshFavCodes();
+      if (funnel && funnel.industry_code) {
+        await loadMembers(funnel.industry_code, funnel.industry_name);
+      }
     } catch (err) {
       showError(err.message);
       try {

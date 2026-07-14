@@ -3,7 +3,7 @@
 # 一次性：页面报表 DWM/DWS 近 1 年历史回填（ODS 已齐，不跑 sync）
 #
 # 覆盖 Web 依赖（东财 DC 口径）：
-#   资金强度 / 行业板块 / 主线板块 / 量化主线 / 板块量价 / 板块龙头
+#   资金强度 / 行业板块 / 主线板块 / 板块量价 / 板块龙头
 # 不覆盖（直接读 ODS，ODS 齐即可）：热点股预览、涨停分析
 #
 # 用法:
@@ -14,7 +14,7 @@
 #
 # 环境变量:
 #   BACKFILL_DAYS=365        无参时：结束日=昨日，开始日=结束日往前 N 自然日
-#   BACKFILL_STEPS=all       all | dwm,dws,vp,dragon,quant（逗号分隔）
+#   BACKFILL_STEPS=all       all | dwm,dws,vp,dragon（逗号分隔）
 #   SKIP_EXISTING=1          1=若当日 monitor 已有数据则整日跳过（便于断点续跑）
 #   STOCK_LOG_DIR=...        日志根目录，默认 ${DW_ROOT}/log/stock_log
 #   FAIL_FAST=0              1=任一步失败即退出（默认 0：记 WARN 继续下一天）
@@ -86,8 +86,6 @@ _day_already_done() {
     tbl="dwm_industry_vp_score_di"
   elif _step_enabled dragon; then
     tbl="dwm_sector_dragon_summary_di"
-  elif _step_enabled quant; then
-    tbl="dws_dc_industry_quant_mainline_di"
   else
     tbl="dwm_dc_industry_fund_flow_di"
   fi
@@ -179,10 +177,6 @@ _run_day() {
   if _step_enabled dragon; then
     _soft_run_pro "sector_dragon" "${DW_ROOT}/dw-dwm/pro_dwm_sector_dragon_score.sh" "${n_date}"
   fi
-
-  if _step_enabled quant; then
-    _soft_run_pro "quant_mainline" "${DW_ROOT}/dw-dws/pro_dws_dc_industry_quant_mainline_di.sh" "${n_date}"
-  fi
 }
 
 # 参数: [START_YYYYMMDD] [END_YYYYMMDD] [STEPS]
@@ -237,8 +231,7 @@ done
     SELECT 'fund_flow' AS tbl, COUNT(*) cnt FROM dwm_dc_industry_fund_flow_di WHERE trade_date='$(format_date "${range_end}")'
     UNION ALL SELECT 'mainline_monitor', COUNT(*) FROM dws_dc_industry_mainline_monitor_di WHERE trade_date='$(format_date "${range_end}")'
     UNION ALL SELECT 'vp_score', COUNT(*) FROM dwm_industry_vp_score_di WHERE trade_date='$(format_date "${range_end}")'
-    UNION ALL SELECT 'dragon_summary', COUNT(*) FROM dwm_sector_dragon_summary_di WHERE trade_date='$(format_date "${range_end}")'
-    UNION ALL SELECT 'quant_mainline', COUNT(*) FROM dws_dc_industry_quant_mainline_di WHERE trade_date='$(format_date "${range_end}")';
+    UNION ALL SELECT 'dragon_summary', COUNT(*) FROM dwm_sector_dragon_summary_di WHERE trade_date='$(format_date "${range_end}")';
   " 2>/dev/null || true
 } | tee -a "${LOG_FILE}"
 

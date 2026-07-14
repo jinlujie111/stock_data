@@ -179,26 +179,8 @@ run_dwm_market_breadth() {
     bash "${runner}" "$@"
 }
 
-run_dwm_market_volatility() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_market_volatility_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_dwm_dc_industry_fund_flow() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_fund_flow_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dwm_dc_industry_volatility() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_volatility_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1
@@ -410,15 +392,6 @@ run_vp_backfill() {
 
 run_sector_dragon_batch() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_sector_dragon_score.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dws_dc_industry_quant_mainline() {
-    local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_quant_mainline_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1

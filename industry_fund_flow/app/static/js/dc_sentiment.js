@@ -194,12 +194,20 @@
   function renderSummary(payload) {
     const marketScore = payload.market?.latest_score;
     const sectorScore = payload.sector?.latest_score;
+    const regime = payload.market?.regime;
     const board = payload.board;
 
     renderBoardPill(board);
     elSummaryText.textContent = board
       ? `截至 ${payload.trade_date}，展示 ${board.industry_name || board.industry_code} 的板块情绪。`
       : `截至 ${payload.trade_date}，未匹配到板块。`;
+
+    const regimeHtml = regime?.label
+      ? `<div class="sentiment-metric">
+        <span>市场状态</span>
+        <strong>${regime.label}</strong>
+      </div>`
+      : "";
 
     elSummaryMetrics.innerHTML = `
       <div class="sentiment-metric">
@@ -214,6 +222,7 @@
         <span>大盘情绪参考</span>
         <strong class="${scoreTone(marketScore)}">${fmtScore(marketScore)}</strong>
       </div>
+      ${regimeHtml}
     `;
   }
 

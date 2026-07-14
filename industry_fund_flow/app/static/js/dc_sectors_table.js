@@ -85,9 +85,9 @@
     return col ? col.label : key;
   }
 
-  function klineLink(kind, code, tradeDate) {
-    return window.DcBoard && window.DcBoard.klineLink
-      ? window.DcBoard.klineLink(kind, code, tradeDate)
+  function funnelBoardLinks(code, name, tradeDate) {
+    return window.DcBoard && window.DcBoard.funnelBoardLinks
+      ? window.DcBoard.funnelBoardLinks(code, name, tradeDate, { primary: "members" })
       : "—";
   }
 
@@ -97,7 +97,7 @@
       const arrow = active ? (sortDir === "asc" ? " ▲" : " ▼") : "";
       return `<th class="sortable-th" data-key="${c.key}" title="点击排序">${c.label}${arrow}</th>`;
     }).join("");
-    theadRow.innerHTML = `<th>名称</th>${sortHeaders}<th>板块龙头</th><th>K线分析</th><th>操作</th>`;
+    theadRow.innerHTML = `<th>名称</th>${sortHeaders}<th>板块龙头</th><th>下一步</th><th>操作</th>`;
   }
 
   function bindSortHeaders(theadEl, state, onChange) {
@@ -146,7 +146,7 @@
         <td>${row.limit_up_cnt ?? "—"}</td>
         <td>${row.total_mv_yi != null ? fmtYi(row.total_mv_yi, 0) : "—"}</td>
         <td>${leaderText(row)}</td>
-        <td>${klineLink("board", row.industry_code, tradeDate)}</td>
+        <td>${funnelBoardLinks(row.industry_code, row.industry_name, tradeDate)}</td>
         <td>${membersBtn}</td>
       </tr>`;
       })

@@ -34,18 +34,62 @@
   #history-card { margin-top: 1.25rem; }
   #history-chart { min-height: 200px; margin-top: 0.75rem; }
   .history-svg { width: 100%; height: 220px; }
+  .history-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .history-head h2 { margin: 0; font-size: 1.05rem; }
 </style>
 
 <div class="page-head">
   <h1>主线板块</h1>
-  <p class="muted">东方财富 · 五维加权得分、等级与三阶段监控榜（默认 5 日均分排序）</p>
 </div>
 
-<div class="card filters-card">
-  <div class="filters">
+<div class="card vp-guide-card">
+  <div class="vp-guide-head">
+    <div>
+      <h2 class="vp-guide-title">指标说明</h2>
+      <p class="vp-guide-sub">东方财富 · 五维加权综合分 · 等级与三阶段监控</p>
+    </div>
+    <div class="vp-weight-bar" aria-label="主线分权重">
+      <span class="vp-weight-chip" style="--w-color:#3b82f6">资金 35%</span>
+      <span class="vp-weight-chip" style="--w-color:#22c55e">趋势 25%</span>
+      <span class="vp-weight-chip" style="--w-color:#f59e0b">热度 15%</span>
+      <span class="vp-weight-chip" style="--w-color:#a855f7">景气 15%</span>
+      <span class="vp-weight-chip" style="--w-color:#ec4899">扩散 10%</span>
+    </div>
+  </div>
+
+  <dl class="vp-def-grid">
+    <div class="vp-def-item"><dt>展示分</dt><dd>默认按 5 日均分（可切 3/10 日）排序展示，降低单日噪声；当日总分见「当日总分」列</dd></div>
+    <div class="vp-def-item"><dt>等级</dt><dd>&gt;85 超级主线 · 70–85 主线 · 60–70 轮动热点 · &lt;60 跟风</dd></div>
+    <div class="vp-def-item"><dt>三阶段</dt><dd>资金试探 → 板块爆发 → 机构化；结合资金连续、RS、涨停扩散判断</dd></div>
+    <div class="vp-def-item"><dt>资金连续</dt><dd>主力净流入为正的连续交易日数</dd></div>
+    <div class="vp-def-item"><dt>RS(5日)</dt><dd>板块相对市场的 5 日相对强弱(%)</dd></div>
+    <div class="vp-def-item"><dt>涨停</dt><dd>板块当日涨停家数，衡量赚钱效应与扩散</dd></div>
+    <div class="vp-def-item"><dt>五维条</dt><dd>资金 / 趋势 / 热度 / 景气 / 扩散 子分可视化（宽度按权重缩放）</dd></div>
+    <div class="vp-def-item"><dt>Top20 监控</dt><dd>勾选后仅看监控池内板块；指定板块筛选时自动放开该限制</dd></div>
+  </dl>
+
+  <div class="vp-guide-foot">
+    <h3 class="vp-guide-foot-title">怎么用这份报表</h3>
+    <ul class="vp-guide-steps">
+      <li><span class="vp-step-num">1</span>选交易日，默认看<strong>行业+概念</strong>合并监控榜；可筛等级、TopN。</li>
+      <li><span class="vp-step-num">2</span>优先盯 <strong>超级主线 / 主线</strong>，并确认阶段处于「爆发」或向「机构化」过渡。</li>
+      <li><span class="vp-step-num">3</span>用<strong>板块搜索</span>锁定观察池；点「数据分析」看近 60 日得分曲线与等级变化。</li>
+      <li><span class="vp-step-num">4</span>等级骤降、阶段回退时需减仓观望；本页为板块级监控，不构成投资建议。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card filters-card vp-filters-card">
+  <div class="filters vp-filters">
     <label class="filter-field">
       <span>交易日期</span>
-      <input type="date" id="trade-date" class="date-input" />
+      <select id="trade-date"></select>
     </label>
     <label class="filter-field">
       <span>均分窗口</span>
@@ -55,23 +99,23 @@
         <option value="10">10 日</option>
       </select>
     </label>
-    <label class="filter-field filter-field--wide">
+    <label class="filter-field">
       <span>板块类型</span>
-      <div class="chip-group" id="content-type-chips">
-        {% for ct in content_types %}
-        <button type="button" class="chip{% if ct in ['行业','概念'] %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
-        {% endfor %}
-      </div>
+      <select id="content-types">
+        <option value="行业,概念" selected>行业+概念</option>
+        <option value="行业">行业</option>
+        <option value="概念">概念</option>
+      </select>
     </label>
-    <label class="filter-field filter-field--wide">
-      <span>等级筛选</span>
-      <div class="chip-group" id="level-chips">
-        <button type="button" class="chip active" data-value="">全部</button>
-        <button type="button" class="chip" data-value="超级主线">超级主线</button>
-        <button type="button" class="chip" data-value="主线">主线</button>
-        <button type="button" class="chip" data-value="轮动热点">轮动热点</button>
-        <button type="button" class="chip" data-value="跟风">跟风</button>
-      </div>
+    <label class="filter-field">
+      <span>等级</span>
+      <select id="level-filter">
+        <option value="" selected>全部</option>
+        <option value="超级主线">超级主线</option>
+        <option value="主线">主线</option>
+        <option value="轮动热点">轮动热点</option>
+        <option value="跟风">跟风</option>
+      </select>
     </label>
     <label class="filter-field">
       <span>TopN</span>
@@ -85,23 +129,34 @@
       <input type="checkbox" id="top20-only" checked />
       <span>仅监控 Top20</span>
     </label>
+    <label class="filter-field filter-field--grow">
+      <span>板块筛选</span>
+      <div class="board-picker" id="board-picker">
+        <div class="board-selected" id="board-selected"></div>
+        <input type="text" id="board-search" class="board-search" placeholder="搜索板块名称或代码" autocomplete="off" />
+        <div class="board-dropdown hidden" id="board-dropdown"></div>
+      </div>
+    </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空</button>
     </div>
   </div>
-  <div id="filter-hint" class="filter-hint muted"></div>
+  <p id="filter-hint" class="filter-hint muted"></p>
 </div>
 
 <div id="page-error" class="alert alert-error hidden"></div>
 
 <section class="card">
-  <h2 class="section-title">主线监控榜</h2>
-  <p id="rank-updated" class="muted snapshot-time"></p>
+  <div class="table-toolbar">
+    <h2 class="section-title" style="margin:0">主线监控榜</h2>
+    <span id="rank-updated" class="muted snapshot-time"></span>
+  </div>
   <div class="table-wrap">
     <table class="data-table" id="rank-table">
       <thead>
         <tr>
-          <th>排名</th>
+          <th>#</th>
           <th>类型</th>
           <th>板块</th>
           <th>展示分</th>
@@ -112,7 +167,7 @@
           <th>RS(5日)</th>
           <th>涨停</th>
           <th>五维</th>
-          <th>K线分析</th>
+          <th>下一步</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -123,10 +178,11 @@
 </section>
 
 <section class="card hidden" id="history-card">
-  <div class="page-head">
+  <div class="history-head">
     <h2 id="history-title">历史得分</h2>
-    <button type="button" class="btn btn-ghost" id="btn-close-history">关闭</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-close-history">关闭</button>
   </div>
+  <div id="history-metrics" class="vp-detail-metrics"></div>
   <div id="history-chart"></div>
   <div class="table-wrap">
     <table class="data-table">
@@ -148,6 +204,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/dc_board_common.js?v=20260710d"></script>
-<script src="/static/js/dc_mainline.js?v=20260710d"></script>
+<script src="/static/js/dc_board_common.js?v=20260714b"></script>
+<script src="/static/js/dc_mainline.js?v=20260714b"></script>
 {% endblock %}

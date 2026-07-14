@@ -1,6 +1,7 @@
 (function () {
   const board = window.DcBoard || {};
   const kline = window.DcKline || {};
+  const { funnelBoardLinks, stockKlineLink, consumeFunnelParams, pickBoard } = board;
   const { normalizeIsoDate, toApiTradeDate } = board;
 
   const elDate = document.getElementById("trade-date");
@@ -529,16 +530,22 @@
         const arrow = active ? (stockSortDir === "asc" ? " ▲" : " ▼") : "";
         return `<th class="sortable-th" data-sort="${col.key}" title="点击排序">${col.label}${arrow}</th>`;
       }).join("") +
-      "</tr>";
+      "<th>下一步</th></tr>";
   }
 
   function renderStockRows(items) {
     if (!elDetailStocks) return;
     elDetailStocks.innerHTML = "";
+    const boardCode = detailIndustryCode || "";
+    const boardName = (elDetailTitle && elDetailTitle.textContent.split("·")[0].trim()) || "";
     (items || []).forEach((row) => {
       const tr = document.createElement("tr");
       const pctCls = pctChgClass(row.pct_chg);
       const volCls = volRatioClass(row.vol_ratio_20);
+      const next =
+        stockKlineLink
+          ? stockKlineLink(row.ts_code, row.stock_name, elDate.value, boardCode, boardName)
+          : "—";
       tr.innerHTML =
         `<td>${row.ts_code}</td>` +
         `<td>${row.stock_name || "—"}</td>` +
@@ -548,7 +555,8 @@
         `<td>${row.is_breakout_strict ? vpVal("是", "vp-l5", true) : "—"}</td>` +
         `<td>${vpVal(labelPattern(row.vp_pattern), patternTone(row.vp_pattern), true)}</td>` +
         `<td>${vpVal(fmt(row.vp_pattern_score, 0), scoreTier(row.vp_pattern_score))}</td>` +
-        `<td>${fmtMvYi(row.circ_mv_yi)}</td>`;
+        `<td>${fmtMvYi(row.circ_mv_yi)}</td>` +
+        `<td>${next}</td>`;
       elDetailStocks.appendChild(tr);
     });
   }
@@ -613,7 +621,7 @@
   function renderRank(items) {
     elThead.innerHTML =
       "<tr><th>#</th><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th>" +
-      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续强度</th><th>20日趋势</th><th>龙头</th><th>操作</th></tr>";
+      "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续强度</th><th>20日趋势</th><th>龙头</th><th>下一步</th><th>操作</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {
       showTableEmpty(EMPTY_MSG_RANK);
@@ -625,6 +633,9 @@
       if (row.industry_code === detailIndustryCode) tr.classList.add("vp-row-active");
       const statusText = STATUS_LABEL[row.vp_status] || row.vp_status || "—";
       const signalText = labelSignal(row.signal_type);
+      const nextHtml = funnelBoardLinks
+        ? funnelBoardLinks(row.industry_code, row.industry_name, elDate.value, { primary: "stock" })
+        : "—";
       tr.innerHTML =
         `<td>${row.rank_vp || idx + 1}</td>` +
         `<td>${row.industry_name || row.industry_code}</td>` +
@@ -638,11 +649,15 @@
         `<td>${vpVal(fmt(row.continuity_strength, 2), continuityTone(row.continuity_strength))}</td>` +
         `<td>${vpVal(retPct(row.trend_return_20d), trendRetTone(row.trend_return_20d))}</td>` +
         `<td>${vpVal(fmt(row.leader_strength, 2), leaderTone(row.leader_strength))}</td>` +
-        `<td><button type="button" class="btn-vp-detail${row.industry_code === detailIndustryCode ? " is-active" : ""}" data-code="${row.industry_code}">数据分析</button></td>`;
+        `<td>${nextHtml}</td>` +
+        `<td><button type="button" class="btn-vp-detail${row.industry_code === detailIndustryCode ? " is-active" : ""}" data-code="${row.industry_code}" data-name="${row.industry_name || ""}">数据分析</button></td>`;
       elBody.appendChild(tr);
     });
     elBody.querySelectorAll(".btn-vp-detail").forEach((btn) => {
-      btn.addEventListener("click", () => loadDetail(btn.dataset.code));
+      btn.addEventListener("click", () => {
+        if (pickBoard) pickBoard(btn.dataset.code, btn.dataset.name, elDate.value);
+        loadDetail(btn.dataset.code);
+      });
     });
   }
 
@@ -695,6 +710,7 @@
       `/api/v1/vp/industries/${encodeURIComponent(code)}?trade_date=${encodeURIComponent(td)}&window=${w}`
     );
     const s = data.score || {};
+    if (pickBoard) pickBoard(code, s.industry_name || code, td);
     elDetailTitle.textContent = `${s.industry_name || code} · VP ${fmt(s.vp_score, 1)}`;
     renderDetailMetrics(s);
 
@@ -798,6 +814,20 @@
 
   renderSelectedBoards();
   loadDates()
-    .then(refresh)
+    .then(async () => {
+      const funnel = consumeFunnelParams ? consumeFunnelParams({ dateEl: elDate }) : null;
+      if (funnel && funnel.industry_code) {
+        selectedBoards.set(funnel.industry_code, {
+          industry_code: funnel.industry_code,
+          industry_name: funnel.industry_name || funnel.industry_code,
+          content_type: "",
+        });
+        renderSelectedBoards();
+      }
+      await refresh();
+      if (funnel && funnel.industry_code) {
+        await loadDetail(funnel.industry_code);
+      }
+    })
     .catch((e) => showError(e.message || String(e)));
 })();

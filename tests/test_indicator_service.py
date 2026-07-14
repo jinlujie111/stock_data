@@ -39,28 +39,14 @@ def test_fibonacci_levels():
     assert isinstance(result["resistances"], list)
 
 
-def test_compute_chip_from_cyq():
-    cyq = [
-        {"price": 100.0, "percent": 15.0},
-        {"price": 95.0, "percent": 25.0},
-        {"price": 90.0, "percent": 20.0},
-        {"price": 105.0, "percent": 10.0},
-    ]
-    from app.indicator_service import compute_chip_levels
-
-    result = compute_chip_levels([{"close": 98.0}], cyq_rows=cyq)
-    assert result["meta"]["source"] == "cyq_chips"
-    assert result["supports"]
-    assert result["profile"]
-
-
 def test_compute_all_levels_keys():
     bars = _bars([20 + i * 0.3 for i in range(100)])
     all_lv = compute_all_levels(bars)
-    for key in ("ma", "fibonacci", "volume_price", "trendline", "chip"):
+    for key in ("ma", "fibonacci", "volume_price", "trendline"):
         assert key in all_lv
         assert "supports" in all_lv[key]
         assert "resistances" in all_lv[key]
+    assert "chip" not in all_lv
 
 
 def test_trendline_rejects_line_crossing_price_action():

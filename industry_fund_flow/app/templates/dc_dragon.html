@@ -1,40 +1,80 @@
 {% extends "app_layout.html" %}
 {% block app_content %}
 <style>
-  #summary-text {
-    color: #e8edf4 !important;
-    background: rgba(15, 20, 25, 0.92) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  .history-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
   }
+  .history-head h2 { margin: 0; font-size: 1.05rem; }
+  .dragon-score { font-weight: 700; color: #fbbf24; }
 </style>
+
 <div class="page-head">
   <h1>板块龙头</h1>
-  <p class="muted">东财行业 + 概念板块 · MVP 四因子综合评分</p>
 </div>
 
-<div class="card filters-card">
-  <div class="filters">
+<div class="card vp-guide-card">
+  <div class="vp-guide-head">
+    <div>
+      <h2 class="vp-guide-title">指标说明</h2>
+      <p class="vp-guide-sub">东财行业 + 概念 · MVP 四因子综合评分 · 识别板块龙头股</p>
+    </div>
+    <div class="vp-weight-bar" aria-label="龙头分维度">
+      <span class="vp-weight-chip" style="--w-color:#3b82f6">资金</span>
+      <span class="vp-weight-chip" style="--w-color:#22c55e">趋势</span>
+      <span class="vp-weight-chip" style="--w-color:#a855f7">机构</span>
+      <span class="vp-weight-chip" style="--w-color:#f59e0b">综合</span>
+    </div>
+  </div>
+
+  <dl class="vp-def-grid">
+    <div class="vp-def-item"><dt>综合龙头</dt><dd>四因子加权后板块内综合分最高的个股</dd></div>
+    <div class="vp-def-item"><dt>综合分</dt><dd>资金 + 趋势 + 机构等百分位因子合成，0–100</dd></div>
+    <div class="vp-def-item"><dt>资金龙头</dt><dd>板块内资金流入/主力净流入强度最高的个股</dd></div>
+    <div class="vp-def-item"><dt>趋势龙头</dt><dd>板块内相对强弱/涨幅结构最优的个股</dd></div>
+    <div class="vp-def-item"><dt>资金分</dt><dd>个股资金流相关指标在板块内的百分位得分</dd></div>
+    <div class="vp-def-item"><dt>趋势分</dt><dd>个股趋势与相对强弱在板块内的百分位得分</dd></div>
+    <div class="vp-def-item"><dt>机构分</dt><dd>机构持仓/成交活跃等代理指标百分位得分</dd></div>
+    <div class="vp-def-item"><dt>排名</dt><dd>板块内按综合分排序的名次</dd></div>
+  </dl>
+
+  <div class="vp-guide-foot">
+    <h3 class="vp-guide-foot-title">怎么用这份报表</h3>
+    <ul class="vp-guide-steps">
+      <li><span class="vp-step-num">1</span>选交易日与板块类型，浏览<strong>全市场龙头速览</strong>，快速定位各板块领涨股。</li>
+      <li><span class="vp-step-num">2</span>用<strong>板块筛选</strong>锁定关注池；关注「综合龙头」与「资金/趋势龙头」是否同股共振。</li>
+      <li><span class="vp-step-num">3</span>点「数据分析」看成分股四因子明细，可按资金/趋势/综合排序核对。</li>
+      <li><span class="vp-step-num">4</span>龙头切换频繁、分数发散时说明板块尚未形成共识；本页不构成投资建议。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card filters-card vp-filters-card">
+  <div class="filters vp-filters">
     <label class="filter-field">
       <span>交易日期</span>
       <select id="trade-date"></select>
     </label>
-    <label class="filter-field filter-field--wide">
+    <label class="filter-field">
       <span>板块类型</span>
-      <div class="chip-group" id="content-type-chips">
-        {% for ct in content_types %}
-        <button type="button" class="chip{% if ct in ['行业','概念'] %} active{% endif %}" data-value="{{ ct }}">{{ ct }}</button>
-        {% endfor %}
-      </div>
+      <select id="content-types">
+        <option value="行业,概念" selected>行业+概念</option>
+        <option value="行业">行业</option>
+        <option value="概念">概念</option>
+      </select>
     </label>
     <label class="filter-field filter-field--grow">
-      <span>板块（默认全部，可输入名称/代码搜索后点选）</span>
+      <span>板块筛选</span>
       <div class="board-picker" id="board-picker">
         <div class="board-selected" id="board-selected"></div>
         <input
           type="text"
           id="board-search"
           class="board-search"
-          placeholder="输入板块名称或代码，模糊匹配…"
+          placeholder="搜索板块名称或代码"
           autocomplete="off"
         />
         <div class="board-dropdown hidden" id="board-dropdown"></div>
@@ -42,17 +82,19 @@
     </label>
     <div class="filter-actions">
       <button type="button" class="btn btn-primary" id="btn-query">查询</button>
-      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空板块</button>
+      <button type="button" class="btn btn-ghost" id="btn-reset-boards">清空</button>
     </div>
   </div>
-  <div id="filter-hint" class="filter-hint muted"></div>
+  <p id="filter-hint" class="filter-hint muted"></p>
 </div>
 
 <div id="page-error" class="alert alert-error hidden"></div>
 
 <section class="card">
-  <h2 class="section-title">全市场龙头速览</h2>
-  <p id="leaders-updated" class="muted snapshot-time"></p>
+  <div class="table-toolbar">
+    <h2 class="section-title" style="margin:0">全市场龙头速览</h2>
+    <span id="leaders-updated" class="muted snapshot-time"></span>
+  </div>
   <div class="table-wrap">
     <table class="data-table" id="leaders-table">
       <thead>
@@ -63,7 +105,7 @@
           <th class="sortable-th" data-sort="composite">综合分</th>
           <th>资金龙头</th>
           <th>趋势龙头</th>
-          <th>K线分析</th>
+          <th>下一步</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -74,23 +116,23 @@
 </section>
 
 <section class="card hidden" id="detail-card">
-  <div class="page-head">
+  <div class="history-head">
     <h2 id="detail-title">板块明细</h2>
-    <button type="button" class="btn btn-ghost" id="btn-close-detail">关闭</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-close-detail">关闭</button>
   </div>
-  <pre id="summary-text" class="summary-box"></pre>
+  <div id="detail-metrics" class="vp-detail-metrics"></div>
   <div class="table-wrap">
     <table class="data-table" id="scores-table">
       <thead>
         <tr>
           <th>股票</th>
-          <th>股票代码</th>
-          <th>综合分</th>
+          <th>代码</th>
+          <th class="sortable-th" data-sort="composite">综合分</th>
           <th class="sortable-th" data-sort="fund">资金分</th>
           <th class="sortable-th" data-sort="trend">趋势分</th>
           <th class="sortable-th" data-sort="inst">机构分</th>
           <th>排名</th>
-          <th>K线分析</th>
+          <th>下一步</th>
         </tr>
       </thead>
       <tbody id="scores-body"></tbody>
@@ -100,6 +142,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/dc_board_common.js?v=20260710d"></script>
-<script src="/static/js/dc_dragon.js?v=20260710d"></script>
+<script src="/static/js/dc_board_common.js?v=20260714b"></script>
+<script src="/static/js/dc_dragon.js?v=20260714b"></script>
 {% endblock %}

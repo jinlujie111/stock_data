@@ -22,7 +22,6 @@ INDICATOR_OPTIONS = [
     {"key": "fibonacci", "label": "斐波那契"},
     {"key": "volume_price", "label": "量价关系"},
     {"key": "trendline", "label": "趋势线"},
-    {"key": "chip", "label": "筹码分布"},
 ]
 
 

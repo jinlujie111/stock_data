@@ -115,16 +115,9 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | ⑨ | `run_dim_industry_track` | ⑤ 市场热度 DWM | 需求4 DIM |
 | ⑨b | `run_ai_core_pool_batch` | ⑨ DIM + ODS 公司/财报/研报 | **需求4 核心池** |
 | ⑩ | `run_sector_dragon_batch` | 资金 DWM + `daily` / `moneyflow` | 需求2 |
-| ⑪ | `run_dws_dc_industry_quant_mainline` | 全部东财 DWM + 龙头摘要 | **需求3 量化主线（东财行业）** |
-| ⑫ | `run_ods_completeness_monitor` | — | ODS 完整度监控告警 |
+| ⑪ | `run_ods_completeness_monitor` | — | ODS 完整度监控告警 |
 
-**需求3 落库表（步骤 ⑪）**
-
-| 表 | 说明 |
-|----|------|
-| `dws_dc_industry_quant_mainline_di` | FTELP 五主因子、MainScore、**行业/概念分别 Top10**、MA3/5/10 |
-| `dws_dc_industry_quant_mainline_signal_di` | 启动 / 退潮 / 观察 + 原因 JSON |
-| `dwm_dc_mainline_config` | 权重与信号阈值（默认 `content_types=行业,概念`） |
+> 已下线：量化主线（需求3）、波动率报表。清表见 `mysql_tables/migrations/20260714_drop_quant_volatility.sql`。
 
 **需求1 落库表（步骤 ⑧）**
 
@@ -322,11 +315,10 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | 页面 | URL | 日批步骤 | 主要读表 |
 |------|-----|----------|----------|
 | 首页（市场广度） | `/` | ② | `dwm_market_breadth_di` |
+| **资金强度** | `/dc/fund-flow` | ③ | `dwm_dc_industry_fund_flow_di` |
 | **主线板块**（需求1） | `/dc/mainline` | ⑧ | `dws_dc_industry_mainline_monitor_di` |
-| **量化主线**（需求3） | `/dc/quant-mainline` | ⑪ | `dws_dc_industry_quant_mainline_di`、`dws_dc_industry_quant_mainline_signal_di` |
 | **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
 | **AI 核心池**（需求4） | `/dc/ai-core` | ⑨ + ⑨b | `dwm_industry_stock_core_di`、`dwm_industry_stock_ai_score_di` |
-| 资金强度 | `/dc/fund-flow` | ③ | `dwm_dc_industry_fund_flow_di` |
 | 趋势强度 | `/dc/trend-strength` | ④ | `dwm_dc_industry_trend_strength_di` |
 | 市场热度 | `/dc/market-heat` | ⑤ | `dwm_dc_industry_market_heat_di` |
 | 产业景气 | `/dc/prosperity` | ⑦ | `dwm_dc_industry_prosperity_di` |
@@ -339,7 +331,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 
 1. 等日批 `xxl_daily_batch.sh` 跑完（或 XXL-JOB `stock_daily_all` 成功）
 2. 浏览器打开 `http://<host>:8082/login` 登录
-3. 首页看市场广度 → 主线榜 → 量化主线 → 板块龙头 → AI 核心池
+3. 首页看市场广度 → 资金强度 → 主线板块 → 板块量价 → 板块龙头 → K线
 
 ### 8.4 API 速查（需登录 Cookie）
 
@@ -348,8 +340,6 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | GET | `/api/me` | 当前用户 |
 | GET | `/api/v1/mainline/rank?trade_date=YYYYMMDD&top=20` | 需求1 主线榜 |
 | GET | `/api/v1/mainline/history?industry_code=BKxxxx.DC&days=60` | 主线历史得分 |
-| GET | `/api/v1/quant-mainline/top-groups?trade_date=YYYYMMDD` | 需求3 行业/概念分榜 Top10 |
-| GET | `/api/v1/quant-mainline/signals?trade_date=YYYYMMDD` | 启动 / 退潮信号 |
 | GET | `/api/v1/dragon/leaders?trade_date=YYYYMMDD` | 需求2 龙头摘要 |
 | GET | `/api/v1/ai-core/pool?trade_date=YYYYMMDD` | 需求4 核心池 |
 | GET | `/api/v1/ai-core/scores?trade_date=YYYYMMDD&industry_id=...` | 需求4 全量评分 |
@@ -374,7 +364,6 @@ USE stock_data;
 SET @d = '2026-06-26';
 
 SELECT 'mainline' AS page, COUNT(*) FROM dws_dc_industry_mainline_monitor_di WHERE trade_date = @d
-UNION ALL SELECT 'quant', COUNT(*) FROM dws_dc_industry_quant_mainline_di WHERE trade_date = @d
 UNION ALL SELECT 'dragon', COUNT(*) FROM dwm_sector_stock_dragon_score_di WHERE trade_date = @d
 UNION ALL SELECT 'ai_core', COUNT(*) FROM dwm_industry_stock_core_di WHERE trade_date = @d
 UNION ALL SELECT 'ai_score', COUNT(*) FROM dwm_industry_stock_ai_score_di WHERE trade_date = @d;
@@ -383,7 +372,6 @@ UNION ALL SELECT 'ai_score', COUNT(*) FROM dwm_industry_stock_ai_score_di WHERE 
 | 页面空 | 常见原因 |
 |--------|----------|
 | 主线榜 | 日批 ⑧ 未跑；`stock_read_grants.sql` 未执行 |
-| 量化主线 | 日批 ⑪ 未跑 |
 | 板块龙头 | 日批 ⑩ 未跑；成分 `<3` 的板块被跳过 |
 | AI 核心池 | ⑨b 未跑或失败；核心池分数 `< score_threshold` 时 `core_di` 可能为 0 但 `ai_score_di` 应有全量 |
 | 五维维度页 | 对应 DWM 步骤 ③～⑦ 未跑 |
@@ -471,7 +459,7 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | [`dw-monitor/pro_ods_completeness.sh`](dw-monitor/pro_ods_completeness.sh) | ODS 完整度监控（配置见 `ods_checks.json`） |
 | [`dw-dwm/pro_dwm_ai_core_pool_di.sh`](dw-dwm/pro_dwm_ai_core_pool_di.sh) | 需求4 AI 核心池批处理 |
 | [`dw-dwm/pro_dwm_*`](dw-dwm/) | DWM ETL（东财/THS/SW 板块因子，**全部保留**） |
-| [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控/量化主线，**THS/SW 保留**） |
+| [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控，**THS/SW 保留**） |
 | [`industry_fund_flow/README.md`](industry_fund_flow/README.md) | 报表 Web 说明（启动见 §八，不进批处理） |
 | [`industry_fund_flow/sql/stock_read_grants.sql`](industry_fund_flow/sql/stock_read_grants.sql) | Web 只读授权 |
 
@@ -485,7 +473,6 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | `Access denied` | 检查 `dw-utils/func.sh` 中 MySQL 账号 |
 | 1045 / 变量未加载 | 先 `source dw-utils/func.sh` 或走 `sync_runner.sh` |
 | Web 主线榜空 | 确认日批 ⑧ 已跑、`stock_read_grants.sql` 已执行（§八.5） |
-| 量化主线 Top 为空 | 确认 ⑪ `run_dws_dc_industry_quant_mainline`；配置 `content_types=行业,概念` |
 | AI 核心池页空 | 确认 ⑨b 已跑；`ai_score_di` 有数但 `core_di` 为 0 属正常（未达入池分） |
 | Web 无法访问 | 检查 uvicorn 进程、端口 8082、安全组（启动见 §八.2） |
 | uvicorn 端口占用 | 换 `--port 8083` 或 `pkill -f "uvicorn app.main:app"` 后重启 |
