@@ -1,0 +1,19 @@
+[Unit]
+Description=Industry Fund Flow Web (uvicorn)
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/stock_data/industry_fund_flow
+EnvironmentFile=-/opt/stock_data/industry_fund_flow/.env
+Environment=IFF_PORT=8082
+ExecStart=/usr/local/bin/python3.11 -m uvicorn app.main:app --host 127.0.0.1 --port 8082
+Restart=always
+RestartSec=5
+StandardOutput=append:/root/log/stock_log/web/industry_fund_flow.log
+StandardError=append:/root/log/stock_log/web/industry_fund_flow.log
+
+[Install]
+WantedBy=multi-user.target
