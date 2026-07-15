@@ -144,25 +144,34 @@ load_dc_mainline_score() {
         WHERE f.trade_date = '${v_date}'
     ),
     pct AS (
+        -- 修复#3：缺失子因子必须“真降权”。PERCENT_RANK 对原值为 NULL 的行仍会给出分位(通常=0)
+        --   且结果几乎不为 NULL，导致“缺失=最差分却仍占权重”。这里改为：当“原始列”为 NULL 时
+        --   pr_* 直接置 NULL，由下游“仅累加原始值非 NULL 的子项权重”实现真正降权。
+        --   注：窗口分位排序仍包含 NULL 行(次要影响)，主口径修复以“缺失不占权重”为准。
         SELECT
             b.*,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY fund_inflow_strength) AS pr_fis,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY net_inflow_days) AS pr_nid,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY fund_accel) AS pr_fa,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY elg_net_ratio) AS pr_elg,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY rs_5d) AS pr_rs5,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY ma_bullish) AS pr_mab,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY is_new_high_60d) AS pr_nh,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY recovery_days DESC) AS pr_rec,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY amount_ratio) AS pr_amt,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY limit_up_ratio) AS pr_lur,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY turnover_rate) AS pr_tr,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY earnings_yoy) AS pr_ey,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY forecast_rev_pct) AS pr_fr,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY upgrade_ratio) AS pr_ur,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY up_ratio) AS pr_up,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY limit_up_20cm_ratio) AS pr_20,
-            100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY continue_limit_ratio) AS pr_clr
+            IF(fund_inflow_strength IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY fund_inflow_strength), NULL) AS pr_fis,
+            IF(net_inflow_days IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY net_inflow_days), NULL) AS pr_nid,
+            IF(fund_accel IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY fund_accel), NULL) AS pr_fa,
+            IF(elg_net_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY elg_net_ratio), NULL) AS pr_elg,
+            IF(rs_5d IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY rs_5d), NULL) AS pr_rs5,
+            -- 局限#4：ma_bullish 为 0/1 二元值，PERCENT_RANK 区分度差(同值并列同分)；
+            --   上游 dwm 未把连续量(如 close/ma20-1)取进 base，为不臆造字段暂保留二元口径。
+            IF(ma_bullish IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY ma_bullish), NULL) AS pr_mab,
+            -- 局限#4：is_new_high_60d 同为 0/1 二元值，区分度差；如需连续可改用趋势表 drawdown_pct(距60日高点)。
+            IF(is_new_high_60d IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY is_new_high_60d), NULL) AS pr_nh,
+            -- 说明#2：recovery_days“越小越好(修复越快)”。PERCENT_RANK 配合 ORDER BY ... DESC 会给
+            --   “最小值”最高分位，即“天数越小 → 得分越高”，方向本就正确，故保留 DESC(不改为 ASC)。
+            IF(recovery_days IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY recovery_days DESC), NULL) AS pr_rec,
+            IF(amount_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY amount_ratio), NULL) AS pr_amt,
+            IF(limit_up_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY limit_up_ratio), NULL) AS pr_lur,
+            IF(turnover_rate IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY turnover_rate), NULL) AS pr_tr,
+            IF(earnings_yoy IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY earnings_yoy), NULL) AS pr_ey,
+            IF(forecast_rev_pct IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY forecast_rev_pct), NULL) AS pr_fr,
+            IF(upgrade_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY upgrade_ratio), NULL) AS pr_ur,
+            IF(up_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY up_ratio), NULL) AS pr_up,
+            IF(limit_up_20cm_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY limit_up_20cm_ratio), NULL) AS pr_20,
+            IF(continue_limit_ratio IS NOT NULL, 100 * PERCENT_RANK() OVER (PARTITION BY trade_date, content_type ORDER BY continue_limit_ratio), NULL) AS pr_clr
         FROM base b
     ),
     dim AS (
@@ -256,6 +265,9 @@ load_dc_mainline_score() {
                 PARTITION BY t.trade_date, t.content_type
                 ORDER BY t.total_score DESC
             ) AS rank_no,
+            -- 说明#5：mainline_level 依据“当日 total_score”判级，而监控/前端默认展示 total_score_ma5(main_score)，
+            --   两者口径不同(当日分 vs 5日均分)，可能出现“等级与展示分不完全一致”。
+            --   此处不新增基于 total_score_ma5 的等级列(避免改 DDL 风险)，仅注释说明。
             CASE
                 WHEN t.total_score > 85 THEN '超级主线'
                 WHEN t.total_score >= 70 THEN '主线'

@@ -81,10 +81,30 @@ def _lerp(x: float, x0: float, x1: float, y0: float, y1: float) -> float:
     return y0 + t * (y1 - y0)
 
 
-def _volume_score(vol_ratio: float | None, index_pct: float | None) -> float:
-    """成交额相对 20 日均的分段映射；大跌放量做恐慌折扣。"""
+def _weighted_renorm(parts: list[tuple[float | None, float]]) -> float | None:
+    """缺维（子分为 None）剔除后，按剩余权重重归一化的加权分。
+
+    parts: [(子分, 权重), ...]。全部缺失时返回 None。
+    这样可避免“缺数填 50 仍占权重”造成的虚假中性拉平。
+    """
+    used = [(s, w) for s, w in parts if s is not None and w > 0]
+    total_w = sum(w for _, w in used)
+    if total_w <= 0:
+        return None
+    return round(sum(s * w for s, w in used) / total_w, 2)
+
+
+def _volume_score(vol_ratio: float | None, index_pct: float | None) -> float | None:
+    """成交活跃度：成交额相对 20 日均的分段映射；大跌放量做恐慌折扣。
+
+    口径说明：
+    - vol_ratio 的分母/分子来自上证+深证指数成交额（近似全 A，非严格全 A）；
+    - 恐慌折扣分支用的 index_pct 是沪深300(hs300)涨跌幅，与量比基准指数不完全一致，
+      仅作“大跌放量偏出货”的定性折扣，不追求口径严格对齐。
+    - 缺失（vol_ratio 为 None）时返回 None，交由上层按剩余权重重归一化（不再默认给 50）。
+    """
     if vol_ratio is None:
-        return 50.0
+        return None
     r = max(0.0, vol_ratio)
     if r <= 0.7:
         score = _lerp(r, 0.0, 0.7, 10.0, 25.0)
@@ -135,8 +155,10 @@ def _consecutive_score(
     limit_down: float,
 ) -> tuple[float, dict[str, float]]:
     height = _board_height_score(max_boards)
+    # continue_cnt = 当日 limit=U 且 limit_times>=2 的家数（即“多连板家数”），
+    # 并非“昨涨停今晋级”口径；cont_ratio 表示多连板家数占当日涨停家数之比。
     cont_ratio = (continue_cnt / limit_up) if limit_up > 0 else 0.0
-    cont_score = _clamp(cont_ratio * 100.0 / 0.35)  # 连板占比约 35% 视为满分
+    cont_score = _clamp(cont_ratio * 100.0 / 0.35)  # 多连板家数占比约 35% 视为满分
     down_score = 100.0 - _scale(limit_down, 0.0, 80.0)
     score = height * 0.40 + cont_score * 0.30 + down_score * 0.30
     return _clamp(score), {
@@ -144,20 +166,26 @@ def _consecutive_score(
         "continue_score": round(cont_score, 2),
         "limit_down_control_score": round(down_score, 2),
         "max_boards": float(max_boards or 0),
+        # 命名保留 continue_ratio 以兼容前端；实际口径为“多连板家数占比”
         "continue_ratio": round(cont_ratio, 4),
     }
 
 
-def _capital_score(north_money: float | None) -> float:
-    """北向资金（百万元）：约 ±150 亿映射到 0–100，缺失给中性 50。"""
+def _capital_score(north_money: float | None) -> float | None:
+    """北向资金（百万元）：约 ±150 亿映射到 0–100。
+
+    2024-08 起北向资金常停更/为 NULL；缺失时返回 None，
+    由上层将该维从加权中剔除并对其余维度按权重重归一化（不再默认给 50 占权重）。
+    """
     if north_money is None:
-        return 50.0
+        return None
     return _clamp(50.0 + (north_money / 15000.0) * 50.0)
 
 
-def _trend_score(close: float | None, ma20: float | None, ma60: float | None, ma120: float | None) -> float:
+def _trend_score(close: float | None, ma20: float | None, ma60: float | None, ma120: float | None) -> float | None:
+    # 收盘缺失或所有均线均缺失时返回 None（缺维），由上层重归一化
     if close is None:
-        return 50.0
+        return None
     score = 0.0
     weighed = 0.0
     if ma20 is not None:
@@ -170,7 +198,7 @@ def _trend_score(close: float | None, ma20: float | None, ma60: float | None, ma
         score += 30.0 if close > ma120 else 0.0
         weighed += 30.0
     if weighed <= 0:
-        return 50.0
+        return None
     # 均线不足时按已有权重归一
     return _clamp(score * 100.0 / weighed)
 
@@ -188,17 +216,22 @@ def _sma(values: list[float | None], end_idx: int, window: int) -> float | None:
     return sum(nums) / len(nums)
 
 
-def _market_sentiment_score(ctx: dict[str, Any]) -> tuple[float, dict[str, float]]:
+def _market_sentiment_score(ctx: dict[str, Any]) -> tuple[float | None, dict[str, Any]]:
     """
-    Market_Emotion =
+    大盘情绪六维（满权重）：
       0.25×Breadth + 0.20×LimitUp + 0.20×Volume
       + 0.15×Trend + 0.10×Capital + 0.10×连板
+
+    统一缺维处理：任一维缺失（子分为 None）则从加权中剔除，
+    并对剩余维度按其权重重归一化，避免缺数默认 50 占权重拉平真实情绪。
+    区分 missing（None，不计入且 UI 显示“—”）与 neutral（真实中性 50）。
     """
     total_cnt = max(_num(ctx.get("total_cnt")) or 0.0, 1.0)
+    # 广度维：仅当 advance_ratio 与 advance_cnt 均缺失时才算缺维（不再用 or 0.5 偏乐观）
     advance_ratio = _num(ctx.get("advance_ratio"))
     if advance_ratio is None:
-        advance_cnt = _num(ctx.get("advance_cnt")) or 0.0
-        advance_ratio = advance_cnt / total_cnt
+        advance_cnt = _num(ctx.get("advance_cnt"))
+        advance_ratio = (advance_cnt / total_cnt) if advance_cnt is not None else None
     elif advance_ratio > 1:
         advance_ratio = advance_ratio / 100.0
 
@@ -208,7 +241,7 @@ def _market_sentiment_score(ctx: dict[str, Any]) -> tuple[float, dict[str, float
     max_boards = _num(ctx.get("max_boards"))
     continue_cnt = _num(ctx.get("continue_cnt")) or 0.0
 
-    breadth_score = _clamp((advance_ratio or 0.5) * 100.0)
+    breadth_score = _clamp(advance_ratio * 100.0) if advance_ratio is not None else None
     limit_score, limit_count_score, seal_score = _limit_up_score(limit_up, blast_cnt)
     volume_score = _volume_score(_num(ctx.get("vol_ratio")), _num(ctx.get("index_pct")))
     trend_score = _trend_score(
@@ -217,29 +250,32 @@ def _market_sentiment_score(ctx: dict[str, Any]) -> tuple[float, dict[str, float
         _num(ctx.get("ma60")),
         _num(ctx.get("ma120")),
     )
+    # 北向资金停更/NULL 时 capital_score=None，被剔除并重归一化
     capital_score = _capital_score(_num(ctx.get("north_money")))
     consecutive_score, consecutive_detail = _consecutive_score(
         max_boards, continue_cnt, limit_up, limit_down
     )
 
-    score = round(
-        breadth_score * 0.25
-        + limit_score * 0.20
-        + volume_score * 0.20
-        + trend_score * 0.15
-        + capital_score * 0.10
-        + consecutive_score * 0.10,
-        2,
+    score = _weighted_renorm(
+        [
+            (breadth_score, 0.25),
+            (limit_score, 0.20),
+            (volume_score, 0.20),
+            (trend_score, 0.15),
+            (capital_score, 0.10),
+            (consecutive_score, 0.10),
+        ]
     )
+    # 缺维子分对外返回 None（前端显示“—”），不再伪装成 50
     detail = {
-        "breadth_score": round(breadth_score, 2),
+        "breadth_score": round(breadth_score, 2) if breadth_score is not None else None,
         "limit_up_score": round(limit_score, 2),
         "limit_count_score": round(limit_count_score, 2),
         "seal_score": round(seal_score, 2),
-        "volume_score": round(volume_score, 2),
-        "vol_ratio": round(_num(ctx.get("vol_ratio")) or 0.0, 4),
-        "trend_score": round(trend_score, 2),
-        "capital_score": round(capital_score, 2),
+        "volume_score": round(volume_score, 2) if volume_score is not None else None,
+        "vol_ratio": round(_num(ctx.get("vol_ratio")), 4) if _num(ctx.get("vol_ratio")) is not None else None,
+        "trend_score": round(trend_score, 2) if trend_score is not None else None,
+        "capital_score": round(capital_score, 2) if capital_score is not None else None,
         "consecutive_score": round(consecutive_score, 2),
         **consecutive_detail,
     }
@@ -256,10 +292,14 @@ def _classify_regime(
     avg_advance_20: float | None,
 ) -> dict[str, Any]:
     """
-    慢变量市场状态：全面牛 / 结构牛 / 震荡 / 熊。
+    慢变量市场状态（规则型标签，非模型预测）：全面牛 / 结构牛 / 震荡 / 熊。
     - 趋势：相对 MA60/MA120 与 60 日收益
     - 广度：近 20 日平均上涨占比
     - 结构：指数偏强但广度偏弱 → 结构性牛市
+
+    口径修正：
+    - 多空条件对称：ret_60 缺失时对多/空一视同仁（原先多头宽松、空头严格）；
+    - 缺广度时降级为“震荡”而非直接判熊，避免过度悲观。
     """
     metrics = {
         "avg_advance_ratio_20d": None if avg_advance_20 is None else round(avg_advance_20, 4),
@@ -270,6 +310,7 @@ def _classify_regime(
     }
 
     breadth = avg_advance_20
+    # ret_60 缺失时多空对称处理：均按“不否决”看待（None 不构成反向证据）
     bullish_trend = (
         close is not None
         and ma60 is not None
@@ -280,7 +321,7 @@ def _classify_regime(
         close is not None
         and ma60 is not None
         and close < ma60
-        and (ret_60 is not None and ret_60 < 0)
+        and (ret_60 is None or ret_60 < 0)
     )
 
     if bullish_trend and breadth is not None:
@@ -295,10 +336,11 @@ def _classify_regime(
         else:
             code = "range"
     elif bullish_trend:
-        # 缺广度时：有趋势暂判结构牛（宁可不叫全面牛）
+        # 缺广度时：有上行趋势暂判结构牛（宁可不叫全面牛）
         code = "structural_bull"
     elif bearish_trend:
-        code = "bear"
+        # 缺广度 + 下行趋势：降级为震荡而非直接判熊（避免过度悲观）
+        code = "range"
     else:
         # 均线纠缠 / 方向不明
         if (
@@ -317,6 +359,7 @@ def _classify_regime(
     return {
         "code": code,
         "label": REGIME_LABELS.get(code, code),
+        "note": "规则型标签，非模型预测；缺广度时倾向震荡",
         "metrics": metrics,
     }
 
@@ -410,7 +453,8 @@ def _fetch_market_enrichment(trade_date: str, limit: int) -> dict[str, dict[str,
     return by_date
 
 
-def _sector_sentiment_score(row: dict[str, Any]) -> tuple[float, dict[str, float]]:
+def _sector_sentiment_score(row: dict[str, Any]) -> tuple[float | None, dict[str, Any]]:
+    """板块情绪七维；与大盘一致：缺维（子分 None）剔除后按剩余权重重归一化。"""
     pct_change = _num(row.get("pct_change"))
     up_ratio = _num(row.get("up_ratio"))
     if up_ratio is not None and up_ratio > 1:
@@ -423,36 +467,35 @@ def _sector_sentiment_score(row: dict[str, Any]) -> tuple[float, dict[str, float
     main_score = _num(row.get("main_score"))
     leader_name = (row.get("leader_composite_name") or "").strip()
 
-    price_score = _scale(pct_change, -6.0, 6.0)
-    breadth_score = _clamp((up_ratio or 0.5) * 100.0)
-    limit_score = _scale(limit_up_ratio, 0.0, 0.08)
-    fund_score = _scale(net_amount_rate, -5.0, 5.0)
-    turnover_score = _scale(turnover_rate, 1.0, 8.0)
-
-    if main_score is None:
-        mainline_score = 50.0
-    else:
-        mainline_score = _scale(main_score, 20.0, 100.0)
-
+    price_score = _scale(pct_change, -6.0, 6.0) if pct_change is not None else None
+    # up_ratio 缺失（热度表无行）→ 视为缺维（None），而非 0 或乐观 0.5
+    breadth_score = _clamp(up_ratio * 100.0) if up_ratio is not None else None
+    limit_score = _scale(limit_up_ratio, 0.0, 0.08) if limit_up_ratio is not None else None
+    fund_score = _scale(net_amount_rate, -5.0, 5.0) if net_amount_rate is not None else None
+    turnover_score = _scale(turnover_rate, 1.0, 8.0) if turnover_rate is not None else None
+    mainline_score = _scale(main_score, 20.0, 100.0) if main_score is not None else None
+    # leader_score 目前是二元 100/40（有龙头/无龙头），存在跳变抖动；
+    # 无 leader_composite_name 字段支撑连续化，暂保留二元并标注
     leader_score = 100.0 if leader_name else 40.0
 
-    score = round(
-        price_score * 0.20
-        + breadth_score * 0.20
-        + limit_score * 0.15
-        + fund_score * 0.15
-        + turnover_score * 0.10
-        + mainline_score * 0.12
-        + leader_score * 0.08,
-        2,
+    score = _weighted_renorm(
+        [
+            (price_score, 0.20),
+            (breadth_score, 0.20),
+            (limit_score, 0.15),
+            (fund_score, 0.15),
+            (turnover_score, 0.10),
+            (mainline_score, 0.12),
+            (leader_score, 0.08),
+        ]
     )
     return score, {
-        "price_score": round(price_score, 2),
-        "breadth_score": round(breadth_score, 2),
-        "limit_score": round(limit_score, 2),
-        "fund_score": round(fund_score, 2),
-        "turnover_score": round(turnover_score, 2),
-        "mainline_score": round(mainline_score, 2),
+        "price_score": round(price_score, 2) if price_score is not None else None,
+        "breadth_score": round(breadth_score, 2) if breadth_score is not None else None,
+        "limit_score": round(limit_score, 2) if limit_score is not None else None,
+        "fund_score": round(fund_score, 2) if fund_score is not None else None,
+        "turnover_score": round(turnover_score, 2) if turnover_score is not None else None,
+        "mainline_score": round(mainline_score, 2) if mainline_score is not None else None,
         "leader_score": round(leader_score, 2),
     }
 
@@ -567,12 +610,20 @@ def _build_market_series(trade_date: str, days: int) -> list[dict[str, Any]]:
             if len(window) >= 15:
                 avg_adv_20 = sum(window) / len(window)
 
+        # 涨跌停家数优先取 DWM 广度表；当 DWM 为 None 或 0（常见于口径缺失/未回填）
+        # 且 ods_limit_list 有非零值时回退到 list，避免 DWM=0 导致封板率失真
         limit_up = _num(row.get("limit_up_cnt"))
-        if limit_up is None:
-            limit_up = extra.get("limit_up_from_list") or 0.0
+        limit_up_list = extra.get("limit_up_from_list")
+        if (limit_up is None or limit_up == 0) and limit_up_list:
+            limit_up = limit_up_list
+        elif limit_up is None:
+            limit_up = 0.0
         limit_down = _num(row.get("limit_down_cnt"))
-        if limit_down is None:
-            limit_down = extra.get("limit_down_from_list") or 0.0
+        limit_down_list = extra.get("limit_down_from_list")
+        if (limit_down is None or limit_down == 0) and limit_down_list:
+            limit_down = limit_down_list
+        elif limit_down is None:
+            limit_down = 0.0
 
         ctx = {
             **row,
@@ -626,7 +677,8 @@ def get_sentiment_history(
             SELECT
                 ff.trade_date, ff.industry_code, ff.industry_name, ff.content_type,
                 ff.pct_change, ff.net_amount, ff.net_amount_rate, ff.board_amount,
-                COALESCE(mh.up_ratio, 0) AS up_ratio,
+                -- 热度表缺行时 up_ratio 保持 NULL（视为缺维，不再 COALESCE 成 0 拉低广度分）
+                mh.up_ratio AS up_ratio,
                 COALESCE(mh.limit_up_ratio, 0) AS limit_up_ratio,
                 COALESCE(mh.limit_up_cnt, 0) AS limit_up_cnt,
                 COALESCE(daily.turnover_rate, idx.turnover_rate, mh.turnover_rate) AS turnover_rate,

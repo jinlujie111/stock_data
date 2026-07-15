@@ -66,15 +66,43 @@ def compute_ma_levels(bars: list[dict]) -> dict[str, Any]:
     return {"supports": supports, "resistances": resistances, "series": series}
 
 
-def _swing_high_low(bars: list[dict], lookback: int = 60) -> tuple[float, float, int, int]:
-    segment = bars[-lookback:] if len(bars) > lookback else bars
-    highs = [_f(b.get("high")) or 0.0 for b in segment]
-    lows = [_f(b.get("low")) or 0.0 for b in segment]
+def _swing_high_low(bars: list[dict], lookback: int = 120) -> tuple[float, float, int, int]:
+    """
+    选取最近一段“显著波段”的高低点用于斐波那契回撤。
+
+    改进：不再简单取窗口内全局高低点，而是在 lookback 内用局部极值(pivot)找出
+    「最近一段」由一个摆动高点与相邻摆动低点构成的波段（主升或主跌腿），更贴合当前走势；
+    枢轴不足时回落到 lookback 内全局高低点。索引均相对整个 bars。
+    局限：仍为启发式，未做完整 ZigZag 波段划分，遇多段震荡可能选到次优波段。
+    """
+    n = len(bars)
+    start = max(0, n - lookback)
+    seg = bars[start:]
+    peaks, troughs = _local_extrema(seg, window=3)
+    pivots = sorted(
+        [(i, v, "H") for i, v in peaks] + [(i, v, "L") for i, v in troughs],
+        key=lambda x: x[0],
+    )
+    if len(pivots) >= 2:
+        last = pivots[-1]
+        prev = None
+        for p in reversed(pivots[:-1]):
+            if p[2] != last[2]:  # 找到与最近枢轴类型相反的上一个枢轴，构成最近一段波段
+                prev = p
+                break
+        if prev is not None:
+            if last[2] == "H":
+                swing_high, hi_i = last[1], start + last[0]
+                swing_low, lo_i = prev[1], start + prev[0]
+            else:
+                swing_low, lo_i = last[1], start + last[0]
+                swing_high, hi_i = prev[1], start + prev[0]
+            return swing_high, swing_low, hi_i, lo_i
+    highs = [_f(b.get("high")) or 0.0 for b in seg]
+    lows = [_f(b.get("low")) or 0.0 for b in seg]
     hi = max(highs)
     lo = min(lows)
-    hi_i = highs.index(hi)
-    lo_i = lows.index(lo)
-    return hi, lo, hi_i, lo_i
+    return hi, lo, start + highs.index(hi), start + lows.index(lo)
 
 
 def compute_fibonacci_levels(bars: list[dict]) -> dict[str, Any]:
@@ -141,59 +169,119 @@ def _volume_bins(bars: list[dict], bins: int = 40) -> list[tuple[float, float]]:
     return [(_round_price(lo + (i + 0.5) * step), acc[i]) for i in range(bins)]
 
 
+def _cluster_profile(profile: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """
+    把成交量分布中「相邻」的高量价位合并成密集区，降低单点噪声。
+
+    先按正量价位的 70 分位取阈值，只保留量能靠前的分箱，再把相邻分箱合并为一段，
+    每段用 volume-weighted 价格代表、量能累加。返回 [(price, volume), ...]。
+    """
+    if not profile:
+        return []
+    positive = sorted(v for _, v in profile if v > 0)
+    if not positive:
+        return []
+    thr = positive[min(len(positive) - 1, int(len(positive) * 0.7))]
+    clusters: list[list[tuple[float, float]]] = []
+    cur: list[tuple[float, float]] = []
+    for price, vol in profile:
+        if vol >= thr and vol > 0:
+            cur.append((price, vol))
+        elif cur:
+            clusters.append(cur)
+            cur = []
+    if cur:
+        clusters.append(cur)
+    out: list[tuple[float, float]] = []
+    for cl in clusters:
+        tot = sum(v for _, v in cl)
+        if tot <= 0:
+            continue
+        vwap = sum(p * v for p, v in cl) / tot
+        out.append((_round_price(vwap), tot))
+    return out
+
+
+def _collapse_group(group: list[dict]) -> dict:
+    """把一组价格相近的位合并成一条：量能加权价为代表价，touch=组内点数。"""
+    total_vol = sum(_f(g.get("volume")) or 0.0 for g in group)
+    if total_vol > 0:
+        price = sum((_f(g.get("volume")) or 0.0) * g["price"] for g in group) / total_vol
+    else:
+        price = sum(g["price"] for g in group) / len(group)
+    rep = max(group, key=lambda g: _f(g.get("volume")) or 0.0)
+    out = dict(rep)
+    out["price"] = _round_price(price)
+    out["touch"] = len(group)  # 触及次数：越多越可信
+    return out
+
+
+def _merge_levels(items: list[dict], tol: float = 0.02) -> list[dict]:
+    """合并价格相近(默认 2%)的支撑/阻力位，累加触及次数，减少密集假位。"""
+    if not items:
+        return []
+    ordered = sorted(items, key=lambda x: x["price"])
+    merged: list[dict] = []
+    group = [ordered[0]]
+    for it in ordered[1:]:
+        base = group[-1]["price"]
+        if abs(it["price"] - base) / max(base, 1) <= tol:
+            group.append(it)
+        else:
+            merged.append(_collapse_group(group))
+            group = [it]
+    merged.append(_collapse_group(group))
+    return merged
+
+
 def compute_volume_price_levels(bars: list[dict]) -> dict[str, Any]:
     if len(bars) < 20:
         return {"supports": [], "resistances": [], "meta": {}}
     last_close = _f(bars[-1].get("close")) or 0.0
+
+    # 1) 成交量分布：相邻高量价位合并为密集区(volume-weighted 价)，只取量能最大的前几处，降噪。
     profile = _volume_bins(bars, bins=36)
-    profile_sorted = sorted(profile, key=lambda x: x[1], reverse=True)
-    top_nodes = profile_sorted[:5]
-    supports: list[dict] = []
-    resistances: list[dict] = []
-    for price, vol in top_nodes:
+    clusters = _cluster_profile(profile)
+    clusters.sort(key=lambda x: x[1], reverse=True)
+    raw_supports: list[dict] = []
+    raw_resistances: list[dict] = []
+    for price, vol in clusters[:4]:
         if vol <= 0:
             continue
-        if price < last_close:
-            supports.append(_level(price, "量价密集支撑", "support", volume=vol))
-        elif price > last_close:
-            resistances.append(_level(price, "量价密集阻力", "resistance", volume=vol))
+        if price <= last_close:
+            raw_supports.append(_level(price, "量价密集支撑", "support", volume=vol))
         else:
-            supports.append(_level(price, "量价密集区", "support", volume=vol))
+            raw_resistances.append(_level(price, "量价密集阻力", "resistance", volume=vol))
 
-    # 放量 K 线高低点
+    # 2) 放量 K 线高低点：仅保留距现价 ±25% 内的点，滤掉远端噪声形成的假支撑/阻力。
     vols = [_f(b.get("vol")) or 0.0 for b in bars]
     avg_vol = sum(vols[-20:]) / min(20, len(vols))
+    band = 0.25
     for bar in bars[-30:]:
         vol = _f(bar.get("vol")) or 0.0
-        if vol < avg_vol * 1.5:
+        if avg_vol <= 0 or vol < avg_vol * 1.5:
             continue
+        pct = _f(bar.get("pct_chg") or bar.get("pct_change")) or 0.0
         h = _f(bar.get("high"))
         l = _f(bar.get("low"))
-        pct = _f(bar.get("pct_chg") or bar.get("pct_change")) or 0.0
-        if h and pct > 0:
-            resistances.append(
+        if h and pct > 0 and abs(h - last_close) / max(last_close, 1) <= band:
+            raw_resistances.append(
                 _level(h, "放量高点阻力", "resistance", trade_date=str(bar.get("trade_date", "")))
             )
-        if l and pct < 0:
-            supports.append(
+        if l and pct < 0 and abs(l - last_close) / max(last_close, 1) <= band:
+            raw_supports.append(
                 _level(l, "放量低点支撑", "support", trade_date=str(bar.get("trade_date", "")))
             )
 
-    def _dedupe(items: list[dict], tol: float = 0.015) -> list[dict]:
-        out: list[dict] = []
-        for it in sorted(items, key=lambda x: x["price"]):
-            if not out or abs(it["price"] - out[-1]["price"]) / max(out[-1]["price"], 1) > tol:
-                out.append(it)
-        return out
-
-    supports = _dedupe(supports)
-    resistances = _dedupe(resistances)
+    # 3) 合并邻近价位并统计触及次数，再限制数量，避免一堆挨得很近的假位。
+    supports = _merge_levels(raw_supports)
+    resistances = _merge_levels(raw_resistances)
     supports.sort(key=lambda x: x["price"], reverse=True)
     resistances.sort(key=lambda x: x["price"])
     return {
-        "supports": supports[:8],
-        "resistances": resistances[:8],
-        "meta": {"avg_vol_20": _round_price(avg_vol, 0)},
+        "supports": supports[:6],
+        "resistances": resistances[:6],
+        "meta": {"avg_vol_20": _round_price(avg_vol, 0), "cluster_cnt": len(clusters)},
     }
 
 

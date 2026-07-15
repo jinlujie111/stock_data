@@ -1,11 +1,21 @@
-"""全市场广度 DWM 查询（dwm_market_breadth_di）。"""
+"""全市场广度 DWM 查询（dwm_market_breadth_di）。
+
+口径说明：本模块仅透传 DWM 结果，不改写 DWM 侧统计口径。
+- BJ（北交所）/ ST 等家数是否纳入统计，由 DWM 层 SQL 决定（那是独立负责的文件）；
+  本层不做家数口径的增删，只在此注明当前依赖上游口径。
+- 新增“家数一致性”轻校验（advance+decline+flat 是否等于 total_cnt），
+  不一致只记 warning 并标记，不修改任何 DWM SQL。
+"""
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from app.db import fetch_all_stock, fetch_one_stock
+
+logger = logging.getLogger(__name__)
 
 TABLE = "dwm_market_breadth_di"
 
@@ -31,6 +41,28 @@ def _serialize(value: Any) -> Any:
 
 def _serialize_row(row: dict) -> dict:
     return {k: _serialize(v) for k, v in row.items()}
+
+
+def _check_breadth_consistency(data: dict) -> bool | None:
+    """校验 上涨+下跌+平盘 是否等于参与统计家数。
+
+    返回 True/False（可校验时），或 None（缺字段无法校验）。
+    不一致时记 warning，供排查上游口径（如 BJ/ST 是否纳入 total_cnt）。
+    """
+    parts = [data.get("advance_cnt"), data.get("decline_cnt"), data.get("flat_cnt")]
+    total = data.get("total_cnt")
+    if total is None or any(p is None for p in parts):
+        return None
+    summed = sum(int(p) for p in parts)
+    ok = summed == int(total)
+    if not ok:
+        logger.warning(
+            "market_breadth 家数不一致 trade_date=%s: advance+decline+flat=%s total_cnt=%s",
+            data.get("trade_date"),
+            summed,
+            int(total),
+        )
+    return ok
 
 
 def parse_trade_date(raw: str | None) -> str | None:
@@ -87,6 +119,8 @@ def get_market_breadth(trade_date: str | None = None) -> dict:
             "data": None,
         }
     data = _serialize_row(row)
+    # 轻校验家数一致性（不改 DWM，仅标记 + warning）
+    data["consistency_ok"] = _check_breadth_consistency(data)
     return {
         "trade_date": data.get("trade_date"),
         "metrics": METRICS,

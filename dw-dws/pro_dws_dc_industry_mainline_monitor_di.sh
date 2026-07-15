@@ -117,6 +117,8 @@ load_dc_mainline_monitor() {
         is_top20
     )
     WITH etf_share_series AS (
+        -- 口径说明#8：LAG(total_share,5) 为“前5条物理记录”，非严格交易日对齐(未接交易日历)。
+        --   ods_etf_share_size_di 通常按交易日连续入库，物理行≈交易日；如需严格对齐可接 ods_trading_day，暂保留近似。
         SELECT
             es.ts_code,
             es.trade_date,
@@ -144,14 +146,16 @@ load_dc_mainline_monitor() {
         GROUP BY dim.industry_name
     ),
     dc_etf_match AS (
+        -- 修复#8：dim_industry_etf_map.industry_code 为“申万行业代码”，与东财板块代码(BK*.DC)不在同一编码空间，
+        --   无法按 industry_code 精确映射；原“双向 LIKE 模糊匹配”易误命中(如子串互相包含)，
+        --   故收紧为“板块名称等值匹配”。宁可少命中(机构化阶段仅作加分信号)也不误命中；
+        --   东财/申万命名不一致时该匹配偏保守(可能少命中)，属可接受的安全取舍。
         SELECT
             s.industry_code,
             MAX(IFNULL(ei.has_etf_inflow, 0)) AS has_etf_inflow
         FROM dws_dc_industry_mainline_score_di s
         LEFT JOIN etf_by_sw_name ei
           ON s.industry_name = ei.industry_name
-          OR s.industry_name LIKE CONCAT('%', ei.industry_name, '%')
-          OR ei.industry_name LIKE CONCAT('%', s.industry_name, '%')
         WHERE s.trade_date = '${v_date}'
         GROUP BY s.industry_code
     ),

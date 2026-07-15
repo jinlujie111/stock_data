@@ -220,6 +220,9 @@ def _content_type_clause(content_types: list[str] | None) -> tuple[str, dict]:
 
 
 def _net_amount_expr() -> str:
+    # 单一真源假设：net_amount（元）与 net_amount_wan（万元）应表征同一主力净额，
+    # 正常仅其一为准。此处优先取 net_amount，缺失时用 net_amount_wan*10000 回退。
+    # 若两字段并存且不一致，此表达式会“静默取 net_amount”，差异需在 ETL 侧对齐。
     return "COALESCE(net_amount, net_amount_wan * 10000)"
 
 
@@ -334,11 +337,15 @@ def get_stock_flow_top10(
         raise ValueError("direction 应为 in 或 out")
     order = "DESC" if direction == "in" else "ASC"
 
+    # 使用 LEFT JOIN ods_stock_detail_di：停牌/当日缺行情的个股不再被剔除，
+    # 仅令 pct_chg/amount 为 NULL（前端做 NULL 安全展示），排序仍按 f.net_mf_amount。
+    # 名称优先级：当日 ll.name（limit_list，日粒度最准）→ sb.name（stock_basic 当前名，优先于易过期的 ths）
+    #            → tmn.name（ths_member MAX(name) 无 trade_date，可能过期，兜底）→ ts_code。
     rows = fetch_all_stock(
         f"""
         SELECT
             f.ts_code,
-            COALESCE(ll.name, tmn.name, f.ts_code) AS stock_name,
+            COALESCE(ll.name, sb.name, tmn.name, f.ts_code) AS stock_name,
             f.net_mf_amount,
             d.pct_chg,
             d.amount,
@@ -353,7 +360,7 @@ def get_stock_flow_top10(
                   )
             ) AS total_amount
         FROM ods_stock_fund_flow_di f
-        INNER JOIN ods_stock_detail_di d
+        LEFT JOIN ods_stock_detail_di d
             ON f.trade_date = d.trade_date AND f.ts_code = d.ts_code
         LEFT JOIN (
             SELECT ts_code, MAX(name) AS name
@@ -361,6 +368,7 @@ def get_stock_flow_top10(
             WHERE trade_date = :trade_date
             GROUP BY ts_code
         ) ll ON ll.ts_code = f.ts_code
+        LEFT JOIN ods_stock_basic_di sb ON sb.ts_code = f.ts_code
         LEFT JOIN (
             SELECT con_code, MAX(name) AS name
             FROM ods_ths_member_di

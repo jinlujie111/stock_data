@@ -35,37 +35,56 @@ def _signal_type(vp_status: str) -> str:
 
 def score_industries(agg_rows: list[dict[str, Any]], cfg: VpConfig) -> list[dict[str, Any]]:
     """
-    行业+概念合并池内计算升序百分位子分并加权 VP 分。
+    按 content_type 分组（行业/概念各自截面）计算升序百分位子分并加权 VP 分。
 
-    六个维度均为「值越大越好」；趋势强度在取百分位前对 20 日收益率做归零约束 max(0, ret)。
-    所有子分统一使用 ascending_percentile_score，禁止降序百分位。
+    六个维度均为「值越大越好」；原始值先 P1–P99 winsorize 再取百分位；缺失值(NaN)不参与
+    该维排名、也不计入综合分（权重重归一），区分“数据不可得”与“最差”。趋势强度在取百分位前
+    对 20 日收益率做归零约束 max(0, ret)。所有子分统一使用 ascending_percentile_score，禁止降序百分位。
     """
     if not agg_rows:
         return []
     g = pd.DataFrame(agg_rows).copy()
 
-    # 合并排名：不按 content_type 分组
-    g["score_continuity"] = ascending_percentile_score(
-        g["continuity_strength"].fillna(0).astype(float)
-    )
-    g["score_vol"] = ascending_percentile_score(
-        g["industry_vol_ratio_20"].fillna(0).astype(float)
-    )
-    g["score_trend"] = ascending_percentile_score(
-        trend_score_input(g["trend_return_20d"])
-    )
-    g["score_breadth"] = ascending_percentile_score(g["rising_ratio"].fillna(0).astype(float))
-    g["score_breakout"] = ascending_percentile_score(g["breakout_ratio"].fillna(0).astype(float))
-    g["score_leader"] = ascending_percentile_score(g["leader_strength"].fillna(0).astype(float))
+    # 按 content_type 分组排名（行业/概念各自成截面）：避免行业与概念(常含小盘、
+    # 成交额比/龙头强度更极端)混排导致概念板块霸榜。content_type 缺失用占位符单独成组。
+    grp_key = g["content_type"].fillna("__na__")
 
-    g["vp_score"] = (
-        g["score_continuity"] * cfg.weight_continuity
-        + g["score_vol"] * cfg.weight_vol
-        + g["score_trend"] * cfg.weight_trend
-        + g["score_breadth"] * cfg.weight_breadth
-        + g["score_breakout"] * cfg.weight_breakout
-        + g["score_leader"] * cfg.weight_leader
-    ).round(2)
+    def _grouped_pct(values: pd.Series) -> pd.Series:
+        # 缺失值(NaN)不再 fillna(0)：保留 NaN，使该维对缺失样本不给分（不当“最差”）。
+        return values.astype(float).groupby(grp_key).transform(ascending_percentile_score)
+
+    g["score_continuity"] = _grouped_pct(g["continuity_strength"])
+    g["score_vol"] = _grouped_pct(g["industry_vol_ratio_20"])
+    g["score_trend"] = trend_score_input(g["trend_return_20d"]).groupby(grp_key).transform(
+        ascending_percentile_score
+    )
+    g["score_breadth"] = _grouped_pct(g["rising_ratio"])
+    g["score_breakout"] = _grouped_pct(g["breakout_ratio"])
+    # score_leader 仅占 weight_leader(默认 5%)，其上游 leader_strength 已修正量纲问题(见 industry_agg)，
+    # 该维现有效；权重维持配置不变。
+    g["score_leader"] = _grouped_pct(g["leader_strength"])
+
+    # 综合分对“缺失维度”做权重重归一（缺失不参与、不给 0 分），区分“数据不可得”与“最差”。
+    _dims = [
+        ("score_continuity", cfg.weight_continuity),
+        ("score_vol", cfg.weight_vol),
+        ("score_trend", cfg.weight_trend),
+        ("score_breadth", cfg.weight_breadth),
+        ("score_breakout", cfg.weight_breakout),
+        ("score_leader", cfg.weight_leader),
+    ]
+
+    def _weighted_vp(row: "pd.Series") -> float:
+        num = 0.0
+        den = 0.0
+        for col, w in _dims:
+            v = row[col]
+            if pd.notna(v):
+                num += w * float(v)
+                den += w
+        return round(num / den, 2) if den > 0 else 0.0
+
+    g["vp_score"] = g.apply(_weighted_vp, axis=1)
 
     g = g.sort_values(["vp_score", "industry_code"], ascending=[False, True])
     g["rank_vp"] = range(1, len(g) + 1)
@@ -89,8 +108,10 @@ def score_industries(agg_rows: list[dict[str, Any]], cfg: VpConfig) -> list[dict
             "leader_strength": float(r["leader_strength"])
             if pd.notna(r.get("leader_strength"))
             else None,
-            "percentile_pool": "merged",
+            "percentile_pool": "by_content_type",
         }
+        # 子分维度可能为 NaN（该维数据缺失、未参与排名）→ 落库为 NULL，不写成 0/最差分。
+        _num = lambda k: float(r[k]) if pd.notna(r.get(k)) else None
         out_rows.append(
             {
                 "trade_date": r["trade_date"],
@@ -98,12 +119,12 @@ def score_industries(agg_rows: list[dict[str, Any]], cfg: VpConfig) -> list[dict
                 "industry_name": r.get("industry_name"),
                 "content_type": r.get("content_type"),
                 "vp_window": int(r["vp_window"]),
-                "score_vol": float(r["score_vol"]),
-                "score_trend": float(r["score_trend"]),
-                "score_continuity": float(r["score_continuity"]),
-                "score_breadth": float(r["score_breadth"]),
-                "score_breakout": float(r["score_breakout"]),
-                "score_leader": float(r["score_leader"]),
+                "score_vol": _num("score_vol"),
+                "score_trend": _num("score_trend"),
+                "score_continuity": _num("score_continuity"),
+                "score_breadth": _num("score_breadth"),
+                "score_breakout": _num("score_breakout"),
+                "score_leader": _num("score_leader"),
                 "vp_score": vp_score,
                 "vp_status": vp_status,
                 "signal_type": _signal_type(vp_status),
@@ -130,5 +151,5 @@ def score_industries(agg_rows: list[dict[str, Any]], cfg: VpConfig) -> list[dict
             }
         )
 
-    logger.info("industry_score rows=%d pool=merged ascending_percentile", len(out_rows))
+    logger.info("industry_score rows=%d pool=by_content_type ascending_percentile", len(out_rows))
     return out_rows

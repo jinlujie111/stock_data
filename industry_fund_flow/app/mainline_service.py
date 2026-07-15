@@ -70,14 +70,17 @@ def _industry_codes_filter(industry_codes: list[str] | None) -> tuple[str, dict]
     return f" AND industry_code IN ({placeholders})", params
 
 
-def _row_to_rank_item(row: dict, ma_window: int) -> dict:
+def _row_to_rank_item(row: dict, ma_window: int, display_rank: int) -> dict:
     item = serialize_row(row)
     ma_col = _ma_column(ma_window)
     display_score = item.get(ma_col) if item.get(ma_col) is not None else item.get("main_score")
     if display_score is None:
         display_score = item.get("total_score")
     return {
-        "rank": item.get("rank_no"),
+        # rank 按展示分（所选 MA）重排后的展示序号，保证与列表顺序一致；
+        # 库内当日分排名另存为 rank_raw，避免序号与列表错位
+        "rank": display_rank,
+        "rank_raw": item.get("rank_no"),
         "industry_code": item.get("industry_code"),
         "industry_name": item.get("industry_name"),
         "content_type": item.get("content_type"),
@@ -139,10 +142,11 @@ def get_rank(
         """,
         params,
     )
+    # rows 已按展示分（ma_col DESC）排序，enumerate 重算展示 rank 与列表顺序对齐
     return {
         "trade_date": td,
         "ma_window": ma_window,
-        "items": [_row_to_rank_item(r, ma_window) for r in rows],
+        "items": [_row_to_rank_item(r, ma_window, i + 1) for i, r in enumerate(rows)],
     }
 
 

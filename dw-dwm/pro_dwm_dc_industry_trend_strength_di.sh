@@ -120,11 +120,27 @@ load_dc_industry_trend_strength() {
         rs_rank
     )
     WITH bench AS (
-        SELECT trade_date, pct_chg AS bench_pct
-        FROM ods_index_daily_di
-        WHERE ts_code = '000300.SH'
-          AND trade_date <= '${v_date}'
-          AND trade_date >= '${v_date_120}'
+        -- 修复#1：先把沪深300基准压成“日度一行”，在日度序列上按交易日滚动累加，
+        --   再 JOIN 回板块行；避免直接在“每天多板块多行”的结果集上按物理行滚动，
+        --   导致同一天其它板块的 bench_pct 被重复累加。
+        --   说明：ods_index_daily_di 中 000300.SH 每交易日仅一行，ROWS N PRECEDING 即 N 个交易日。
+        SELECT
+            b0.trade_date,
+            SUM(b0.bench_pct) OVER (
+                ORDER BY b0.trade_date
+                ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
+            ) AS bench_ret_5d,
+            SUM(b0.bench_pct) OVER (
+                ORDER BY b0.trade_date
+                ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
+            ) AS bench_ret_20d
+        FROM (
+            SELECT trade_date, pct_chg AS bench_pct
+            FROM ods_index_daily_di
+            WHERE ts_code = '000300.SH'
+              AND trade_date <= '${v_date}'
+              AND trade_date >= '${v_date_120}'
+        ) b0
     ),
     daily_base AS (
         SELECT
@@ -139,7 +155,9 @@ load_dc_industry_trend_strength() {
             END AS content_type,
             d.close,
             d.pct_change,
-            b.bench_pct
+            -- 修复#1：携带日度基准累计涨幅，同日所有板块取同一基准值
+            b.bench_ret_5d,
+            b.bench_ret_20d
         FROM ods_dc_daily_di d
         LEFT JOIN ods_dc_index_di idx
           ON d.trade_date = idx.trade_date
@@ -151,24 +169,19 @@ load_dc_industry_trend_strength() {
     calc AS (
         SELECT
             db.*,
+            -- 板块自身收益按 industry_code 分区累加（口径正确，保持不变）；
+            -- 基准累计已在 bench 日度算好并随 db 携带(bench_ret_5d/20d)。
+            -- 注：ret_5d/ret_20d 为“日涨跌幅算术累加”，属近似口径；因与基准同口径，其差值 RS 仍可比。
             SUM(db.pct_change) OVER (
                 PARTITION BY db.industry_code
                 ORDER BY db.trade_date
                 ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
             ) AS ret_5d,
-            SUM(db.bench_pct) OVER (
-                ORDER BY db.trade_date
-                ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
-            ) AS bench_ret_5d,
             SUM(db.pct_change) OVER (
                 PARTITION BY db.industry_code
                 ORDER BY db.trade_date
                 ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
             ) AS ret_20d,
-            SUM(db.bench_pct) OVER (
-                ORDER BY db.trade_date
-                ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
-            ) AS bench_ret_20d,
             AVG(db.close) OVER (
                 PARTITION BY db.industry_code
                 ORDER BY db.trade_date

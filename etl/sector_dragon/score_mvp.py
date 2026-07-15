@@ -27,6 +27,11 @@ from etl.sector_dragon.scoring import (
 
 logger = logging.getLogger(__name__)
 
+# 综合分纳入产业/机构(研报活跃度)维度的附加权重（本地常量，DragonConfig 未含此配置）。
+# 使“综合龙头”与 UI「四龙头 + 综合」口径一致；缺失时 composite_weighted 自动降权并重归一。
+W_INDUSTRY_COMPOSITE = 0.15
+W_INST_COMPOSITE = 0.10
+
 
 def _compound_return(conn, codes: list[str], start: date, end: date) -> dict[str, float]:
     if not codes:
@@ -245,33 +250,31 @@ def score_board_mvp(
         ).mappings().all()
         amt_map = {r["ts_code"]: float(r["avg_amt"] or 0) for r in amt_rows}
 
+        # 市值口径修正：主来源改为 ods_daily_basic_di.total_mv（全市场覆盖、真实总市值），
+        # 缺失兜底流通市值 circ_mv；不再用涨跌停表(覆盖低)或 close*amount(根本不是市值)。
         mv_rows = conn.execute(
             text(
                 f"""
-                SELECT ts_code, total_mv
-                FROM ods_limit_list_di
+                SELECT ts_code, total_mv, circ_mv
+                FROM ods_daily_basic_di
                 WHERE trade_date = :td AND ts_code IN ({placeholders})
                 """
             ),
             base_params,
         ).mappings().all()
-        mv_map = {r["ts_code"]: float(r["total_mv"] or 0) for r in mv_rows}
-
-        for c in codes:
-            if c not in mv_map:
-                close_row = conn.execute(
-                    text(
-                        "SELECT close, amount FROM ods_stock_detail_di "
-                        "WHERE trade_date = :td AND ts_code = :c LIMIT 1"
-                    ),
-                    {"td": trade_date, "c": c},
-                ).mappings().first()
-                if close_row and close_row["close"]:
-                    mv_map[c] = float(close_row["close"]) * float(close_row.get("amount") or 0)
+        mv_map = {}
+        for r in mv_rows:
+            tv = float(r["total_mv"]) if r["total_mv"] is not None else None
+            cv = float(r["circ_mv"]) if r["circ_mv"] is not None else None
+            val = tv if (tv and tv > 0) else (cv if (cv and cv > 0) else None)
+            if val is not None:
+                mv_map[r["ts_code"]] = val
 
         stock_ret = _compound_return(conn, codes, start_ret, trade_date)
         board_ret = _board_return(conn, industry_code, start_ret, trade_date)
 
+        # 注意：inst 维度取的是近30日研报篇数（研报活跃度），并非机构持仓/机构资金。
+        # 字段名保持 score_inst 不变，仅以文案/注释据实说明（见 build_summary_text）。
         inst_rows = conn.execute(
             text(
                 f"""
@@ -297,8 +300,15 @@ def score_board_mvp(
         else:
             rs_raw[c] = sr / board_ret
 
+    # 传入个股自身收益 stock_ret，供板块走平(board_ret≈0)时的 RS 兜底定分使用。
     rs_score_map = {
-        c: rs_to_score(rs_raw.get(c), board_ret, cap=cfg.rs_cap, cap_score=cfg.rs_cap_score)
+        c: rs_to_score(
+            rs_raw.get(c),
+            board_ret,
+            cap=cfg.rs_cap,
+            cap_score=cfg.rs_cap_score,
+            stock_ret=stock_ret.get(c),
+        )
         for c in codes
     }
 
@@ -339,9 +349,13 @@ def score_board_mvp(
         srs = rs_score_map.get(c)
         sa = amt_pct.get(c)
         smv = mv_pct.get(c)
+        # 综合分纳入产业(score_industry)与机构/研报(score_inst)维度，与 UI 四龙头口径一致；
+        # 缺失维度由 composite_weighted 自动降权重归一。
         comp = composite_mvp(
             sf, srs, sa, smv,
             w_fund=cfg.w_fund, w_rs=cfg.w_rs, w_amount=cfg.w_amount, w_mv=cfg.w_mv,
+            score_industry=industry_map.get(c), score_inst=inst_pct.get(c),
+            w_industry=W_INDUSTRY_COMPOSITE, w_inst=W_INST_COMPOSITE,
         )
         composite_map[c] = comp
         trend_proxy = None

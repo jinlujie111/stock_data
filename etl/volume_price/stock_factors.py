@@ -15,7 +15,17 @@ from etl.volume_price.db_util import VpConfig, list_trading_days, load_st_codes
 logger = logging.getLogger(__name__)
 
 
-def _classify_vp_pattern(price_up: bool, vol_up: bool, pct_chg: float, vol_ratio: float) -> tuple[str, float]:
+def _classify_vp_pattern(
+    price_up: bool, vol_up: bool, pct_chg: float, vol_ratio: float | None
+) -> tuple[str, float]:
+    # 量比缺失（均线样本不足等）单独标记为 vol_unknown，不再默认 1.0，
+    # 避免把“数据不可得”误判为“量平/缩量”参与量能分类。
+    if vol_ratio is None:
+        score = 60.0 if price_up else 40.0
+        adj = min(10.0, abs(pct_chg) / 2.0)
+        score = min(100.0, score + adj) if price_up else max(0.0, score - adj)
+        return "vol_unknown", round(score, 2)
+
     if price_up and vol_up:
         pattern, score = "trend_confirm", 90.0
     elif price_up and not vol_up:
@@ -24,11 +34,15 @@ def _classify_vp_pattern(price_up: bool, vol_up: bool, pct_chg: float, vol_ratio
         pattern, score = "distribution", 25.0
     else:
         pattern, score = "consolidation", 50.0
-    adj = min(10.0, abs(pct_chg) / 2.0) + min(10.0, max(0.0, (vol_ratio or 1.0) - 1.0) * 5.0)
+    # 强度微调：涨跌幅 + 量比溢出（此处 vol_ratio 必非空）。
+    adj = min(10.0, abs(pct_chg) / 2.0) + min(10.0, max(0.0, vol_ratio - 1.0) * 5.0)
     if pattern in ("trend_confirm", "weak_rise"):
         score = min(100.0, score + adj)
     elif pattern == "distribution":
         score = max(0.0, score - adj)
+    elif pattern == "consolidation" and pct_chg < 0:
+        # 缩量横盘不再固定 50 分：按当日跌幅小幅下调，避免所有横盘同分。
+        score = max(0.0, score - min(10.0, abs(pct_chg) / 2.0))
     return pattern, round(score, 2)
 
 
@@ -87,26 +101,31 @@ def compute_stock_factors(
     parts: list[pd.DataFrame] = []
     for ts_code, grp in df.groupby("ts_code", sort=False):
         g = grp.copy()
-        g["vol_ma20"] = g["vol"].rolling(window=window, min_periods=window).mean()
+        # 量比基准均线排除当日：rolling(20).mean().shift(1) 取 T-1..T-20 的 20 日均量，
+        # 不含当日，避免当日成交量算进分母自我参照、压低量比。
+        g["vol_ma20"] = (
+            g["vol"].rolling(window=window, min_periods=window).mean().shift(1)
+        )
         g["vol_ratio_20"] = g["vol"] / g["vol_ma20"].replace(0, np.nan)
         g["price_ma20"] = g["close"].rolling(window=window, min_periods=window).mean()
         lag_close = g["close"].shift(window)
         g["price_trend_20"] = (g["close"] - lag_close) / lag_close.replace(0, np.nan) * 100.0
+        # 60 日新高基准：仅取“前一日及之前”的最高价（排除当日），close 站上/突破此值才算新高。
         g["high_60_prior"] = g["high"].shift(1).rolling(
             window=cfg.breakout_lookback - 1, min_periods=cfg.breakout_lookback - 1
         ).max()
-        g["high_60"] = g["high"].rolling(
-            window=cfg.breakout_lookback, min_periods=cfg.breakout_lookback
-        ).max()
-        g["amount_ma5"] = g["amount"].rolling(window=5, min_periods=5).mean()
+        # 突破放量基准也排除当日（T-1..T-5 均额），与量比口径一致。
+        g["amount_ma5"] = g["amount"].rolling(window=5, min_periods=5).mean().shift(1)
         g["vol_streak_days"] = _vol_streak_series(g["vol"], g["vol_ma20"])
+        # 新高统一用 prior-high（排除当日）；放量口径统一用成交额(amount)，避免与 strict 混用量/额。
+        # is_breakout_60：close 站上 60 日 prior-high 且成交额放大。
         g["is_breakout_60"] = (
-            (g["close"] >= g["high_60"])
-            & (g["vol"] > g["vol_ma20"] * cfg.breakout_vol_mult)
+            (g["close"] >= g["high_60_prior"])
+            & (g["amount"] > g["amount_ma5"] * cfg.breakout_vol_mult)
         ).astype(int)
+        # is_breakout_strict：close 严格创新高(> 而非 >=)且成交额放大，比 is_breakout_60 更严。
         g["is_breakout_strict"] = (
-            (g["close"] >= g["high_60"])
-            & (g["close"] > g["high_60_prior"])
+            (g["close"] > g["high_60_prior"])
             & (g["amount"] > g["amount_ma5"] * cfg.breakout_vol_mult)
         ).astype(int)
         parts.append(g)
@@ -127,7 +146,8 @@ def compute_stock_factors(
         vol_ratio = float(r["vol_ratio_20"]) if pd.notna(r["vol_ratio_20"]) else None
         price_up = pct > 0
         vol_up = bool(vol_ratio is not None and vol_ratio > 1.0)
-        pattern, pattern_score = _classify_vp_pattern(price_up, vol_up, pct, vol_ratio or 1.0)
+        # 传入原始 vol_ratio（可能为 None），由分类函数区分“量比缺失”与“量平”。
+        pattern, pattern_score = _classify_vp_pattern(price_up, vol_up, pct, vol_ratio)
         rows.append(
             {
                 "trade_date": trade_date,

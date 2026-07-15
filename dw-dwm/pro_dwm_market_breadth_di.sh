@@ -92,16 +92,25 @@ load_market_breadth() {
         END AS advance_ratio,
         s.total_cnt
     FROM (
+        -- 口径说明#9：
+        --   1) 仅统计以 .SH/.SZ 结尾的沪深A股，不含北交所(.BJ)，与全站保守口径保持一致；
+        --   2) pct_chg IS NULL 暂计入 flat_cnt(平盘)——受既有表结构限制无独立 NULL 列，故沿用并注释；
+        --   3) 新增按 ods_stock_basic_di.list_status 过滤退市/暂停(仅排除已知 D/P，未匹配到基础表则保留)，
+        --      降低退市股干扰；ST/新股首日因无逐日状态列，未做剔除。
         SELECT
-            SUM(CASE WHEN pct_chg > 0 THEN 1 ELSE 0 END) AS advance_cnt,
-            SUM(CASE WHEN pct_chg < 0 THEN 1 ELSE 0 END) AS decline_cnt,
-            SUM(CASE WHEN pct_chg = 0 OR pct_chg IS NULL THEN 1 ELSE 0 END) AS flat_cnt,
+            SUM(CASE WHEN d.pct_chg > 0 THEN 1 ELSE 0 END) AS advance_cnt,
+            SUM(CASE WHEN d.pct_chg < 0 THEN 1 ELSE 0 END) AS decline_cnt,
+            SUM(CASE WHEN d.pct_chg = 0 OR d.pct_chg IS NULL THEN 1 ELSE 0 END) AS flat_cnt,
             COUNT(*) AS total_cnt
-        FROM ods_stock_detail_di
-        WHERE trade_date = '${v_date}'
-          AND ts_code REGEXP '\\.(SH|SZ)$'
+        FROM ods_stock_detail_di d
+        LEFT JOIN ods_stock_basic_di b ON b.ts_code = d.ts_code
+        WHERE d.trade_date = '${v_date}'
+          AND d.ts_code REGEXP '\\.(SH|SZ)$'
+          AND (b.list_status = 'L' OR b.list_status IS NULL)
     ) s
     CROSS JOIN (
+        -- 口径说明#9：涨跌停家数取自 ods_limit_list_di 全量(未按 SH/SZ 过滤，可能含 .BJ)，
+        --   与上方沪深广度口径略有差异，保留现状不改。
         SELECT
             COUNT(DISTINCT CASE WHEN \`limit\` = 'U' THEN ts_code END) AS limit_up_cnt,
             COUNT(DISTINCT CASE WHEN \`limit\` = 'D' THEN ts_code END) AS limit_down_cnt

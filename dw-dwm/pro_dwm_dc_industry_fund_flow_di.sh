@@ -107,21 +107,45 @@ load_dc_industry_fund_flow() {
         elg_net_ratio,
         dc_rank
     )
-    WITH hist AS (
+    WITH cal AS (
+        -- 修复#6：连续净流入天数须按“交易日历”判断，避免 ODS 中间缺交易日时把不相邻记录当作连续(导致高估)。
+        --   以 ods_trading_day 为准；若日历在窗口内无数据则回退为 ODS 已有交易日(退化为旧行为，避免整表为空)。
+        SELECT trade_date
+        FROM ods_trading_day
+        WHERE trade_date >= '${v_date_120}' AND trade_date <= '${v_date}'
+        UNION
+        SELECT DISTINCT trade_date
+        FROM ods_industry_fund_flow_di
+        WHERE trade_date >= '${v_date_120}' AND trade_date <= '${v_date}'
+    ),
+    industries AS (
+        -- 仅对“当日存在”的板块构建交易日面板并输出；历史缺失的交易日会成为 NULL 行 → 触发断裂
+        SELECT DISTINCT industry_code, content_type, industry_name
+        FROM ods_industry_fund_flow_di
+        WHERE trade_date = '${v_date}'
+    ),
+    panel AS (
+        SELECT c.trade_date, i.industry_code, i.content_type, i.industry_name
+        FROM cal c
+        CROSS JOIN industries i
+    ),
+    hist AS (
         SELECT
-            f.trade_date,
-            f.content_type,
-            f.industry_code,
-            f.industry_name,
+            p.trade_date,
+            p.content_type,
+            p.industry_code,
+            p.industry_name,
             f.net_amount,
             f.net_amount_rate,
             f.buy_elg_amount,
             f.pct_change,
             f.\`rank\` AS dc_rank,
+            -- 断裂条件：净流入<=0(含0，保留原口径) 或 该交易日 ODS 无记录(net_amount 为 NULL)
             CASE WHEN IFNULL(f.net_amount, 0) <= 0 THEN 1 ELSE 0 END AS is_break
-        FROM ods_industry_fund_flow_di f
-        WHERE f.trade_date <= '${v_date}'
-          AND f.trade_date >= '${v_date_120}'
+        FROM panel p
+        LEFT JOIN ods_industry_fund_flow_di f
+          ON f.trade_date = p.trade_date
+         AND f.industry_code = p.industry_code
     ),
     streak_base AS (
         SELECT
@@ -151,6 +175,8 @@ load_dc_industry_fund_flow() {
                     ORDER BY s.trade_date
                 )
             END AS net_inflow_days,
+            -- 口径#7：经 #6 面板对齐后，此处 ROWS 5 PRECEDING 即“前5个交易日”(非物理行)；
+            --   AVG 自动忽略缺失(NULL)交易日。含义为“前5交易日平均净流入(不含当日)”。
             AVG(s.net_amount) OVER (
                 PARTITION BY s.industry_code
                 ORDER BY s.trade_date
@@ -176,13 +202,15 @@ load_dc_industry_fund_flow() {
         END AS fund_inflow_strength,
         m.net_inflow_days,
         m.net_amount_5d_avg,
+        -- 口径#7：fund_accel 实为“当日净流入 − 前5交易日均值”的水平偏离，并非严格加速度(二阶差分)；字段名沿用不改。
         CASE
             WHEN m.net_amount_5d_avg IS NOT NULL
             THEN ROUND(m.net_amount - m.net_amount_5d_avg, 4)
             ELSE NULL
         END AS fund_accel,
+        -- 修复#7：净流出(net_amount<0)时该比值语义混乱，改为仅“主力净流入 net_amount>0”时计算，否则 NULL。
         CASE
-            WHEN m.net_amount IS NOT NULL AND m.net_amount <> 0
+            WHEN m.net_amount > 0
             THEN ROUND(m.buy_elg_amount / m.net_amount, 6)
             ELSE NULL
         END AS elg_net_ratio,

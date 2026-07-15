@@ -26,6 +26,30 @@
     if (val === null || val === undefined || val === "") return "—";
     if (fmt === "bool") return val === 1 || val === true ? "是" : "否";
     if (fmt === "int") return Number(val).toLocaleString("zh-CN");
+    // 与 dc_fund_flow.js 保持一致的口径：
+    // yi：源单位为万元（如 net_amount_wan），/1e4 得“亿”，保留 2 位；
+    // yi_accel：源单位为元（如 fund_accel），/1e8 得“亿”，保留 2 位；
+    // strength4：比值类（如 fund_inflow_strength），保留 4 位小数。
+    if (fmt === "yi") {
+      const n = Number(val);
+      if (Number.isNaN(n)) return val;
+      return (n / 1e4).toFixed(2) + "亿";
+    }
+    if (fmt === "yi_accel") {
+      const n = Number(val);
+      if (Number.isNaN(n)) return val;
+      return (n / 1e8).toFixed(2) + "亿";
+    }
+    if (fmt === "strength4") {
+      const n = Number(val);
+      if (Number.isNaN(n)) return val;
+      return n.toFixed(4);
+    }
+    if (fmt === "days") {
+      const n = Number(val);
+      if (Number.isNaN(n)) return val;
+      return String(Math.trunc(n)) + "天";
+    }
     if (fmt === "pct" || fmt === "pct2" || fmt === "num") {
       const n = Number(val);
       if (Number.isNaN(n)) return val;
