@@ -35,19 +35,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 库内与页面仅保留近 1 个月
+DRAGON_RETENTION_DAYS = 31
+
 SCORE_INSERT = """
 INSERT INTO dwm_sector_stock_dragon_score_di (
     trade_date, industry_code, industry_name, content_type, ts_code, stock_name,
     score_industry, score_fund, score_trend, score_inst, score_composite,
     rank_industry, rank_fund, rank_trend, rank_inst, rank_composite,
     is_industry_leader, is_fund_leader, is_trend_leader, is_inst_leader, is_composite_leader,
-    score_mode, industry_as_of, inst_as_of, detail_json
+    score_mode, industry_as_of, inst_as_of
 ) VALUES (
     :trade_date, :industry_code, :industry_name, :content_type, :ts_code, :stock_name,
     :score_industry, :score_fund, :score_trend, :score_inst, :score_composite,
     :rank_industry, :rank_fund, :rank_trend, :rank_inst, :rank_composite,
     :is_industry_leader, :is_fund_leader, :is_trend_leader, :is_inst_leader, :is_composite_leader,
-    :score_mode, :industry_as_of, :inst_as_of, :detail_json
+    :score_mode, :industry_as_of, :inst_as_of
 )
 ON DUPLICATE KEY UPDATE
     industry_name=VALUES(industry_name), content_type=VALUES(content_type),
@@ -61,7 +64,7 @@ ON DUPLICATE KEY UPDATE
     is_industry_leader=VALUES(is_industry_leader), is_fund_leader=VALUES(is_fund_leader),
     is_trend_leader=VALUES(is_trend_leader), is_inst_leader=VALUES(is_inst_leader),
     is_composite_leader=VALUES(is_composite_leader),
-    industry_as_of=VALUES(industry_as_of), inst_as_of=VALUES(inst_as_of), detail_json=VALUES(detail_json),
+    industry_as_of=VALUES(industry_as_of), inst_as_of=VALUES(inst_as_of),
     updated_at=CURRENT_TIMESTAMP
 """
 
@@ -185,12 +188,33 @@ def run_batch(
     with engine.begin() as conn:
         conn.execute(text(SCORE_INSERT), all_scores)
         conn.execute(text(SUMMARY_INSERT), summaries)
+        purged_score = conn.execute(
+            text(
+                """
+                DELETE FROM dwm_sector_stock_dragon_score_di
+                WHERE trade_date < DATE_SUB(:td, INTERVAL :days DAY)
+                """
+            ),
+            {"td": trade_date, "days": DRAGON_RETENTION_DAYS},
+        ).rowcount
+        purged_summary = conn.execute(
+            text(
+                """
+                DELETE FROM dwm_sector_dragon_summary_di
+                WHERE trade_date < DATE_SUB(:td, INTERVAL :days DAY)
+                """
+            ),
+            {"td": trade_date, "days": DRAGON_RETENTION_DAYS},
+        ).rowcount
 
     stats = {
         "boards_total": len(boards),
         "boards_ok": len(summaries),
         "boards_skipped": skipped,
         "score_rows": len(all_scores),
+        "purged_score_rows": int(purged_score or 0),
+        "purged_summary_rows": int(purged_summary or 0),
+        "retention_days": DRAGON_RETENTION_DAYS,
         "ok_by_type": dict(Counter(s.get("content_type") for s in summaries)),
     }
     logger.info("batch done %s", stats)

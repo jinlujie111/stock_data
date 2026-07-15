@@ -15,6 +15,9 @@ SCORE_TABLE = "dwm_industry_vp_score_di"
 AGG_TABLE = "dwm_industry_vp_agg_di"
 FACTOR_TABLE = "dwm_stock_vp_factor_di"
 
+# 与 etl.volume_price.batch.VP_RETENTION_DAYS 对齐：近半年
+VP_RETENTION_DAYS = 183
+
 _VP_SCORE_COLUMNS = """
     industry_code, industry_name, content_type, vp_score, vp_status,
     signal_type, industry_vol_ratio_20, rising_ratio, breakout_ratio,
@@ -108,12 +111,13 @@ def latest_trade_date() -> str | None:
     return _serialize(row["d"]) if row and row.get("d") else None
 
 
-def list_trade_dates(limit: int = 60) -> list[str]:
-    limit = max(1, min(limit, 365))
+def list_trade_dates(limit: int = 120) -> list[str]:
+    limit = max(1, min(limit, VP_RETENTION_DAYS))
     rows = fetch_all_stock(
         f"""
         SELECT DISTINCT trade_date AS d
         FROM {SCORE_TABLE}
+        WHERE trade_date >= DATE_SUB(CURDATE(), INTERVAL {VP_RETENTION_DAYS} DAY)
         ORDER BY d DESC
         LIMIT {limit}
         """
@@ -126,6 +130,7 @@ def list_trade_dates(limit: int = 60) -> list[str]:
         f"""
         SELECT DISTINCT trade_date AS d
         FROM ods_stock_detail_di
+        WHERE trade_date >= DATE_SUB(CURDATE(), INTERVAL {VP_RETENTION_DAYS} DAY)
         ORDER BY d DESC
         LIMIT {limit}
         """

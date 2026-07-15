@@ -16,11 +16,22 @@ def test_vp_menu_items_and_routes_exist():
 
     nav_slugs = {item["slug"] for item in NAV_ITEMS}
     assert "volume-price" in nav_slugs
+    assert "sentiment" not in nav_slugs
+    assert "limit-up" not in nav_slugs
+    assert "hot-stocks" not in nav_slugs
 
-    sector_items = [
+    # 已下线页面路由
+    assert "/dc/sentiment" not in paths
+    assert "/dc/limit-up" not in paths
+    assert "/dc/hot-stocks" not in paths
+    # 首页大盘情绪仍依赖 sentiment API
+    assert "/api/v1/sentiment/history" in paths
+
+    decision_items = [
         item
         for section in NAV_SECTIONS
-        if section["title"] == "板块分析"
+        if section["title"] == "决策链路"
         for item in section["items"]
     ]
-    assert any(item["slug"] == "volume-price" for item in sector_items)
+    assert any(item["slug"] == "volume-price" for item in decision_items)
+    assert any(item["slug"] == "dragon" for item in decision_items)

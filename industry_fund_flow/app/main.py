@@ -14,8 +14,6 @@ from app import (
     routes_chart,
     routes_dc,
     routes_dragon,
-    routes_hot_stocks,
-    routes_limit_up,
     routes_mainline,
     routes_quant,
     routes_sentiment,
@@ -42,24 +40,18 @@ app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 routes_dc.init_dc_routes(_TEMPLATES)
 routes_dragon.init_dragon_routes(_TEMPLATES)
 routes_mainline.init_mainline_routes(_TEMPLATES)
+# 板块情绪页已下线；保留 sentiment API 供首页「大盘情绪」使用
 routes_sentiment.init_sentiment_routes(_TEMPLATES)
 routes_sectors.init_sectors_routes(_TEMPLATES)
-routes_hot_stocks.init_hot_stocks_routes(_TEMPLATES)
-routes_limit_up.init_limit_up_routes(_TEMPLATES)
 routes_vp.init_vp_routes(_TEMPLATES)
 routes_chart.init_chart_routes(_TEMPLATES)
 routes_quant.init_quant_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
-app.include_router(routes_sentiment.page_router)
 app.include_router(routes_sentiment.api_router)
 app.include_router(routes_sectors.page_router)
 app.include_router(routes_sectors.api_router)
 app.include_router(routes_sectors.fav_router)
-app.include_router(routes_hot_stocks.page_router)
-app.include_router(routes_hot_stocks.api_router)
-app.include_router(routes_limit_up.page_router)
-app.include_router(routes_limit_up.api_router)
 app.include_router(routes_dragon.page_router)
 app.include_router(routes_dragon.api_router)
 app.include_router(routes_vp.page_router)

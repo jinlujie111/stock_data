@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.deps import require_user
-from app.dc_registry import NAV_ITEMS
 from app import sentiment_service as sentiment_svc
 
 api_router = APIRouter(prefix="/api/v1/sentiment", tags=["sentiment-api"])
+# 兼容旧 init；页面路由已下线
 page_router = APIRouter(tags=["sentiment-pages"])
 
 _templates: Jinja2Templates | None = None
@@ -20,18 +19,7 @@ def init_sentiment_routes(templates: Jinja2Templates) -> None:
     _templates = templates
 
 
-@page_router.get("/dc/sentiment", response_class=HTMLResponse)
-def sentiment_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "dc_sentiment.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "sentiment",
-            "title": "板块情绪",
-        },
-    )
+# 板块情绪页已下线（导航与 page_router 不再挂载）；API 仍供首页大盘情绪使用。
 
 
 @api_router.get("/trade-dates")

@@ -36,7 +36,7 @@ def volume_price_page(request: Request, user: dict = Depends(require_user)):
 
 @api_router.get("/trade-dates")
 def api_vp_trade_dates(
-    limit: int = Query(60, ge=1, le=365),
+    limit: int = Query(120, ge=1, le=183),
     _user: dict = Depends(require_user),
 ):
     try:

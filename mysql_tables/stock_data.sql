@@ -635,7 +635,6 @@ CREATE TABLE IF NOT EXISTS dwm_sector_stock_dragon_score_di (
     score_mode          VARCHAR(8)     NOT NULL DEFAULT 'mvp' COMMENT 'mvp/full',
     industry_as_of      DATE           NULL COMMENT '财报截止日',
     inst_as_of          DATE           NULL COMMENT '机构数据截止日',
-    detail_json         JSON           NULL COMMENT '子因子明细',
     created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_sector_dragon_score (trade_date, industry_code, ts_code, score_mode),

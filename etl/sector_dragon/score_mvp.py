@@ -18,7 +18,6 @@ from etl.sector_dragon.scoring import (
     build_summary_text,
     composite_mvp,
     composite_weighted,
-    detail_json,
     mark_leader,
     percentile_score,
     rank_desc,
@@ -380,22 +379,6 @@ def score_board_mvp(
                 "score_inst": inst_pct.get(c),
                 "score_composite": comp,
                 "score_mode": cfg.score_mode,
-                "detail_json": detail_json(
-                    fund_net_20d=fund_map.get(c),
-                    rs_raw=rs_raw.get(c),
-                    rs_score=srs,
-                    avg_amount=amt_map.get(c),
-                    mv_proxy=mv_map.get(c),
-                    report_cnt_30d=inst_map.get(c),
-                    board_ret_60d=board_ret,
-                    member_date=str(member_date),
-                    netprofit_yoy=np_yoy_map.get(c),
-                    q_profit_yoy=q_yoy_map.get(c),
-                    roe=roe_map.get(c),
-                    upgrade_ratio=upgrade_map.get(c),
-                    forecast_rev_pct=forecast_rev_map.get(c),
-                    fina_end_date=str(industry_as_of_map.get(c) or ""),
-                ),
             }
         )
 

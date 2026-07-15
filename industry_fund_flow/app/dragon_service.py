@@ -33,12 +33,17 @@ def latest_trade_date() -> str | None:
     return _serialize(row["d"]) if row and row.get("d") else None
 
 
-def list_trade_dates(limit: int = 60) -> list[str]:
-    limit = max(1, min(limit, 365))
+# 页面与库内仅保留近 1 个月龙头结果
+DRAGON_RETENTION_DAYS = 31
+
+
+def list_trade_dates(limit: int = 31) -> list[str]:
+    limit = max(1, min(limit, DRAGON_RETENTION_DAYS))
     rows = fetch_all_stock(
         f"""
         SELECT DISTINCT trade_date AS d
         FROM {SUMMARY_TABLE}
+        WHERE trade_date >= DATE_SUB(CURDATE(), INTERVAL {DRAGON_RETENTION_DAYS} DAY)
         ORDER BY trade_date DESC
         LIMIT {limit}
         """
@@ -193,8 +198,7 @@ def get_board_scores(
         SELECT ts_code, stock_name,
                score_industry, score_fund, score_trend, score_inst, score_composite,
                rank_composite, rank_fund, rank_trend, rank_inst,
-               is_composite_leader, is_fund_leader, is_trend_leader, is_inst_leader,
-               detail_json
+               is_composite_leader, is_fund_leader, is_trend_leader, is_inst_leader
         FROM {SCORE_TABLE}
         WHERE trade_date = :td AND industry_code = :ic AND score_mode = :mode
         ORDER BY {sort_col} IS NULL, {sort_col} {order_sql}, rank_composite ASC

@@ -37,7 +37,7 @@ def dragon_page(request: Request, user: dict = Depends(require_user)):
 
 @api_router.get("/trade-dates")
 def api_dragon_trade_dates(
-    limit: int = Query(60, ge=1, le=365),
+    limit: int = Query(31, ge=1, le=31),
     _user: dict = Depends(require_user),
 ):
     try:

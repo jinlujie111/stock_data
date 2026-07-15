@@ -30,6 +30,9 @@ from etl.volume_price.stock_factors import compute_stock_factors  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+# 库内与页面仅保留近半年
+VP_RETENTION_DAYS = 183
+
 STOCK_UPSERT = """
 INSERT INTO dwm_stock_vp_factor_di (
     trade_date, ts_code, close, vol, amount, pct_chg, turnover_rate,
@@ -174,6 +177,33 @@ def run_batch(
         )
         _chunk_insert(conn, AGG_UPSERT, agg_rows)
         _chunk_insert(conn, SCORE_UPSERT, score_rows)
+        purged_factor = conn.execute(
+            text(
+                """
+                DELETE FROM dwm_stock_vp_factor_di
+                WHERE trade_date < DATE_SUB(:td, INTERVAL :days DAY)
+                """
+            ),
+            {"td": trade_date, "days": VP_RETENTION_DAYS},
+        ).rowcount
+        purged_agg = conn.execute(
+            text(
+                """
+                DELETE FROM dwm_industry_vp_agg_di
+                WHERE trade_date < DATE_SUB(:td, INTERVAL :days DAY)
+                """
+            ),
+            {"td": trade_date, "days": VP_RETENTION_DAYS},
+        ).rowcount
+        purged_score = conn.execute(
+            text(
+                """
+                DELETE FROM dwm_industry_vp_score_di
+                WHERE trade_date < DATE_SUB(:td, INTERVAL :days DAY)
+                """
+            ),
+            {"td": trade_date, "days": VP_RETENTION_DAYS},
+        ).rowcount
 
     by_type = {}
     for r in score_rows:
@@ -185,6 +215,10 @@ def run_batch(
         "board_total": len(boards),
         "agg_rows": len(agg_rows),
         "score_rows": len(score_rows),
+        "purged_factor_rows": int(purged_factor or 0),
+        "purged_agg_rows": int(purged_agg or 0),
+        "purged_score_rows": int(purged_score or 0),
+        "retention_days": VP_RETENTION_DAYS,
         "by_type": by_type,
     }
     logger.info("vp_batch done %s", stats)

@@ -144,14 +144,12 @@ RESERVED_DC_PAGE_SLUGS = frozenset(
         "dragon",
         "sectors",
         "kline",
-        "sentiment",
         "volume-price",
-        "hot-stocks",
-        "limit-up",
     }
 )
 
 # 决策链路：资金 → 主线 → 量价确认 → 龙头/成分 → K线
+# 已下线页面（保留 API 时勿再挂导航）：板块情绪 / 涨停分析 / 热点股预览
 _NAV_RAW: list[dict[str, str]] = [
     {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow", "section": "决策链路"},
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "决策链路"},
@@ -164,10 +162,6 @@ _NAV_RAW: list[dict[str, str]] = [
     {"slug": "quant-strategies", "label": "策略管理", "href": "/quant/strategies", "section": "量化选股"},
     {"slug": "quant-backtest", "label": "策略回测", "href": "/quant/backtest", "section": "量化选股"},
     {"slug": "quant-trades", "label": "买卖点记录", "href": "/quant/trades", "section": "量化选股"},
-    # 辅助
-    {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up", "section": "辅助雷达"},
-    {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks", "section": "辅助雷达"},
-    {"slug": "sentiment", "label": "板块情绪", "href": "/dc/sentiment", "section": "辅助雷达"},
     # 自选
     {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
     {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks", "section": "我的自选"},
