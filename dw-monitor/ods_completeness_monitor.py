@@ -380,6 +380,18 @@ def run_monitor(
         for spec in specs:
             table = spec["table"]
             ctype = spec.get("type", "snapshot")
+            # enabled=false：同步已停用的表，避免日批完整度 ALERT
+            if spec.get("enabled") is False:
+                results.append(
+                    CheckResult(
+                        table,
+                        ctype,
+                        Level.SKIP,
+                        "检查已停用（对应同步/链路未接入现网）",
+                        spec.get("label") or table,
+                    )
+                )
+                continue
             if not table_exists(conn, table):
                 results.append(
                     CheckResult(table, ctype, Level.ALERT, "表不存在", spec.get("label") or table)

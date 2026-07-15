@@ -93,20 +93,21 @@ _run_step "run_dwm_dc_industry_market_heat" run_dwm_dc_industry_market_heat "${n
 # --- 6) DWM：扩散效应 ---
 _run_step "run_dwm_dc_industry_diffusion" run_dwm_dc_industry_diffusion "${n_date}"
 # _run_step "run_dwm_ths_industry_diffusion" run_dwm_ths_industry_diffusion "${n_date}"
-_run_step "run_dwm_sw_industry_diffusion" run_dwm_sw_industry_diffusion "${n_date}"
+# 申万链路已停用（ods_industry_daily / index_member_all 不再同步；Web 仅东财）
+# _run_step "run_dwm_sw_industry_diffusion" run_dwm_sw_industry_diffusion "${n_date}"
 
 # --- 7) DWM：产业景气 ---
 _run_step "run_dwm_dc_industry_prosperity" run_dwm_dc_industry_prosperity "${n_date}"
 # _run_step "run_dwm_ths_industry_prosperity" run_dwm_ths_industry_prosperity "${n_date}"
-_run_step "run_dwm_sw_industry_prosperity" run_dwm_sw_industry_prosperity "${n_date}"
+# _run_step "run_dwm_sw_industry_prosperity" run_dwm_sw_industry_prosperity "${n_date}"
 
 # --- 8) DWS：主线评分 + 监控（需求1，仅东财）---
 _run_step "run_dws_dc_industry_mainline_score" run_dws_dc_industry_mainline_score "${n_date}"
 # _run_step "run_dws_ths_industry_mainline_score" run_dws_ths_industry_mainline_score "${n_date}"
-_run_step "run_dws_sw_industry_mainline_score" run_dws_sw_industry_mainline_score "${n_date}"
+# _run_step "run_dws_sw_industry_mainline_score" run_dws_sw_industry_mainline_score "${n_date}"
 _run_step "run_dws_dc_industry_mainline_monitor" run_dws_dc_industry_mainline_monitor "${n_date}"
 # _run_step "run_dws_ths_industry_mainline_monitor" run_dws_ths_industry_mainline_monitor "${n_date}"
-_run_step "run_dws_sw_industry_mainline_monitor" run_dws_sw_industry_mainline_monitor "${n_date}"
+# _run_step "run_dws_sw_industry_mainline_monitor" run_dws_sw_industry_mainline_monitor "${n_date}"
 
 # --- 9) 板块量价 VP（需求5）---
 _run_step "run_vp_batch" run_vp_batch "${n_date}"

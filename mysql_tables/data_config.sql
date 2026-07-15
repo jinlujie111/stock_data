@@ -318,7 +318,7 @@ INSERT INTO db_sync_task (
             'change', 'pct_change', 'vol', 'amount', 'pe', 'pb', 'float_mv', 'total_mv'
         )
     ),
-    1, '申万行业日线行情日快照(Tushare sw_daily)'
+    0, '【已停用 2026-07-15】申万行业日线(Tushare sw_daily)；Web 仅东财，SW 日批已停'
 );
 
 -- Tushare daily → ods_stock_detail_di（按日 snapshot，A股日线行情）
@@ -444,7 +444,7 @@ INSERT INTO db_sync_task (
             'ts_code', 'name', 'in_date', 'out_date', 'is_new'
         )
     ),
-    1, '全量更新申万行业成分(Tushare index_member_all, is_new=Y；offset 分页最多4页×2000行)'
+    0, '【已停用 2026-07-15】全量申万成分(Tushare index_member_all)；Web 仅东财，SW 日批已停'
 );
 
 -- Tushare fina_indicator_vip → ods_fina_indicator（全市场一季/一日；需约5000积分）
@@ -500,7 +500,7 @@ INSERT INTO db_sync_task (
             'main_business', 'business_scope'
         )
     ),
-    1, '上市公司简介/主营/经营范围(Tushare stock_company)；每月1号全量刷新，供需求4 AI核心池'
+    0, '【已停用 2026-07-15】上市公司信息(Tushare stock_company)；AI 核心池默认关，现网无读方'
 );
 
 -- Tushare fina_mainbz_vip → ods_fina_mainbz_di（按产品 type=P；snapshot=近2季，full=季末回溯；monthly 由月批 --force 执行）
@@ -688,7 +688,7 @@ INSERT INTO db_sync_task (
             'ts_code', 'name', 'count', 'exchange', 'list_date', 'index_type'
         )
     ),
-    1, '全量更新同花顺板块指数(Tushare ths_index, exchange=A；需约6000积分)'
+    0, '【已停用 2026-07-15】同花顺板块指数(Tushare ths_index)；现网主链路仅东财'
 );
 
 -- Tushare ths_daily → ods_ths_daily_di（按日 snapshot，同花顺板块指数日线）
@@ -737,7 +737,7 @@ INSERT INTO db_sync_task (
             'ts_code', 'con_code', 'name', 'weight', 'in_date', 'out_date', 'is_new'
         )
     ),
-    1, '全量更新同花顺板块成分(Tushare ths_member；依赖 ods_ths_index_di，按 ts_code 循环；需约6000积分)'
+    0, '【已停用 2026-07-15】同花顺板块成分(Tushare ths_member)；现网主链路仅东财'
 );
 
 -- Tushare ths_hot → ods_ths_hot_di（按日 snapshot，同花顺App热榜）
@@ -768,7 +768,7 @@ INSERT INTO db_sync_task (
             'rank_reason', 'hot', 'rank_time'
         )
     ),
-    1, '同花顺App热榜日快照(Tushare ths_hot, is_new=Y收盘榜；按market循环；单次最多2000行/类型，需约6000积分，建议22:30后)'
+    0, '【已停用 2026-07-15】同花顺App热榜(Tushare ths_hot)；现网主链路仅东财'
 );
 
 -- Tushare dc_hot → ods_dc_hot_di（按日 snapshot，东财App热榜）
@@ -846,7 +846,7 @@ INSERT INTO db_sync_task (
             'amount_rate', 'float_values', 'reason'
         )
     ),
-    1, '龙虎榜日快照(Tushare top_list, trade_date=$trade_date；单次最多1万行，约2000积分，建议20点后)'
+    0, '【已停用 2026-07-15】龙虎榜日快照(Tushare top_list)；现网未接入'
 );
 
 -- Tushare moneyflow_hsgt → ods_moneyflow_hsgt_di（按日 snapshot，沪深港通通道资金流向）
@@ -897,7 +897,7 @@ INSERT INTO db_sync_task (
             'trade_date', 'code', 'ts_code', 'name', 'vol', 'ratio', 'exchange'
         )
     ),
-    1, '沪深港股通持股日快照(Tushare hk_hold, SH+SZ北向；单次最多3800行/通道，约2000积分，T+1更新)'
+    0, '【已停用 2026-07-15】沪深港股通持股(Tushare hk_hold)；现网未用（情绪用 moneyflow_hsgt）'
 );
 
 -- 存量库迁移：fina_mainbz_vip 由 daily 改为 monthly（与日批 fina_mainbz 一并由 xxl_monthly_batch.sh 执行）
@@ -938,7 +938,7 @@ INSERT INTO db_sync_task (
             'ebit', 'ebitda', 'update_flag'
         )
     ),
-    1, '利润表VIP(Tushare income_vip)；snapshot=近2季全市场；约5000积分；月批 --force'
+    0, '【已停用 2026-07-15】利润表VIP(Tushare income_vip)；现网无读方'
 );
 
 -- Tushare cashflow_vip → ods_cashflow_di（现金流量表；含 CapEx）
@@ -968,7 +968,7 @@ INSERT INTO db_sync_task (
             'c_cash_equ_end_period', 'update_flag'
         )
     ),
-    1, '现金流量表VIP(Tushare cashflow_vip)；含CapEx；snapshot=近2季；约5000积分；月批 --force'
+    0, '【已停用 2026-07-15】现金流量表VIP(Tushare cashflow_vip)；现网无读方'
 );
 
 -- Tushare balancesheet_vip → ods_balancesheet_di
@@ -999,7 +999,7 @@ INSERT INTO db_sync_task (
             'total_hldr_eqy_exc_min_int', 'total_hldr_eqy_inc_min_int', 'update_flag'
         )
     ),
-    1, '资产负债表VIP(Tushare balancesheet_vip)；snapshot=近2季；约5000积分；月批 --force'
+    0, '【已停用 2026-07-15】资产负债表VIP(Tushare balancesheet_vip)；现网无读方'
 );
 
 -- Tushare forecast_vip → ods_forecast_di（业绩预告；type 字段映射为 forecast_type）
@@ -1029,7 +1029,7 @@ INSERT INTO db_sync_task (
             'last_parent_net', 'first_ann_date', 'summary', 'change_reason'
         )
     ),
-    1, '业绩预告VIP(Tushare forecast_vip)；snapshot=近2季；约5000积分；月批 --force'
+    0, '【已停用 2026-07-15】业绩预告VIP(Tushare forecast_vip)；现网无读方'
 );
 
 -- Tushare express_vip → ods_express_di（业绩快报）
@@ -1060,7 +1060,7 @@ INSERT INTO db_sync_task (
             'perf_summary', 'is_audit', 'remark'
         )
     ),
-    1, '业绩快报VIP(Tushare express_vip)；snapshot=近2季；约5000积分；月批 --force'
+    0, '【已停用 2026-07-15】业绩快报VIP(Tushare express_vip)；现网无读方'
 );
 
 -- ============================================================================
@@ -1088,7 +1088,7 @@ INSERT INTO db_sync_task (
             'buy', 'buy_rate', 'sell', 'sell_rate', 'net_buy', 'reason'
         )
     ),
-    1, '龙虎榜机构明细日快照(Tushare top_inst；约5000积分，建议20点后)'
+    0, '【已停用 2026-07-15】龙虎榜机构明细(Tushare top_inst)；现网未接入'
 );
 
 -- Tushare margin → ods_margin_di（融资融券汇总，按交易所）
@@ -1112,7 +1112,7 @@ INSERT INTO db_sync_task (
             'rzye', 'rzmre', 'rzche', 'rqye', 'rqmcl', 'rqyl', 'rzrqye'
         )
     ),
-    1, '融资融券交易汇总日快照(Tushare margin；交易所合计，约2000积分)'
+    0, '【已停用 2026-07-15】融资融券汇总(Tushare margin)；现网未用'
 );
 
 -- Tushare margin_detail → ods_margin_detail_di（融资融券个股明细）
@@ -1136,7 +1136,7 @@ INSERT INTO db_sync_task (
             'rzye', 'rqye', 'rzmre', 'rqyl', 'rzche', 'rqchl', 'rqmcl', 'rzrqye'
         )
     ),
-    1, '融资融券个股明细日快照(Tushare margin_detail；单次最多6000行，约2000积分)'
+    0, '【已停用 2026-07-15】融资融券个股明细(Tushare margin_detail)；现网未用'
 );
 
 -- Tushare stk_holdertrade → ods_stk_holdertrade_di（股东增减持，按公告日）
@@ -1163,7 +1163,7 @@ INSERT INTO db_sync_task (
             'avg_price', 'total_share', 'begin_date', 'close_date'
         )
     ),
-    1, '股东增减持日快照(Tushare stk_holdertrade,ann_date=$trade_date；约2000积分)'
+    0, '【已停用 2026-07-15】股东增减持(Tushare stk_holdertrade)；现网未用'
 );
 
 -- Tushare stk_holdernumber → ods_stk_holdernumber_di（股东人数，按公告日）
@@ -1184,7 +1184,7 @@ INSERT INTO db_sync_task (
         'dropna', JSON_ARRAY('ts_code', 'ann_date', 'end_date'),
         'keep_columns', JSON_ARRAY('ts_code', 'ann_date', 'end_date', 'holder_num')
     ),
-    1, '股东人数日快照(Tushare stk_holdernumber,ann_date=$trade_date；不定期披露，空日正常)'
+    0, '【已停用 2026-07-15】股东人数(Tushare stk_holdernumber)；现网未用'
 );
 
 -- Tushare adj_factor → ods_adj_factor_di（复权因子）
@@ -1234,8 +1234,10 @@ DELETE FROM db_sync_task WHERE source_table = 'fund_portfolio';
 -- 若表已创建，可在 stock_data 库执行：DROP TABLE IF EXISTS ods_fund_hold_di;
 
 -- =============================================================================
--- 2026-07-15：停用高占用且现网不用的同步（筹码 / 主营构成 / 同花顺日线）
--- 配套：TRUNCATE 见 mysql_tables/migrations/20260715_disable_unused_heavy_tables.sql
+-- 2026-07-15：停用现网产品未消费的同步
+-- 配套迁移：
+--   mysql_tables/migrations/20260715_disable_unused_heavy_tables.sql
+--   mysql_tables/migrations/20260715_pause_unused_sync.sql
 -- =============================================================================
 UPDATE db_sync_task
 SET status = 0,
@@ -1246,13 +1248,32 @@ SET status = 0,
 WHERE status = 1
   AND (
         source_table IN (
+            -- 高占用 / 已确认不用
             'cyq_chips',
             'fina_mainbz',
             'fina_mainbz_vip',
             'ths_daily',
             'ths_index',
             'ths_member',
-            'ths_hot'
+            'ths_hot',
+            -- P1 扩展未接入产品
+            'hk_hold',
+            'margin',
+            'margin_detail',
+            'top_list',
+            'top_inst',
+            'stk_holdertrade',
+            'stk_holdernumber',
+            -- 申万主线链路（Web 仅东财；日批 SW DWM/DWS 已停）
+            'sw_daily',
+            'index_member_all',
+            -- 月批财务报表 / 公司信息（现网无读方；AI 核心池默认关）
+            'stock_company',
+            'income_vip',
+            'cashflow_vip',
+            'balancesheet_vip',
+            'forecast_vip',
+            'express_vip'
         )
         OR target_table IN (
             'ods_cyq_chips_di',
@@ -1260,6 +1281,21 @@ WHERE status = 1
             'ods_ths_daily_di',
             'ods_ths_index_di',
             'ods_ths_member_di',
-            'ods_ths_hot_di'
+            'ods_ths_hot_di',
+            'ods_hk_hold_di',
+            'ods_margin_di',
+            'ods_margin_detail_di',
+            'ods_top_list_di',
+            'ods_top_inst_di',
+            'ods_stk_holdertrade_di',
+            'ods_stk_holdernumber_di',
+            'ods_industry_daily_di',
+            'ods_index_member_all',
+            'ods_stock_company_di',
+            'ods_income_di',
+            'ods_cashflow_di',
+            'ods_balancesheet_di',
+            'ods_forecast_di',
+            'ods_express_di'
         )
     );

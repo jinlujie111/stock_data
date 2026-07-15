@@ -35,12 +35,13 @@
       "label": "个股资金流 moneyflow"
     },
     {
+      "enabled": false,
       "table": "ods_industry_daily_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 30,
       "continuity": true,
-      "label": "申万行业日线 sw_daily"
+      "label": "申万行业日线 sw_daily（已停同步）"
     },
     {
       "table": "ods_industry_fund_flow_di",
@@ -82,19 +83,21 @@
       "label": "东财热榜 dc_hot"
     },
     {
+      "enabled": false,
       "table": "ods_ths_daily_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 100,
       "continuity": true,
-      "label": "同花顺板块日线 ths_daily"
+      "label": "同花顺板块日线 ths_daily（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_ths_hot_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 50,
-      "label": "同花顺热榜 ths_hot"
+      "label": "同花顺热榜 ths_hot（已停同步）"
     },
     {
       "table": "ods_limit_list_di",
@@ -139,21 +142,23 @@
       "label": "申万行业分类 index_classify"
     },
     {
+      "enabled": false,
       "table": "ods_index_member_all",
       "type": "full",
       "min_rows": 5000,
       "min_distinct": 5000,
       "distinct_column": "ts_code",
       "where": "is_new = 'Y'",
-      "label": "申万成分 index_member_all"
+      "label": "申万成分 index_member_all（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_stock_company_di",
       "type": "full",
       "min_rows": 5000,
       "min_distinct": 5000,
       "distinct_column": "ts_code",
-      "label": "上市公司基本信息 stock_company"
+      "label": "上市公司基本信息 stock_company（已停同步）"
     },
     {
       "table": "ods_etf_basic_di",
@@ -162,16 +167,18 @@
       "label": "ETF基础 etf_basic"
     },
     {
+      "enabled": false,
       "table": "ods_ths_index_di",
       "type": "full",
       "min_rows": 200,
-      "label": "同花顺板块指数 ths_index"
+      "label": "同花顺板块指数 ths_index（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_ths_member_di",
       "type": "full",
       "min_rows": 5000,
-      "label": "同花顺板块成分 ths_member"
+      "label": "同花顺板块成分 ths_member（已停同步）"
     },
     {
       "table": "ods_fina_indicator",
@@ -183,6 +190,7 @@
       "label": "财务指标 fina_indicator_vip"
     },
     {
+      "enabled": false,
       "table": "ods_fina_mainbz_di",
       "type": "period",
       "date_column": "end_date",
@@ -191,50 +199,55 @@
       "distinct_column": "ts_code",
       "where": "bz_type = 'P'",
       "min_rows_per_period": 5000,
-      "label": "主营业务构成 fina_mainbz"
+      "label": "主营业务构成 fina_mainbz（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_income_di",
       "type": "period",
       "date_column": "end_date",
       "period_count": 2,
       "min_distinct": 3000,
       "distinct_column": "ts_code",
-      "label": "利润表 income_vip"
+      "label": "利润表 income_vip（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_cashflow_di",
       "type": "period",
       "date_column": "end_date",
       "period_count": 2,
       "min_distinct": 3000,
       "distinct_column": "ts_code",
-      "label": "现金流量表 cashflow_vip"
+      "label": "现金流量表 cashflow_vip（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_balancesheet_di",
       "type": "period",
       "date_column": "end_date",
       "period_count": 2,
       "min_distinct": 3000,
       "distinct_column": "ts_code",
-      "label": "资产负债表 balancesheet_vip"
+      "label": "资产负债表 balancesheet_vip（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_forecast_di",
       "type": "period",
       "date_column": "end_date",
       "period_count": 2,
       "min_rows_per_period": 100,
-      "label": "业绩预告 forecast_vip"
+      "label": "业绩预告 forecast_vip（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_express_di",
       "type": "period",
       "date_column": "end_date",
       "period_count": 2,
       "min_rows_per_period": 50,
-      "label": "业绩快报 express_vip"
+      "label": "业绩快报 express_vip（已停同步）"
     },
     {
       "table": "ods_adj_factor_di",
@@ -257,27 +270,30 @@
       "label": "涨跌停价 stk_limit"
     },
     {
+      "enabled": false,
       "table": "ods_margin_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 2,
       "continuity": true,
-      "label": "融资融券汇总 margin"
+      "label": "融资融券汇总 margin（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_margin_detail_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 1000,
       "continuity": true,
-      "label": "融资融券明细 margin_detail"
+      "label": "融资融券明细 margin_detail（已停同步）"
     },
     {
+      "enabled": false,
       "table": "ods_top_inst_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 1,
-      "label": "龙虎榜机构 top_inst"
+      "label": "龙虎榜机构 top_inst（已停同步）"
     }
   ]
 }

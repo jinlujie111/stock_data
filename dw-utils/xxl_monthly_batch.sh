@@ -24,16 +24,16 @@ n_date="${1:-$(date +%Y%m%d)}"
 
 echo "======== stock_data 月批 ${n_date} $(date '+%F %T') ========"
 
-run_data_sync "${n_date}" --source-table stock_company --force
-# 主营构成已停用（ods_fina_mainbz_di 腾盘/现网未用）
+# 公司信息 / 主营构成 / 三表+预告快报：现网产品无读方，已停同步（见 data_config status=0）
+# AI 核心池若再开：ENABLE_AI_CORE_POOL=1 并单独恢复 stock_company
+# run_data_sync "${n_date}" --source-table stock_company --force
 # run_data_sync "${n_date}" --source-table fina_mainbz_vip --force
 # run_data_sync "${n_date}" --source-table fina_mainbz --force
+# run_data_sync "${n_date}" --source-table income_vip --force
+# run_data_sync "${n_date}" --source-table cashflow_vip --force
+# run_data_sync "${n_date}" --source-table balancesheet_vip --force
+# run_data_sync "${n_date}" --source-table forecast_vip --force
+# run_data_sync "${n_date}" --source-table express_vip --force
 
-# P0：三张报表 + 业绩预告/快报（近2季 VIP）
-run_data_sync "${n_date}" --source-table income_vip --force
-run_data_sync "${n_date}" --source-table cashflow_vip --force
-run_data_sync "${n_date}" --source-table balancesheet_vip --force
-run_data_sync "${n_date}" --source-table forecast_vip --force
-run_data_sync "${n_date}" --source-table express_vip --force
-
+echo "SKIP: 月批无启用任务（财务报表/公司信息已暂停同步）"
 echo "======== 月批完成 ${n_date} ========"
