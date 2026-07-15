@@ -188,26 +188,8 @@ run_dwm_dc_industry_fund_flow() {
     bash "${runner}" "$@"
 }
 
-run_dwm_ths_industry_fund_flow() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_fund_flow_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_dwm_dc_industry_trend_strength() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_trend_strength_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dwm_ths_industry_trend_strength() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_trend_strength_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1
@@ -224,35 +206,8 @@ run_dwm_dc_industry_prosperity() {
     bash "${runner}" "$@"
 }
 
-run_dwm_ths_industry_prosperity() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_prosperity_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dwm_sw_industry_prosperity() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_sw_industry_prosperity_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_dwm_dc_industry_market_heat() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_dc_industry_market_heat_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dwm_ths_industry_market_heat() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_market_heat_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1
@@ -269,44 +224,8 @@ run_dwm_dc_industry_diffusion() {
     bash "${runner}" "$@"
 }
 
-run_dwm_ths_industry_diffusion() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ths_industry_diffusion_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dwm_sw_industry_diffusion() {
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_sw_industry_diffusion_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_dws_dc_industry_mainline_score() {
     local runner="${DW_ROOT}/dw-dws/pro_dws_dc_industry_mainline_score_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dws_ths_industry_mainline_score() {
-    local runner="${DW_ROOT}/dw-dws/pro_dws_ths_industry_mainline_score_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dws_sw_industry_mainline_score() {
-    local runner="${DW_ROOT}/dw-dws/pro_dws_sw_industry_mainline_score_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1
@@ -323,54 +242,12 @@ run_dws_dc_industry_mainline_monitor() {
     bash "${runner}" "$@"
 }
 
-run_dws_ths_industry_mainline_monitor() {
-    local runner="${DW_ROOT}/dw-dws/pro_dws_ths_industry_mainline_monitor_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dws_sw_industry_mainline_monitor() {
-    local runner="${DW_ROOT}/dw-dws/pro_dws_sw_industry_mainline_monitor_di.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
 run_dwd_market_breadth() {
     run_dwm_market_breadth "$@"
 }
 
 run_dim_industry_etf_map() {
     local runner="${DW_ROOT}/dw-dim/pro_dim_industry_etf_map.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_dim_industry_track() {
-    local runner="${DW_ROOT}/dw-dim/pro_dim_industry_track.sh"
-    if [[ ! -f "${runner}" ]]; then
-        echo "ERROR: 未找到 ${runner}" >&2
-        return 1
-    fi
-    bash "${runner}" "$@"
-}
-
-run_ai_core_pool_batch() {
-    # 2026-07-15：AI 核心池写入 dwm_industry_stock_ai_score_di，现网未用且占盘，默认跳过。
-    # 需要时：ENABLE_AI_CORE_POOL=1 bash ... 或手动跑 dw-dwm/pro_dwm_ai_core_pool_di.sh
-    if [[ "${ENABLE_AI_CORE_POOL:-0}" != "1" ]]; then
-        echo "[SKIP] run_ai_core_pool_batch（已停用；设 ENABLE_AI_CORE_POOL=1 可强制执行）"
-        return 0
-    fi
-    local runner="${DW_ROOT}/dw-dwm/pro_dwm_ai_core_pool_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2
         return 1

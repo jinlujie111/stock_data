@@ -1,9 +1,10 @@
 # stock_data — XXL-JOB 调度执行顺序
 
-> 维护日期：2026-06-28  
+> 维护日期：2026-07-15  
 > 项目路径（服务器）：`/opt/stock_data`  
 > 执行前统一：`cd /opt/stock_data && source dw-utils/func.sh`  
-> **表结构真相源**：[`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql)（ETL 脚本内 `CREATE IF NOT EXISTS` 与之对齐）
+> **表结构真相源**：[`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql)（ETL 脚本内 `CREATE IF NOT EXISTS` 与之对齐）  
+> **现网链路**：仅东财 DC（同花顺 / 申万 / AI 核心池脚本已删除；对应 ODS sync `status=0`）
 
 **XXL-JOB 建议**
 
@@ -16,7 +17,7 @@
 **相关文档**
 
 - [需求1-主线板块确认-需求文档.md](需求整理/需求1-主线板块确认-需求文档.md) — 主线榜业务与验收
-- [需求4-AI板块成分股识别-技术文档.md](需求整理/需求4-AI板块成分股识别-技术文档.md)
+- 补跑：`tmp/xxl_backfill_metric_fix.sh`（指标口径回填）、`dw-dwm/pro_dwm_quant_signal_di.sh`（量化信号）
 
 ---
 
@@ -88,11 +89,12 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 
 | Job 名称 | Cron 示例（Linux crontab） | 脚本 | 说明 |
 |----------|---------------------------|------|------|
-| `stock_ods_daily` | `30 22 * * 1-5` | `xxl_daily_batch.sh` 前半（或拆 Job） | ODS + DWM + DWS |
-| `stock_daily_all` | `30 22 * * 1-5` | **`dw-utils/xxl_daily_batch.sh`** | **推荐：日批一键** |
-| `stock_ods_monthly` | `0 21 1 * *` | `dw-utils/xxl_monthly_batch.sh` | 每月 1 号 21:00 |
-| `stock_dim_etf_weekly` | `0 3 * * 1` | `dw-utils/xxl_weekly_batch.sh` | 每周一：ETF 映射（需求1 机构化前置） |
-| `stock_mainline_only` | 手工 / 补跑 | `dw-utils/xxl_mainline_batch.sh` | 仅需求1 主线 DWM+DWS |
+| `stock_daily_all` | `30 22 * * 1-5` | **`dw-utils/xxl_daily_batch.sh`** | **推荐：日批一键（仅东财）** |
+| `stock_ods_monthly` | `0 21 1 * *` | `dw-utils/xxl_monthly_batch.sh` | 当前为空跑 SKIP（财报/公司 sync 已停） |
+| `stock_dim_etf_weekly` | `0 3 * * 1` | `dw-utils/xxl_weekly_batch.sh` | 每周一：ETF 映射 |
+| `stock_mainline_only` | 手工 / 补跑 | `dw-utils/xxl_mainline_batch.sh` | 仅东财主线 DWM+DWS |
+| `stock_metric_fix_backfill` | 手工 | `tmp/xxl_backfill_metric_fix.sh` | 指标口径修复回填 |
+| `stock_quant_signal` | 日批内 / 手工 | `dw-dwm/pro_dwm_quant_signal_di.sh` | 量化选股信号（可区间回填） |
 
 > **Quartz（XXL-JOB）对照**：日批 `0 30 22 ? * MON-FRI`；月批 `0 0 21 1 * ?`；周批 `0 0 3 ? * MON`。
 
@@ -104,20 +106,20 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 
 | 步骤 | 任务 | 依赖 | 产品 |
 |------|------|------|------|
-| ① | `run_data_sync` | `daily` / `daily_basic` / `moneyflow` / `dc_*` / `ths_*` / `report_rc` / `fina_indicator_vip` / `limit_list_d` / `index_daily` / `etf_*` / `top_inst` / `margin*` / `adj_factor` / `stk_limit` / `stk_holder*` 等；`monthly`（`stock_company`、`fina_mainbz_*`、`income_vip`、`cashflow_vip`、`balancesheet_vip`、`forecast_vip`、`express_vip`）非 1 号自动跳过 | 全部 |
-| ② | `run_dwm_market_breadth` | `ods_stock_detail_di`、`ods_limit_list_di` | 首页广度 |
-| ③ | `run_dwm_dc_industry_fund_flow` / `run_dwm_ths_industry_fund_flow` | 板块资金流 ODS | 需求1 五维 |
-| ④ | `run_dwm_dc_industry_trend_strength` / `run_dwm_ths_industry_trend_strength` | 板块日线 + `ods_index_daily_di` | 需求1 五维 |
-| ⑤ | `run_dwm_dc_industry_market_heat` / `run_dwm_ths_industry_market_heat` | `ods_dc_*` / 热榜；**需求4 `dim_industry_track` 前置** | 需求1 / 需求4 |
-| ⑥ | `run_dwm_dc_industry_diffusion` / `run_dwm_ths_industry_diffusion` / `run_dwm_sw_industry_diffusion` | 成分 + 涨停 + 广度 | 需求1 五维 |
-| ⑦ | `run_dwm_dc_industry_prosperity` / `run_dwm_ths_industry_prosperity` / `run_dwm_sw_industry_prosperity` | 成分 + `ods_fina_indicator` + `ods_report_rc_di` | 需求1 五维 |
-| ⑧ | `run_dws_*_mainline_score` + `run_dws_*_mainline_monitor` | 上述全部 DWM | **需求1 主线榜** |
-| ⑨ | `run_dim_industry_track` | ⑤ 市场热度 DWM | 需求4 DIM |
-| ⑨b | `run_ai_core_pool_batch` | ⑨ DIM + ODS 公司/财报/研报 | **需求4 核心池** |
-| ⑩ | `run_sector_dragon_batch` | 资金 DWM + `daily` / `moneyflow` | 需求2 |
-| ⑪ | `run_ods_completeness_monitor` | — | ODS 完整度监控告警 |
+| ① | `run_data_sync` | `status=1` 的 ODS（个股行情/指标/资金流、东财板块、`limit_list`、`index_daily`、`moneyflow_hsgt`、`dc_hot`、`fina_indicator`、`report_rc`、`adj_factor`、`stk_limit`、ETF 等） | 全部 |
+| ② | `run_dwm_market_breadth` | `ods_stock_detail_di`、`ods_limit_list_di` | 首页广度 / 情绪 |
+| ③ | `run_dwm_dc_industry_fund_flow` | 东财行业资金流 ODS | 需求1 五维 |
+| ④ | `run_dwm_dc_industry_trend_strength` | 东财板块日线 + `ods_index_daily_di` | 需求1 五维 |
+| ⑤ | `run_dwm_dc_industry_market_heat` | `ods_dc_*` + `ods_dc_hot_di` | 需求1 五维 |
+| ⑥ | `run_dwm_dc_industry_diffusion` | 东财成分 + 涨停 + 广度 | 需求1 五维 |
+| ⑦ | `run_dwm_dc_industry_prosperity` | 东财成分 + `ods_fina_indicator` + `ods_report_rc_di` | 需求1 五维 |
+| ⑧ | `run_dws_dc_industry_mainline_score` + `monitor` | 上述全部 DWM | **需求1 主线榜** |
+| ⑨ | `run_vp_batch` | 板块/个股 ODS | 需求5 量价 |
+| ⑩ | `run_sector_dragon_batch` | 资金 DWM + 个股 ODS | 需求2 龙头 |
+| ⑩.5 | `run_quant_signal` | 个股行情 / VP 因子等 | 量化选股 |
+| ⑪ | `run_ods_completeness_monitor` | — | ODS 完整度（已停表 `enabled=false`） |
 
-> 已下线：量化主线（需求3）、波动率报表。清表见 `mysql_tables/migrations/20260714_drop_quant_volatility.sql`。
+> **已删除链路**：同花顺 / 申万 DWM·DWS、AI 核心池、量化主线（需求3）。停同步见 `mysql_tables/migrations/20260715_pause_unused_sync.sql`。
 
 **需求1 落库表（步骤 ⑧）**
 
@@ -125,7 +127,6 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 |----|------|
 | `dws_dc_industry_mainline_score_di` | 东财五维总分、等级、MA3/5/10 |
 | `dws_dc_industry_mainline_monitor_di` | 东财监控 Top20、三阶段标签 |
-| `dws_ths_*` / `dws_sw_*` | 同花顺 / 申万（Web 暂未接，仅数仓） |
 
 ---
 
@@ -154,16 +155,12 @@ bash dw-utils/xxl_daily_batch.sh "${1:-$(date +%Y%m%d)}"
 
 ## 四、月批脚本
 
-`stock_company`、`fina_mainbz_vip`、`fina_mainbz`、`income_vip`、`cashflow_vip`、`balancesheet_vip`、`forecast_vip`、`express_vip` 在 `db_sync_task` 中为 `schedule_type=monthly`。日批 `run_data_sync` 在非 1 号会跳过；本 Job 用 `--force` 显式执行。
+月批任务已停用（`stock_company` / 三表财报 VIP / `fina_mainbz*` 均为 `status=0`）。脚本保留为空跑 stub，XXL 任务可删或保留无害：
 
 ```bash
 cd /opt/stock_data
-bash dw-utils/xxl_monthly_batch.sh
-# 或指定日期
-bash dw-utils/xxl_monthly_batch.sh 20260601
+bash dw-utils/xxl_monthly_batch.sh   # 仅打印 SKIP
 ```
-
-脚本见 [`dw-utils/xxl_monthly_batch.sh`](dw-utils/xxl_monthly_batch.sh)。
 
 ---
 
@@ -195,6 +192,14 @@ run_data_sync_range 20250101 20260615 --source-table daily_basic --force
 bash dw-utils/xxl_mainline_batch.sh 20260616
 bash dw-utils/xxl_mainline_batch.sh 20250601 20260616   # 区间补 MA
 
+# 指标口径修复回填（breadth→fund→trend→score→monitor→vp→dragon）
+bash tmp/xxl_backfill_metric_fix.sh 20250701 20260714
+bash tmp/xxl_backfill_metric_fix.sh 20250701 20260714 score,monitor,vp,dragon
+
+# 量化信号（单日 / 区间）
+bash dw-dwm/pro_dwm_quant_signal_di.sh 20260714
+bash dw-dwm/pro_dwm_quant_signal_di.sh 20260101 20260714
+
 # DWS 区间（更细粒度）
 bash dw-dws/pro_dws_dc_industry_mainline_score_di.sh 20250601 20260616
 bash dw-dws/pro_dws_dc_industry_mainline_monitor_di.sh 20250601 20260616
@@ -202,14 +207,11 @@ bash dw-dws/pro_dws_dc_industry_mainline_monitor_di.sh 20250601 20260616
 # 只跑板块龙头（需求2）
 run_sector_dragon_batch 20260616
 
-# 只刷新 AI 赛道 DIM（需求4）
-run_dim_industry_track 20260616
-
 # DWM 历史区间
 bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 ```
 
-**日志路径**：`/root/log/stock_log/${n_date}/pro_dws_dc_industry_mainline_*.log`
+**日志路径**：`${STOCK_LOG_DIR:-/opt/stock_data/log/stock_log}/${n_date}/`
 
 ---
 
@@ -219,13 +221,10 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 |------|--------|------|
 | `run_data_sync` | 是* | 下游 DWM 都依赖当日 ODS；*热榜建议 22:30 后 |
 | DWM / DWS 主线（⑧） | **需求1 要** | 不做 `/dc/mainline` 可不跑 |
-| `run_dim_industry_track` | 需求4 要 | 不做 AI 核心池可不跑 |
-| `run_ai_core_pool_batch` | 需求4 要 | 无 LLM Key 时走规则引擎 |
-| `run_sector_dragon_batch` | 需求2 要 | 不做板块龙头页可不跑 |
-| `xxl_weekly_batch` | 建议 | 提升「机构化」命中率；无则仍可出榜 |
+| `run_vp_batch` / `run_sector_dragon_batch` | 需求5 / 2 要 | 量价 / 龙头页 |
+| `run_quant_signal` | 量化页要 | 依赖个股 ODS + 因子 |
+| `xxl_weekly_batch` | 建议 | 提升「机构化」命中率 |
 | `run_ods_completeness_monitor` | 建议 | 生产环境 ODS 完整度告警 |
-
-需求4 AI ETL（`run_ai_core_pool_batch`）已接入日批，位于 `run_dim_industry_track` 之后、`run_sector_dragon_batch` 之前。
 
 ---
 
@@ -314,24 +313,21 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 
 | 页面 | URL | 日批步骤 | 主要读表 |
 |------|-----|----------|----------|
-| 首页（市场广度） | `/` | ② | `dwm_market_breadth_di` |
+| 首页（市场广度 / 情绪） | `/` | ② + HSGT ODS | `dwm_market_breadth_di` 等 |
 | **资金强度** | `/dc/fund-flow` | ③ | `dwm_dc_industry_fund_flow_di` |
 | **主线板块**（需求1） | `/dc/mainline` | ⑧ | `dws_dc_industry_mainline_monitor_di` |
+| **板块量价**（需求5） | `/dc/vp` | ⑨ | `dwm_industry_vp_score_di` 等 |
 | **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
-| **AI 核心池**（需求4） | `/dc/ai-core` | ⑨ + ⑨b | `dwm_industry_stock_core_di`、`dwm_industry_stock_ai_score_di` |
-| 趋势强度 | `/dc/trend-strength` | ④ | `dwm_dc_industry_trend_strength_di` |
-| 市场热度 | `/dc/market-heat` | ⑤ | `dwm_dc_industry_market_heat_di` |
-| 产业景气 | `/dc/prosperity` | ⑦ | `dwm_dc_industry_prosperity_di` |
-| 扩散效应 | `/dc/diffusion` | ⑥ | `dwm_dc_industry_diffusion_di` |
+| **量化选股** | `/dc/quant/*` | ⑩.5 | `dwm_quant_signal_di` 等 |
 | 登录 / 注册 | `/login` `/register` | — | `data_industry.app_user` |
 
-导航栏「东财板块」下拉与各 `/dc/{slug}` 维度页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册。
+导航栏与各 `/dc/{slug}` 页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册（五维单页可已下架导航，ETL 仍写库供主线）。
 
 **推荐访问顺序（收盘后）**
 
 1. 等日批 `xxl_daily_batch.sh` 跑完（或 XXL-JOB `stock_daily_all` 成功）
 2. 浏览器打开 `http://<host>:8082/login` 登录
-3. 首页看市场广度 → 资金强度 → 主线板块 → 板块量价 → 板块龙头 → K线
+3. 首页看情绪/广度 → 资金强度 → 主线板块 → 板块量价 → 板块龙头 → 量化
 
 ### 8.4 API 速查（需登录 Cookie）
 
@@ -341,8 +337,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | GET | `/api/v1/mainline/rank?trade_date=YYYYMMDD&top=20` | 需求1 主线榜 |
 | GET | `/api/v1/mainline/history?industry_code=BKxxxx.DC&days=60` | 主线历史得分 |
 | GET | `/api/v1/dragon/leaders?trade_date=YYYYMMDD` | 需求2 龙头摘要 |
-| GET | `/api/v1/ai-core/pool?trade_date=YYYYMMDD` | 需求4 核心池 |
-| GET | `/api/v1/ai-core/scores?trade_date=YYYYMMDD&industry_id=...` | 需求4 全量评分 |
+| GET | `/api/v1/quant/signals?trade_date=YYYYMMDD` | 量化信号 |
 | GET | `/api/dc/{slug}?trade_date=YYYYMMDD` | 五维 DWM 通用榜单 |
 
 命令行测 API（先登录拿 Cookie）：
@@ -352,7 +347,7 @@ curl -c cookies.txt -b cookies.txt -X POST "http://127.0.0.1:8082/login" \
   -d "username=你的用户&password=你的密码" -L -s -o /dev/null
 
 curl -b cookies.txt -s "http://127.0.0.1:8082/api/v1/mainline/rank?top=20" | python3 -m json.tool
-curl -b cookies.txt -s "http://127.0.0.1:8082/api/v1/ai-core/pool?trade_date=20260626" | python3 -m json.tool
+curl -b cookies.txt -s "http://127.0.0.1:8082/api/v1/quant/signals?trade_date=20260626" | python3 -m json.tool
 ```
 
 ### 8.5 页面无数据速查 SQL
@@ -365,18 +360,18 @@ SET @d = '2026-06-26';
 
 SELECT 'mainline' AS page, COUNT(*) FROM dws_dc_industry_mainline_monitor_di WHERE trade_date = @d
 UNION ALL SELECT 'dragon', COUNT(*) FROM dwm_sector_stock_dragon_score_di WHERE trade_date = @d
-UNION ALL SELECT 'ai_core', COUNT(*) FROM dwm_industry_stock_core_di WHERE trade_date = @d
-UNION ALL SELECT 'ai_score', COUNT(*) FROM dwm_industry_stock_ai_score_di WHERE trade_date = @d;
+UNION ALL SELECT 'vp', COUNT(*) FROM dwm_industry_vp_score_di WHERE trade_date = @d
+UNION ALL SELECT 'quant', COUNT(*) FROM data_industry.quant_signal_di WHERE trade_date = @d;
 ```
 
 | 页面空 | 常见原因 |
 |--------|----------|
 | 主线榜 | 日批 ⑧ 未跑；`stock_read_grants.sql` 未执行 |
 | 板块龙头 | 日批 ⑩ 未跑；成分 `<3` 的板块被跳过 |
-| AI 核心池 | ⑨b 未跑或失败；核心池分数 `< score_threshold` 时 `core_di` 可能为 0 但 `ai_score_di` 应有全量 |
-| 五维维度页 | 对应 DWM 步骤 ③～⑦ 未跑 |
+| 板块量价 | 日批 ⑨ 未跑 |
+| 量化信号 | 日批 ⑩.5 未跑；策略未启用 |
 
-Web 日志：`/root/log/stock_log/web/industry_fund_flow.log`
+Web 日志：`${STOCK_LOG_DIR:-/opt/stock_data/log/stock_log}/web/industry_fund_flow.log`
 
 ---
 
@@ -422,25 +417,11 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 
 ---
 
-## 十、新增 ODS 表备忘（2026-06 / 2026-07）
+## 十、ODS 同步备忘（2026-07 现状）
 
-| source_table | target_table | 调度 | 用途 |
-|--------------|--------------|------|------|
-| `daily_basic` | `ods_daily_basic_di` | daily | 市值 / 换手率 / PE，需求4 V1 权重 |
-| `stock_company` | `ods_stock_company_di` | monthly | 公司简介 / 主营，需求4 Prompt |
-| `fina_mainbz_vip` | `ods_fina_mainbz_di` | monthly | 主营业务构成 VIP（近 2 季全市场，月批 `--force`） |
-| `fina_mainbz` | `ods_fina_mainbz_di` | monthly | 按股补全 mainbz 缺失 |
-| `income_vip` | `ods_income_di` | monthly | 利润表营收/归母净利（P0） |
-| `cashflow_vip` | `ods_cashflow_di` | monthly | 现金流量 / CapEx（P0） |
-| `balancesheet_vip` | `ods_balancesheet_di` | monthly | 资产负债表（P0） |
-| `forecast_vip` | `ods_forecast_di` | monthly | 业绩预告（P0） |
-| `express_vip` | `ods_express_di` | monthly | 业绩快报（P0） |
-| `top_inst` | `ods_top_inst_di` | daily | 龙虎榜机构席位（P1） |
-| `margin` / `margin_detail` | `ods_margin_di` / `ods_margin_detail_di` | daily | 融资融券（P1） |
-| `stk_holdertrade` | `ods_stk_holdertrade_di` | daily | 股东增减持（P1） |
-| `stk_holdernumber` | `ods_stk_holdernumber_di` | daily | 股东户数（P1） |
-| `adj_factor` | `ods_adj_factor_di` | daily | 复权因子（P1） |
-| `stk_limit` | `ods_stk_limit_di` | daily | 每日涨跌停价（P1） |
+**仍在同步（`status=1`）**：个股 `daily`/`daily_basic`/`moneyflow`、东财 `dc_*`/`moneyflow_ind_dc`/`dc_hot`、`limit_list_d`、`index_daily`、`moneyflow_hsgt`、`fina_indicator_vip`、`report_rc`、`adj_factor`、`stk_limit`、ETF、交易日历、`index_classify`、`stock_basic` 等。
+
+**已停用（`status=0`）**：同花顺、申万日线/成分、筹码、主营构成、融资融券、龙虎榜、股东、三表财报 VIP、公司信息等。详见 `mysql_tables/migrations/20260715_pause_unused_sync.sql`。
 
 ---
 
@@ -449,19 +430,19 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | 文件 | 说明 |
 |------|------|
 | [`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql) | **数仓 DDL 真相源** |
-| [`dw-utils/func.sh`](dw-utils/func.sh) | MySQL 环境、`run_data_sync`、DWM/DWS 封装 |
+| [`dw-utils/func.sh`](dw-utils/func.sh) | MySQL 环境、`run_data_sync`、东财 DWM/DWS 封装 |
 | [`dw-sync/sync_runner.sh`](dw-sync/sync_runner.sh) | ODS 同步入口 |
 | [`dw-sync/sync_data.py`](dw-sync/sync_data.py) | 配置驱动同步 |
-| [`dw-utils/xxl_daily_batch.sh`](dw-utils/xxl_daily_batch.sh) | 日批一键 |
-| [`dw-utils/xxl_monthly_batch.sh`](dw-utils/xxl_monthly_batch.sh) | 月批 |
+| [`dw-utils/xxl_daily_batch.sh`](dw-utils/xxl_daily_batch.sh) | 日批一键（仅东财） |
+| [`dw-utils/xxl_monthly_batch.sh`](dw-utils/xxl_monthly_batch.sh) | 月批（当前 SKIP stub） |
 | [`dw-utils/xxl_weekly_batch.sh`](dw-utils/xxl_weekly_batch.sh) | 周批 ETF 映射 |
 | [`dw-utils/xxl_mainline_batch.sh`](dw-utils/xxl_mainline_batch.sh) | 仅需求1 补跑 |
-| [`dw-monitor/pro_ods_completeness.sh`](dw-monitor/pro_ods_completeness.sh) | ODS 完整度监控（配置见 `ods_checks.json`） |
-| [`dw-dwm/pro_dwm_ai_core_pool_di.sh`](dw-dwm/pro_dwm_ai_core_pool_di.sh) | 需求4 AI 核心池批处理 |
-| [`dw-dwm/pro_dwm_*`](dw-dwm/) | DWM ETL（东财/THS/SW 板块因子，**全部保留**） |
-| [`dw-dws/pro_dws_*`](dw-dws/) | DWS ETL（主线评分/监控，**THS/SW 保留**） |
-| [`industry_fund_flow/README.md`](industry_fund_flow/README.md) | 报表 Web 说明（启动见 §八，不进批处理） |
-| [`industry_fund_flow/sql/stock_read_grants.sql`](industry_fund_flow/sql/stock_read_grants.sql) | Web 只读授权 |
+| [`tmp/xxl_backfill_metric_fix.sh`](tmp/xxl_backfill_metric_fix.sh) | 指标口径修复回填 |
+| [`dw-dwm/pro_dwm_quant_signal_di.sh`](dw-dwm/pro_dwm_quant_signal_di.sh) | 量化信号（可区间回填） |
+| [`dw-monitor/pro_ods_completeness.sh`](dw-monitor/pro_ods_completeness.sh) | ODS 完整度监控 |
+| [`dw-dwm/pro_dwm_*`](dw-dwm/) | 东财 DWM + 量价/龙头/量化 |
+| [`dw-dws/pro_dws_*`](dw-dws/) | 东财主线评分/监控 |
+| [`industry_fund_flow/README.md`](industry_fund_flow/README.md) | 报表 Web 说明 |
 
 ---
 
@@ -473,6 +454,6 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | `Access denied` | 检查 `dw-utils/func.sh` 中 MySQL 账号 |
 | 1045 / 变量未加载 | 先 `source dw-utils/func.sh` 或走 `sync_runner.sh` |
 | Web 主线榜空 | 确认日批 ⑧ 已跑、`stock_read_grants.sql` 已执行（§八.5） |
-| AI 核心池页空 | 确认 ⑨b 已跑；`ai_score_di` 有数但 `core_di` 为 0 属正常（未达入池分） |
 | Web 无法访问 | 检查 uvicorn 进程、端口 8082、安全组（启动见 §八.2） |
 | uvicorn 端口占用 | 换 `--port 8083` 或 `pkill -f "uvicorn app.main:app"` 后重启 |
+| 完整度 ALERT 误报 | 确认 `ods_checks.json` 中已停表为 `enabled:false` |
