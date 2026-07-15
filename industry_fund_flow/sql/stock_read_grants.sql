@@ -70,4 +70,14 @@ GRANT SELECT ON stock_data.dwm_industry_vp_score_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_stock_basic_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_stock_basic_di TO 'app_user'@'%';
 
+-- 量化选股/回测新增只读依赖
+GRANT SELECT ON stock_data.ods_adj_factor_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_adj_factor_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_stk_limit_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_stk_limit_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_trading_day TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_trading_day TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_index_daily_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_index_daily_di TO 'app_user'@'%';
+
 FLUSH PRIVILEGES;

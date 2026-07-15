@@ -159,6 +159,11 @@ _NAV_RAW: list[dict[str, str]] = [
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "决策链路"},
     {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "决策链路"},
     {"slug": "kline", "label": "K线分析", "href": "/dc/kline", "section": "决策链路"},
+    # 量化选股
+    {"slug": "quant-signals", "label": "选股信号", "href": "/quant/signals", "section": "量化选股"},
+    {"slug": "quant-strategies", "label": "策略管理", "href": "/quant/strategies", "section": "量化选股"},
+    {"slug": "quant-backtest", "label": "策略回测", "href": "/quant/backtest", "section": "量化选股"},
+    {"slug": "quant-trades", "label": "买卖点记录", "href": "/quant/trades", "section": "量化选股"},
     # 辅助
     {"slug": "limit-up", "label": "涨停分析", "href": "/dc/limit-up", "section": "辅助雷达"},
     {"slug": "hot-stocks", "label": "热点股预览", "href": "/dc/hot-stocks", "section": "辅助雷达"},

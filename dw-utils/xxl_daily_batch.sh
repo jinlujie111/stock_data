@@ -113,6 +113,9 @@ _run_step "run_vp_batch" run_vp_batch "${n_date}"
 # --- 10) 板块龙头 MVP（需求2）---
 _run_step "run_sector_dragon_batch" run_sector_dragon_batch "${n_date}"
 
+# --- 10.5) 量化选股每日信号（依赖个股行情/VP 因子，故在 VP 之后）---
+_run_step "run_quant_signal" run_quant_signal "${n_date}"
+
 # --- 11) ODS 完整度监控（有 ALERT 则 exit 1）---
 _run_step "run_ods_completeness_monitor" run_ods_completeness_monitor "${n_date}"
 

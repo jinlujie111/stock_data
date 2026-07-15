@@ -17,6 +17,7 @@ from app import (
     routes_hot_stocks,
     routes_limit_up,
     routes_mainline,
+    routes_quant,
     routes_sentiment,
     routes_sectors,
     routes_vp,
@@ -47,6 +48,7 @@ routes_hot_stocks.init_hot_stocks_routes(_TEMPLATES)
 routes_limit_up.init_limit_up_routes(_TEMPLATES)
 routes_vp.init_vp_routes(_TEMPLATES)
 routes_chart.init_chart_routes(_TEMPLATES)
+routes_quant.init_quant_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_sentiment.page_router)
@@ -64,6 +66,8 @@ app.include_router(routes_vp.page_router)
 app.include_router(routes_vp.api_router)
 app.include_router(routes_chart.page_router)
 app.include_router(routes_chart.api_router)
+app.include_router(routes_quant.page_router)
+app.include_router(routes_quant.api_router)
 app.include_router(routes_dc.page_router)
 app.include_router(routes_dc.api_router)
 
