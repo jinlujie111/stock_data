@@ -25,9 +25,9 @@ n_date="${1:-$(date +%Y%m%d)}"
 echo "======== stock_data 月批 ${n_date} $(date '+%F %T') ========"
 
 run_data_sync "${n_date}" --source-table stock_company --force
-run_data_sync "${n_date}" --source-table fina_mainbz_vip --force
-# fina_mainbz 按股补 VIP 截断缺失，耗时长，建议单独夜间跑
-run_data_sync "${n_date}" --source-table fina_mainbz --force
+# 主营构成已停用（ods_fina_mainbz_di 腾盘/现网未用）
+# run_data_sync "${n_date}" --source-table fina_mainbz_vip --force
+# run_data_sync "${n_date}" --source-table fina_mainbz --force
 
 # P0：三张报表 + 业绩预告/快报（近2季 VIP）
 run_data_sync "${n_date}" --source-table income_vip --force

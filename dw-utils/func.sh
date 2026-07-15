@@ -364,6 +364,12 @@ run_dim_industry_track() {
 }
 
 run_ai_core_pool_batch() {
+    # 2026-07-15：AI 核心池写入 dwm_industry_stock_ai_score_di，现网未用且占盘，默认跳过。
+    # 需要时：ENABLE_AI_CORE_POOL=1 bash ... 或手动跑 dw-dwm/pro_dwm_ai_core_pool_di.sh
+    if [[ "${ENABLE_AI_CORE_POOL:-0}" != "1" ]]; then
+        echo "[SKIP] run_ai_core_pool_batch（已停用；设 ENABLE_AI_CORE_POOL=1 可强制执行）"
+        return 0
+    fi
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_ai_core_pool_di.sh"
     if [[ ! -f "${runner}" ]]; then
         echo "ERROR: 未找到 ${runner}" >&2

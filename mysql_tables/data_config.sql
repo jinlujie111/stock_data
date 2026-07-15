@@ -394,7 +394,7 @@ INSERT INTO db_sync_task (
         'keep_columns', JSON_ARRAY('ts_code', 'trade_date', 'price', 'percent'),
         'add_timestamps', TRUE
     ),
-    1, 'A股每日筹码分布(Tushare cyq_chips，按 ods_stock_detail_di 当日个股循环；需较高积分)'
+    0, '【已停用 2026-07-15】A股每日筹码分布(Tushare cyq_chips)；占盘大且现网未用，勿再开启'
 );
 
 -- Tushare limit_list_d → ods_limit_list_di（按日 snapshot，含涨停U/跌停D/炸板Z）
@@ -530,7 +530,7 @@ INSERT INTO db_sync_task (
             'bz_sales', 'bz_profit', 'bz_cost', 'curr_type', 'update_flag'
         )
     ),
-    1, '主营业务构成VIP(Tushare fina_mainbz_vip,type=P)；snapshot=近2季全市场；monthly+月批 --force（单次约1万行上限，需配合 fina_mainbz 按股补全）'
+    0, '【已停用 2026-07-15】主营业务构成VIP(Tushare fina_mainbz_vip)；现网未用、占盘，勿再开启'
 );
 
 -- Tushare fina_mainbz → ods_fina_mainbz_di（按股循环，补 VIP 截断缺失；missing_only 默认 true）
@@ -563,7 +563,7 @@ INSERT INTO db_sync_task (
             'bz_sales', 'bz_profit', 'bz_cost', 'curr_type', 'update_flag'
         )
     ),
-    1, '主营业务构成按股补全(Tushare fina_mainbz)；补近2季无记录股票，约2000积分'
+    0, '【已停用 2026-07-15】主营业务构成按股补全(Tushare fina_mainbz)；现网未用、占盘，勿再开启'
 );
 
 -- Tushare report_rc → ods_report_rc_di（按日 snapshot，卖方盈利预测）
@@ -711,7 +711,7 @@ INSERT INTO db_sync_task (
             'avg_price', 'change', 'pct_change', 'vol', 'turnover_rate', 'total_mv', 'float_mv'
         )
     ),
-    1, '同花顺板块指数日线日快照(Tushare ths_daily, trade_date全市场；单次最多3000行，需约6000积分)'
+    0, '【已停用 2026-07-15】同花顺板块指数日线日快照(Tushare ths_daily)；现网主链路仅东财，勿再开启'
 );
 
 -- Tushare ths_member → ods_ths_member_di（full，按 ods_ths_index_di 循环拉成分）
@@ -1232,3 +1232,34 @@ INSERT INTO db_sync_task (
 -- 存量清理：取消 fund_portfolio 同步（不再维护 ods_fund_hold_di）
 DELETE FROM db_sync_task WHERE source_table = 'fund_portfolio';
 -- 若表已创建，可在 stock_data 库执行：DROP TABLE IF EXISTS ods_fund_hold_di;
+
+-- =============================================================================
+-- 2026-07-15：停用高占用且现网不用的同步（筹码 / 主营构成 / 同花顺日线）
+-- 配套：TRUNCATE 见 mysql_tables/migrations/20260715_disable_unused_heavy_tables.sql
+-- =============================================================================
+UPDATE db_sync_task
+SET status = 0,
+    remark = CONCAT(
+        IFNULL(remark, ''),
+        ' 【已停用 2026-07-15 腾盘/现网未用】'
+    )
+WHERE status = 1
+  AND (
+        source_table IN (
+            'cyq_chips',
+            'fina_mainbz',
+            'fina_mainbz_vip',
+            'ths_daily',
+            'ths_index',
+            'ths_member',
+            'ths_hot'
+        )
+        OR target_table IN (
+            'ods_cyq_chips_di',
+            'ods_fina_mainbz_di',
+            'ods_ths_daily_di',
+            'ods_ths_index_di',
+            'ods_ths_member_di',
+            'ods_ths_hot_di'
+        )
+    );
