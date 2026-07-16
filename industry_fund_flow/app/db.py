@@ -94,3 +94,10 @@ def execute(sql: str, params: dict | None = None) -> int:
     with get_engine().begin() as conn:
         result = conn.execute(text(sql), params or {})
         return result.rowcount
+
+
+def execute_stock(sql: str, params: dict | None = None) -> int:
+    """写入 stock_data（板块轮动 rotation_* 等）。"""
+    with get_stock_engine().begin() as conn:
+        result = conn.execute(text(sql), params or {})
+        return result.rowcount

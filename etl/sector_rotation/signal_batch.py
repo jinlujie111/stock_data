@@ -18,7 +18,6 @@ for _p in (_ROOT, _ROOT / "dw-utils"):
         sys.path.insert(0, str(_p))
 
 from etl.db_util import (  # noqa: E402
-    get_industry_engine,
     get_stock_engine,
     latest_trade_date,
     list_trading_days,
@@ -34,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 def run(start: date, end: date) -> int:
     stock_engine = get_stock_engine()
-    industry_engine = get_industry_engine()
     days = list_trading_days(stock_engine, start, end)
     if not days:
         logger.error("区间无交易日: %s ~ %s", start, end)
@@ -43,7 +41,7 @@ def run(start: date, end: date) -> int:
     panel_start = pad[0] if pad else days[0]
     panel = load_panel_from_mysql(stock_engine, panel_start, days[-1])
     for d in days:
-        stats = generate_all(d, stock_engine, industry_engine, panel)
+        stats = generate_all(d, stock_engine, panel)
         logger.info("轮动信号完成 %s: %s", d, stats)
     return 0
 

@@ -1,4 +1,4 @@
-"""每日板块轮动信号 → data_industry.rotation_signal_di。"""
+"""每日板块轮动信号 → stock_data.rotation_signal_di。"""
 from __future__ import annotations
 
 import json
@@ -15,8 +15,8 @@ from etl.sector_rotation.factors import SectorPanel, load_panel_from_mysql
 logger = logging.getLogger(__name__)
 
 
-def load_active_strategies(industry_engine: Engine) -> list[dict]:
-    with industry_engine.connect() as conn:
+def load_active_strategies(engine: Engine) -> list[dict]:
+    with engine.connect() as conn:
         rows = conn.execute(
             text(
                 """
@@ -34,12 +34,11 @@ def generate_for_strategy(
     d: date,
     strategy: dict,
     panel: SectorPanel,
-    industry_engine: Engine,
+    engine: Engine,
     *,
     prev_codes: set[str] | None = None,
 ) -> int:
     cfg = RotationConfig.from_json(strategy["config_json"])
-    # 信号日用固定风格或 auto 的当前默认（无完整调仓历史时用 momentum 起步）
     regime = "momentum" if cfg.regime == "auto" else cfg.regime
     if cfg.regime == "reversal":
         regime = "reversal"
@@ -51,7 +50,7 @@ def generate_for_strategy(
     prev = prev_codes or set()
 
     rows = []
-    for i, r in buyable.iterrows():
+    for i, (_, r) in enumerate(buyable.iterrows()):
         code = r["ts_code"]
         action = "HOLD" if code in prev else "BUY"
         factors = {
@@ -66,15 +65,12 @@ def generate_for_strategy(
                 "ts_code": code,
                 "industry_name": r.get("name"),
                 "action": action,
-                "rank_no": int(r.name) + 1 if isinstance(r.name, int) else i + 1,
+                "rank_no": i + 1,
                 "score": float(r["score"]) if pd.notna(r["score"]) else None,
                 "close": float(r["close"]) if pd.notna(r["close"]) else None,
                 "factor_json": json.dumps(factors, ensure_ascii=False),
             }
         )
-    # 修正 rank
-    for i, row in enumerate(rows):
-        row["rank_no"] = i + 1
     for code in prev - target:
         name = panel.names.get(code, code)
         rows.append(
@@ -91,7 +87,7 @@ def generate_for_strategy(
             }
         )
 
-    with industry_engine.begin() as conn:
+    with engine.begin() as conn:
         conn.execute(
             text(
                 "DELETE FROM rotation_signal_di WHERE strategy_id=:sid AND trade_date=:d"
@@ -115,8 +111,8 @@ def generate_for_strategy(
     return len(rows)
 
 
-def prev_holdings(industry_engine: Engine, strategy_id: int, before: date) -> set[str]:
-    with industry_engine.connect() as conn:
+def prev_holdings(engine: Engine, strategy_id: int, before: date) -> set[str]:
+    with engine.connect() as conn:
         row = conn.execute(
             text(
                 """
@@ -141,15 +137,20 @@ def prev_holdings(industry_engine: Engine, strategy_id: int, before: date) -> se
 
 
 def generate_all(
-    d: date, stock_engine: Engine, industry_engine: Engine, panel: SectorPanel | None = None
+    d: date, stock_engine: Engine, panel: SectorPanel | None = None
 ) -> dict[str, int]:
+    """策略与信号均读写 stock_data.rotation_*。"""
     if panel is None:
         panel = load_panel_from_mysql(stock_engine, d, d)
-    strategies = load_active_strategies(industry_engine)
+    strategies = load_active_strategies(stock_engine)
+    if not strategies:
+        logger.warning(
+            "rotation_strategy 无启用策略；请确认已在 stock_data 建表并插入内置策略"
+        )
     stats: dict[str, int] = {}
     for s in strategies:
-        prev = prev_holdings(industry_engine, s["id"], d)
-        n = generate_for_strategy(d, s, panel, industry_engine, prev_codes=prev)
+        prev = prev_holdings(stock_engine, s["id"], d)
+        n = generate_for_strategy(d, s, panel, stock_engine, prev_codes=prev)
         stats[s["code"]] = n
         logger.info("rotation signal %s %s: %d rows", d, s["code"], n)
     return stats

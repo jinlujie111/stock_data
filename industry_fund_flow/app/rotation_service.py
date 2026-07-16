@@ -1,4 +1,4 @@
-"""板块轮动 Web 服务：策略 / 信号 / 回测（读写 rotation_* 表）。"""
+﻿"""板块轮动 Web 服务：策略 / 信号 / 回测（读写 stock_data.rotation_*）。"""
 from __future__ import annotations
 
 import json
@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from app.db import execute, fetch_all, fetch_one, get_engine, get_stock_engine
+from app.db import execute_stock, fetch_all_stock, fetch_one_stock, get_stock_engine
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 for _p in (_REPO_ROOT, _REPO_ROOT / "dw-utils"):
@@ -53,7 +53,6 @@ def _validate_config(config: Any) -> str:
         raise ValueError("config.factors 不能为空")
     if not (data.get("select") or {}).get("top_n"):
         raise ValueError("config.select.top_n 必填")
-    # 校验可解析
     from etl.sector_rotation.engine import RotationConfig
 
     RotationConfig.from_json(data)
@@ -61,7 +60,7 @@ def _validate_config(config: Any) -> str:
 
 
 def list_strategies(user_id: int) -> list[dict]:
-    rows = fetch_all(
+    rows = fetch_all_stock(
         """
         SELECT id, code, name, description, config_json,
                is_system, is_active, owner_user_id, updated_at
@@ -84,7 +83,7 @@ def list_strategies(user_id: int) -> list[dict]:
 
 
 def get_strategy(strategy_id: int) -> dict | None:
-    r = fetch_one("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
+    r = fetch_one_stock("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
     if not r:
         return None
     item = _row(r)
@@ -103,7 +102,7 @@ def create_strategy(
     if not name or not name.strip():
         raise ValueError("name 必填")
     cfg_json = _validate_config(config)
-    execute(
+    execute_stock(
         """
         INSERT INTO rotation_strategy
             (code, name, description, config_json, is_system, is_active, owner_user_id)
@@ -117,7 +116,7 @@ def create_strategy(
             "uid": user_id,
         },
     )
-    r = fetch_one(
+    r = fetch_one_stock(
         "SELECT id FROM rotation_strategy WHERE code = :code", {"code": code.strip()}
     )
     return get_strategy(r["id"]) if r else {"code": code}
@@ -126,7 +125,7 @@ def create_strategy(
 def update_strategy(
     user_id: int, strategy_id: int, *, name=None, description=None, config=None, is_active=None
 ) -> dict:
-    r = fetch_one("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
+    r = fetch_one_stock("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
     if not r:
         raise ValueError("策略不存在")
     if r["is_system"]:
@@ -148,24 +147,26 @@ def update_strategy(
         sets.append("is_active = :act")
         params["act"] = 1 if is_active else 0
     if sets:
-        execute(f"UPDATE rotation_strategy SET {', '.join(sets)} WHERE id = :id", params)
+        execute_stock(
+            f"UPDATE rotation_strategy SET {', '.join(sets)} WHERE id = :id", params
+        )
     return get_strategy(strategy_id)
 
 
 def delete_strategy(user_id: int, strategy_id: int) -> bool:
-    r = fetch_one("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
+    r = fetch_one_stock("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
     if not r:
         return False
     if r["is_system"]:
         raise ValueError("系统内置策略不可删除")
     if r["owner_user_id"] != user_id:
         raise ValueError("无权删除该策略")
-    n = execute("DELETE FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
+    n = execute_stock("DELETE FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
     return n > 0
 
 
 def signal_trade_dates(strategy_id: int, limit: int = 60) -> list[str]:
-    rows = fetch_all(
+    rows = fetch_all_stock(
         f"""
         SELECT DISTINCT trade_date FROM rotation_signal_di
         WHERE strategy_id = :sid
@@ -180,14 +181,14 @@ def list_signals(strategy_id: int, trade_date: str | None = None) -> dict:
     if trade_date:
         td = _iso(trade_date)
     else:
-        row = fetch_one(
+        row = fetch_one_stock(
             "SELECT MAX(trade_date) AS d FROM rotation_signal_di WHERE strategy_id = :sid",
             {"sid": strategy_id},
         )
         td = _serialize(row["d"]) if row and row.get("d") else None
     if not td:
         return {"trade_date": None, "items": []}
-    rows = fetch_all(
+    rows = fetch_all_stock(
         """
         SELECT ts_code, industry_name, action, rank_no, score, close, factor_json
         FROM rotation_signal_di
@@ -213,7 +214,9 @@ def list_signals(strategy_id: int, trade_date: str | None = None) -> dict:
 def create_backtest(
     user_id: int, strategy_id: int, start_date: str, end_date: str, init_capital: float, name: str | None
 ) -> int:
-    strat = fetch_one("SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id})
+    strat = fetch_one_stock(
+        "SELECT * FROM rotation_strategy WHERE id = :id", {"id": strategy_id}
+    )
     if not strat:
         raise ValueError("策略不存在")
     s = _iso(start_date)
@@ -221,7 +224,7 @@ def create_backtest(
     if s > e:
         s, e = e, s
     cap = float(init_capital) if init_capital else DEFAULT_INIT_CAPITAL
-    execute(
+    execute_stock(
         """
         INSERT INTO rotation_backtest_run
             (strategy_id, owner_user_id, name, start_date, end_date, init_capital, params_json, status)
@@ -237,7 +240,7 @@ def create_backtest(
             "params": strat["config_json"],
         },
     )
-    row = fetch_one(
+    row = fetch_one_stock(
         """
         SELECT id FROM rotation_backtest_run
         WHERE owner_user_id = :uid AND strategy_id = :sid
@@ -266,7 +269,7 @@ def _run_backtest_worker(run_id: int, config_json: str, s: str, e: str, cap: flo
     )
 
     try:
-        execute(
+        execute_stock(
             "UPDATE rotation_backtest_run SET status='running' WHERE id=:id", {"id": run_id}
         )
         cfg = RotationConfig.from_json(config_json)
@@ -274,7 +277,6 @@ def _run_backtest_worker(run_id: int, config_json: str, s: str, e: str, cap: flo
         start = datetime.strptime(s.replace("-", ""), "%Y%m%d").date()
         end = datetime.strptime(e.replace("-", ""), "%Y%m%d").date()
 
-        panel = None
         bench: dict = {}
         try:
             stock_engine = get_stock_engine()
@@ -297,7 +299,7 @@ def _run_backtest_worker(run_id: int, config_json: str, s: str, e: str, cap: flo
         result = run_backtest(panel, cfg, start, end, benchmark=bench or None)
         _persist_backtest(run_id, result)
         m = result.metrics
-        execute(
+        execute_stock(
             """
             UPDATE rotation_backtest_run SET
                 status='done', total_return=:tr, annual_return=:ar, max_drawdown=:md,
@@ -319,14 +321,14 @@ def _run_backtest_worker(run_id: int, config_json: str, s: str, e: str, cap: flo
         logger.info("板块回测 %s 完成: %s", run_id, m)
     except Exception as exc:  # noqa: BLE001
         logger.exception("板块回测 %s 失败", run_id)
-        execute(
+        execute_stock(
             "UPDATE rotation_backtest_run SET status='failed', error_msg=:msg, finished_at=NOW() WHERE id=:id",
             {"id": run_id, "msg": str(exc)[:500]},
         )
 
 
 def _persist_backtest(run_id: int, result) -> None:
-    eng = get_engine()
+    eng = get_stock_engine()
     with eng.begin() as conn:
         conn.execute(text("DELETE FROM rotation_backtest_trade WHERE run_id=:id"), {"id": run_id})
         conn.execute(text("DELETE FROM rotation_backtest_nav WHERE run_id=:id"), {"id": run_id})
@@ -384,7 +386,7 @@ def _persist_backtest(run_id: int, result) -> None:
 
 
 def list_backtests(user_id: int, limit: int = 30) -> list[dict]:
-    rows = fetch_all(
+    rows = fetch_all_stock(
         f"""
         SELECT r.id, r.strategy_id, s.name AS strategy_name, r.name, r.start_date, r.end_date,
                r.init_capital, r.status, r.total_return, r.annual_return, r.max_drawdown,
@@ -400,7 +402,7 @@ def list_backtests(user_id: int, limit: int = 30) -> list[dict]:
 
 
 def get_backtest(user_id: int, run_id: int) -> dict | None:
-    r = fetch_one(
+    r = fetch_one_stock(
         """
         SELECT r.*, s.name AS strategy_name FROM rotation_backtest_run r
         LEFT JOIN rotation_strategy s ON s.id = r.strategy_id
@@ -412,12 +414,12 @@ def get_backtest(user_id: int, run_id: int) -> dict | None:
         return None
     out = _row(r)
     out.pop("params_json", None)
-    nav = fetch_all(
+    nav = fetch_all_stock(
         "SELECT trade_date, nav, bench_nav, drawdown FROM rotation_backtest_nav "
         "WHERE run_id = :id ORDER BY trade_date ASC",
         {"id": run_id},
     )
-    trades = fetch_all(
+    trades = fetch_all_stock(
         "SELECT ts_code, stock_name, side, trade_date, price, shares, amount, pnl, "
         "return_pct, hold_days, reason FROM rotation_backtest_trade "
         "WHERE run_id = :id ORDER BY trade_date ASC, side DESC",
