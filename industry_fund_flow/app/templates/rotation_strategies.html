@@ -1,0 +1,52 @@
+﻿{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head page-head--row">
+  <div>
+    <h1>选板块策略</h1>
+    <p class="muted page-head-desc">内置状态机+资金流 / 反转+资金流模板；可自定义因子与 regime</p>
+  </div>
+  <div class="page-head-actions">
+    <a href="/rotation/signals" class="btn btn-ghost btn-sm">选板块信号</a>
+    <a href="/rotation/backtest" class="btn btn-ghost btn-sm">选板块回测</a>
+  </div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<section class="card table-card">
+  <div class="table-toolbar"><span class="muted">策略列表</span></div>
+  <div class="table-wrap">
+    <table class="data-table" id="strat-table">
+      <thead>
+        <tr><th>名称</th><th>编码</th><th>风格</th><th>说明</th><th>类型</th><th>启用</th><th>操作</th></tr>
+      </thead>
+      <tbody id="strat-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="table-toolbar"><span class="muted" id="editor-title">新建策略</span></div>
+  <div class="filters" style="flex-wrap:wrap;gap:12px">
+    <label class="filter-field"><span>编码</span><input id="f-code" class="date-input" placeholder="my_sw_auto_01" /></label>
+    <label class="filter-field"><span>名称</span><input id="f-name" class="date-input" placeholder="我的板块轮动" /></label>
+    <label class="filter-field filter-field--grow"><span>说明</span><input id="f-desc" class="date-input" /></label>
+  </div>
+  <label class="filter-field" style="display:block;margin-top:8px">
+    <span>配置 JSON（factors / select.top_n / regime / cost）</span>
+    <textarea id="f-config" rows="12" style="width:100%;font-family:monospace;font-size:12px"></textarea>
+  </label>
+  <div class="filter-actions" style="margin-top:8px">
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-fill-short">填入状态机模板</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-fill-long">填入反转模板</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-reset">清空</button>
+    <button type="button" class="btn btn-primary" id="btn-save">保存策略</button>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dc_board_common.js?v=20260715a"></script>
+<script src="/static/js/rotation_strategies.js?v=20260715a"></script>
+{% endblock %}
+
