@@ -318,7 +318,7 @@ INSERT INTO db_sync_task (
             'change', 'pct_change', 'vol', 'amount', 'pe', 'pb', 'float_mv', 'total_mv'
         )
     ),
-    0, '【已停用 2026-07-15】申万行业日线(Tushare sw_daily)；Web 仅东财，SW 日批已停'
+    1, '【已恢复 2026-07-16 板块轮动】申万行业日线(Tushare sw_daily)'
 );
 
 -- Tushare daily → ods_stock_detail_di（按日 snapshot，A股日线行情）

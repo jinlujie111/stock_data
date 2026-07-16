@@ -157,11 +157,10 @@ _NAV_RAW: list[dict[str, str]] = [
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "决策链路"},
     {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "决策链路"},
     {"slug": "kline", "label": "K线分析", "href": "/dc/kline", "section": "决策链路"},
-    # 量化选股
-    {"slug": "quant-signals", "label": "选股信号", "href": "/quant/signals", "section": "量化选股"},
-    {"slug": "quant-strategies", "label": "策略管理", "href": "/quant/strategies", "section": "量化选股"},
-    {"slug": "quant-backtest", "label": "策略回测", "href": "/quant/backtest", "section": "量化选股"},
-    {"slug": "quant-trades", "label": "买卖点记录", "href": "/quant/trades", "section": "量化选股"},
+    # 量化选板块（申万一级轮动）
+    {"slug": "rotation-signals", "label": "选板块信号", "href": "/rotation/signals", "section": "量化选板块"},
+    {"slug": "rotation-strategies", "label": "选板块策略", "href": "/rotation/strategies", "section": "量化选板块"},
+    {"slug": "rotation-backtest", "label": "选板块回测", "href": "/rotation/backtest", "section": "量化选板块"},
     # 自选
     {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
     {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks", "section": "我的自选"},

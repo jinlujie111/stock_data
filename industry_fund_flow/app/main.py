@@ -15,7 +15,7 @@ from app import (
     routes_dc,
     routes_dragon,
     routes_mainline,
-    routes_quant,
+    routes_rotation,
     routes_sentiment,
     routes_sectors,
     routes_vp,
@@ -45,7 +45,7 @@ routes_sentiment.init_sentiment_routes(_TEMPLATES)
 routes_sectors.init_sectors_routes(_TEMPLATES)
 routes_vp.init_vp_routes(_TEMPLATES)
 routes_chart.init_chart_routes(_TEMPLATES)
-routes_quant.init_quant_routes(_TEMPLATES)
+routes_rotation.init_rotation_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_sentiment.api_router)
@@ -58,8 +58,8 @@ app.include_router(routes_vp.page_router)
 app.include_router(routes_vp.api_router)
 app.include_router(routes_chart.page_router)
 app.include_router(routes_chart.api_router)
-app.include_router(routes_quant.page_router)
-app.include_router(routes_quant.api_router)
+app.include_router(routes_rotation.page_router)
+app.include_router(routes_rotation.api_router)
 app.include_router(routes_dc.page_router)
 app.include_router(routes_dc.api_router)
 
