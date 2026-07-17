@@ -200,6 +200,13 @@ def merge_mcp_fund_flow(dump_dir: Path, out_csv: Path | None = None) -> pd.DataF
     return agg
 
 
+def _to_float_frame(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """MySQL DECIMAL 转 float，避免与 float 混算 TypeError。"""
+    if df is None or df.empty:
+        return df
+    return df.apply(pd.to_numeric, errors="coerce").astype(float)
+
+
 def load_panel_from_csv(
     csv_path: Path,
     flow_csv: Path | None = None,
@@ -211,9 +218,12 @@ def load_panel_from_csv(
         codes = [c for c in SW2021_L1 if c in set(df["ts_code"])]
     sub = df[df["ts_code"].isin(codes)].copy()
     close = sub.pivot(index="trade_date", columns="ts_code", values="close").sort_index()
+    close = _to_float_frame(close)
     amount = None
     if "amount" in sub.columns:
-        amount = sub.pivot(index="trade_date", columns="ts_code", values="amount").sort_index()
+        amount = _to_float_frame(
+            sub.pivot(index="trade_date", columns="ts_code", values="amount").sort_index()
+        )
     names = {
         str(c): str(
             sub.loc[sub["ts_code"] == c, "name"].dropna().iloc[0]
@@ -268,13 +278,21 @@ def load_panel_from_mysql(
         raise RuntimeError("ods_industry_daily_di 无申万一级行情，请先恢复 sw_daily 同步并回填")
     df = pd.DataFrame([dict(r) for r in rows])
     df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.date
-    close = df.pivot(index="trade_date", columns="ts_code", values="close").sort_index()
-    amount = df.pivot(index="trade_date", columns="ts_code", values="amount").sort_index()
+    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    if "amount" in df.columns:
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+    close = _to_float_frame(
+        df.pivot(index="trade_date", columns="ts_code", values="close").sort_index()
+    )
+    amount = _to_float_frame(
+        df.pivot(index="trade_date", columns="ts_code", values="amount").sort_index()
+    )
     names = {c: SW2021_L1.get(c, c) for c in close.columns}
     for _, r in df.dropna(subset=["name"]).iterrows():
         names[str(r["ts_code"])] = str(r["name"])
 
     net_flow = _load_flow_from_mysql(engine, pad_start.date(), end, list(close.columns))
+    net_flow = _to_float_frame(net_flow)
     return SectorPanel(close=close, names=names, amount=amount, net_flow=net_flow)
 
 

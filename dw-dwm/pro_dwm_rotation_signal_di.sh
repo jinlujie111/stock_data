@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# 申万一级行业板块轮动每日信号 → data_industry.rotation_signal_di
+# 申万一级行业板块轮动每日信号 → stock_data.rotation_signal_di
 #
 # 依赖: sw_daily(ods_industry_daily_di) + moneyflow_ind_dc(ods_industry_fund_flow_di)
 # XXL: 建议在 run_data_sync 之后、与量化选股同级执行
