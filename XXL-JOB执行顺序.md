@@ -1,10 +1,10 @@
 # stock_data — XXL-JOB 调度执行顺序
 
-> 维护日期：2026-07-15  
+> 维护日期：2026-07-23  
 > 项目路径（服务器）：`/opt/stock_data`  
 > 执行前统一：`cd /opt/stock_data && source dw-utils/func.sh`  
 > **表结构真相源**：[`mysql_tables/stock_data.sql`](mysql_tables/stock_data.sql)（ETL 脚本内 `CREATE IF NOT EXISTS` 与之对齐）  
-> **现网链路**：仅东财 DC（同花顺 / 申万 / AI 核心池脚本已删除；对应 ODS sync `status=0`）
+> **现网链路**：东财 DC 主链路；同花顺/申万 DWM·DWS、AI 核心池、量化选股/选板块已删除。`sw_daily` 等 ODS 仍按 `db_sync_task.status=1` 同步。
 
 **XXL-JOB 建议**
 
@@ -17,7 +17,7 @@
 **相关文档**
 
 - [需求1-主线板块确认-需求文档.md](需求整理/需求1-主线板块确认-需求文档.md) — 主线榜业务与验收
-- 补跑：`tmp/xxl_backfill_metric_fix.sh`（指标口径回填）
+- 补跑：见下文「手工补跑」示例（主线 / 指标口径相关步骤）
 
 ---
 
@@ -93,8 +93,6 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | `stock_ods_monthly` | `0 21 1 * *` | `dw-utils/xxl_monthly_batch.sh` | 当前为空跑 SKIP（财报/公司 sync 已停） |
 | `stock_dim_etf_weekly` | `0 3 * * 1` | `dw-utils/xxl_weekly_batch.sh` | 每周一：ETF 映射 |
 | `stock_mainline_only` | 手工 / 补跑 | `dw-utils/xxl_mainline_batch.sh` | 仅东财主线 DWM+DWS |
-| `stock_metric_fix_backfill` | 手工 | `tmp/xxl_backfill_metric_fix.sh` | 指标口径修复回填 |
-| `stock_rotation_signal` | 日批内 / 手工 | `dw-dwm/pro_dwm_rotation_signal_di.sh` | 申万板块轮动信号（依赖 sw_daily） |
 
 > **Quartz（XXL-JOB）对照**：日批 `0 30 22 ? * MON-FRI`；月批 `0 0 21 1 * ?`；周批 `0 0 3 ? * MON`。
 
@@ -116,11 +114,10 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | ⑧ | `run_dws_dc_industry_mainline_score` + `monitor` | 上述全部 DWM | **需求1 主线榜** |
 | ⑨ | `run_vp_batch` | 板块/个股 ODS | 需求5 量价 |
 | ⑩ | `run_sector_dragon_batch` | 资金 DWM + 个股 ODS | 需求2 龙头 |
-| ⑩.6 | `run_rotation_signal` | `sw_daily` + 东财行业资金流 | 量化选板块 |
-| ⑪ | `run_ods_completeness_monitor` | — | ODS 完整度（已停表 `enabled=false`） |
+| ⑪ | `run_board_timing_batch` | 东财日线/资金流/涨停/成分 ODS | 板块四因子择时（K 线买卖点） |
+| ⑫ | `run_ods_completeness_monitor` | — | ODS 完整度（已停表 `enabled=false`） |
 
-> **已删除链路**：同花顺 / 申万 DWM·DWS、AI 核心池、量化主线（需求3）、量化选股。停同步见 `mysql_tables/migrations/20260715_pause_unused_sync.sql`。  
-> **2026-07-16**：恢复 `sw_daily` → `ods_industry_daily_di`（板块轮动），迁移脚本 `mysql_tables/migrations/20260716_restore_sw_daily_sync.sql`。
+> **已删除链路**：同花顺 / 申万 DWM·DWS、AI 核心池、量化主线（需求3）、量化选股、量化选板块。停同步见 `mysql_tables/migrations/20260715_pause_unused_sync.sql`；`rotation_*` 业务表删除见 `20260723_drop_rotation_sector_selection.sql`（**不影响** `sw_daily` 等 ODS 同步）。  
 
 **需求1 落库表（步骤 ⑧）**
 
@@ -193,10 +190,6 @@ run_data_sync_range 20250101 20260615 --source-table daily_basic --force
 bash dw-utils/xxl_mainline_batch.sh 20260616
 bash dw-utils/xxl_mainline_batch.sh 20250601 20260616   # 区间补 MA
 
-# 指标口径修复回填（breadth→fund→trend→score→monitor→vp→dragon）
-bash tmp/xxl_backfill_metric_fix.sh 20250701 20260714
-bash tmp/xxl_backfill_metric_fix.sh 20250701 20260714 score,monitor,vp,dragon
-
 # DWS 区间（更细粒度）
 bash dw-dws/pro_dws_dc_industry_mainline_score_di.sh 20250601 20260616
 bash dw-dws/pro_dws_dc_industry_mainline_monitor_di.sh 20250601 20260616
@@ -219,6 +212,7 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 | `run_data_sync` | 是* | 下游 DWM 都依赖当日 ODS；*热榜建议 22:30 后 |
 | DWM / DWS 主线（⑧） | **需求1 要** | 不做 `/dc/mainline` 可不跑 |
 | `run_vp_batch` / `run_sector_dragon_batch` | 需求5 / 2 要 | 量价 / 龙头页 |
+| `run_board_timing_batch` | 择时页要 | 四因子买卖点 `/dc/board-timing` |
 | `xxl_weekly_batch` | 建议 | 提升「机构化」命中率 |
 | `run_ods_completeness_monitor` | 建议 | 生产环境 ODS 完整度告警 |
 
@@ -314,6 +308,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | **主线板块**（需求1） | `/dc/mainline` | ⑧ | `dws_dc_industry_mainline_monitor_di` |
 | **板块量价**（需求5） | `/dc/vp` | ⑨ | `dwm_industry_vp_score_di` 等 |
 | **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
+| **板块择时**（四因子买卖点） | `/dc/board-timing` | ⑪ | `dwm_board_timing_signal_di` |
 | 登录 / 注册 | `/login` `/register` | — | `data_industry.app_user` |
 
 导航栏与各 `/dc/{slug}` 页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册（五维单页可已下架导航，ETL 仍写库供主线）。
@@ -322,7 +317,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 
 1. 等日批 `xxl_daily_batch.sh` 跑完（或 XXL-JOB `stock_daily_all` 成功）
 2. 浏览器打开 `http://<host>:8082/login` 登录
-3. 首页看情绪/广度 → 资金强度 → 主线板块 → 板块量价 → 板块龙头
+3. 首页看情绪/广度 → 资金强度 → 主线板块 → 板块量价 → 板块择时 → 板块龙头
 
 ### 8.4 API 速查（需登录 Cookie）
 
@@ -353,7 +348,8 @@ SET @d = '2026-06-26';
 
 SELECT 'mainline' AS page, COUNT(*) FROM dws_dc_industry_mainline_monitor_di WHERE trade_date = @d
 UNION ALL SELECT 'dragon', COUNT(*) FROM dwm_sector_stock_dragon_score_di WHERE trade_date = @d
-UNION ALL SELECT 'vp', COUNT(*) FROM dwm_industry_vp_score_di WHERE trade_date = @d;
+UNION ALL SELECT 'vp', COUNT(*) FROM dwm_industry_vp_score_di WHERE trade_date = @d
+UNION ALL SELECT 'timing', COUNT(*) FROM dwm_board_timing_signal_di WHERE trade_date = @d;
 ```
 
 | 页面空 | 常见原因 |
@@ -361,7 +357,7 @@ UNION ALL SELECT 'vp', COUNT(*) FROM dwm_industry_vp_score_di WHERE trade_date =
 | 主线榜 | 日批 ⑧ 未跑；`stock_read_grants.sql` 未执行 |
 | 板块龙头 | 日批 ⑩ 未跑；成分 `<3` 的板块被跳过 |
 | 板块量价 | 日批 ⑨ 未跑 |
-| 量化信号 | 日批 ⑩.5 未跑；策略未启用 |
+| 板块择时 | 日批 ⑪ 未跑；表未建（执行 `20260723_create_board_timing_signal.sql`） |
 
 Web 日志：`${STOCK_LOG_DIR:-/opt/stock_data/log/stock_log}/web/industry_fund_flow.log`
 
@@ -429,9 +425,8 @@ curl -b cookies.txt -s "http://127.0.0.1:8082/api/me"
 | [`dw-utils/xxl_monthly_batch.sh`](dw-utils/xxl_monthly_batch.sh) | 月批（当前 SKIP stub） |
 | [`dw-utils/xxl_weekly_batch.sh`](dw-utils/xxl_weekly_batch.sh) | 周批 ETF 映射 |
 | [`dw-utils/xxl_mainline_batch.sh`](dw-utils/xxl_mainline_batch.sh) | 仅需求1 补跑 |
-| [`tmp/xxl_backfill_metric_fix.sh`](tmp/xxl_backfill_metric_fix.sh) | 指标口径修复回填 |
 | [`dw-monitor/pro_ods_completeness.sh`](dw-monitor/pro_ods_completeness.sh) | ODS 完整度监控 |
-| [`dw-dwm/pro_dwm_*`](dw-dwm/) | 东财 DWM + 量价/龙头 |
+| [`dw-dwm/pro_dwm_*`](dw-dwm/) | 东财 DWM + 量价/龙头/择时 |
 | [`dw-dws/pro_dws_*`](dw-dws/) | 东财主线评分/监控 |
 | [`industry_fund_flow/README.md`](industry_fund_flow/README.md) | 报表 Web 说明 |
 

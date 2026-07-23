@@ -102,7 +102,10 @@ _run_step "run_vp_batch" run_vp_batch "${n_date}"
 # --- 10) 板块龙头 MVP（需求2）---
 _run_step "run_sector_dragon_batch" run_sector_dragon_batch "${n_date}"
 
-# --- 11) ODS 完整度监控（有 ALERT 则 exit 1）---
+# --- 11) 板块四因子择时（K 线买卖点）---
+_run_step "run_board_timing_batch" run_board_timing_batch "${n_date}"
+
+# --- 12) ODS 完整度监控（有 ALERT 则 exit 1）---
 _run_step "run_ods_completeness_monitor" run_ods_completeness_monitor "${n_date}"
 
 echo "======== stock_data 日批完成 ${n_date} $(date '+%F %T') ========"

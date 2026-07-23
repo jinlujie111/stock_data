@@ -1,6 +1,6 @@
 # 行业资金流网站
 
-基于 FastAPI 的 Web 应用：用户登录 + 东财板块数据展示（资金流、主线榜、量化主线、板块龙头、AI 核心池等）。
+基于 FastAPI 的 Web 应用：用户登录 + 东财板块数据展示（资金强度、主线榜、量价、板块择时、龙头、行业板块、K 线、自选等）。
 
 **启动方式**：见仓库根目录 [XXL-JOB执行顺序.md §八](../XXL-JOB执行顺序.md)（**不纳入日批 / func.sh 封装**）。
 
@@ -30,11 +30,15 @@ export IFF_JWT_SECRET='请改为随机长字符串'   # 生产环境必设
 | 路径 | 说明 |
 |------|------|
 | `/login` `/register` | 登录 / 注册 |
-| `/` | 登录后首页 |
+| `/` | 登录后首页（市场广度 / 大盘情绪） |
+| `/dc/fund-flow` | 资金强度 |
 | `/dc/mainline` | 需求1 东财主线榜 |
-| `/dc/quant-mainline` | 需求3 量化主线 |
+| `/dc/volume-price` | 需求5 板块量价 |
+| `/dc/board-timing` | 板块择时 |
 | `/dc/dragon` | 需求2 板块龙头 |
-| `/dc/ai-core` | 需求4 AI 核心池 |
+| `/dc/sectors` | 行业板块 |
+| `/dc/kline` | K 线分析 |
+| `/favorites/boards` `/favorites/stocks` | 板块/股票自选 |
 | `POST /logout` | 退出 |
 
 ## API（需 Cookie `iff_token`）
@@ -43,7 +47,7 @@ export IFF_JWT_SECRET='请改为随机长字符串'   # 生产环境必设
 |------|------|------|
 | GET | `/api/me` | 当前用户 |
 | GET | `/api/v1/mainline/rank` | 主线监控榜 |
-| GET | `/api/v1/quant-mainline/top-groups` | 量化主线分榜 Top10 |
-| GET | `/api/v1/ai-core/pool` | AI 核心池 |
+| GET | `/api/v1/dragon/leaders` | 板块龙头摘要 |
+| GET | `/api/dc/{slug}` | 五维 DWM 通用榜单 |
 
 完整 API 与日批依赖见 [XXL-JOB执行顺序.md §八](../XXL-JOB执行顺序.md)。

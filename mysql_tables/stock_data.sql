@@ -805,95 +805,6 @@ CREATE TABLE IF NOT EXISTS ods_index_member_all (
     UNIQUE KEY uk_index_member_all (ts_code, l3_code, in_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ç”³ä¸‡è¡Œä¸šæˆåˆ†åˆ†çº§(Tushare index_member_all)';
 
--- =============================================================================
--- é‡åŒ–é€‰æ¿å—ï¼ˆç”³ä¸‡ä¸€çº§è½®åŠ¨ï¼‰ä¸šåŠ¡è¡¨
--- =============================================================================
-CREATE TABLE IF NOT EXISTS rotation_strategy (
-    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-    code          VARCHAR(64)  NOT NULL COMMENT 'ç­–ç•¥å”¯ä¸€ç¼–ç ',
-    name          VARCHAR(128) NOT NULL COMMENT 'ç­–ç•¥åç§°',
-    description   VARCHAR(512) NULL COMMENT 'ç­–ç•¥è¯´æ˜',
-    config_json   MEDIUMTEXT   NOT NULL COMMENT 'å› å­/è°ƒä»“/çŠ¶æ€æœºé…ç½®(JSON)',
-    is_system     TINYINT      NOT NULL DEFAULT 0 COMMENT '1=ç³»ç»Ÿå†…ç½®',
-    is_active     TINYINT      NOT NULL DEFAULT 1 COMMENT '1=å¯ç”¨(å‚ä¸æ¯æ—¥ä¿¡å·)',
-    owner_user_id BIGINT       NULL COMMENT 'åˆ›å»ºè€… app_user.idï¼ŒNULL=ç³»ç»Ÿ',
-    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_rotation_strategy_code (code),
-    KEY idx_rotation_strategy_owner (owner_user_id),
-    KEY idx_rotation_strategy_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='æ¿å—è½®åŠ¨ç­–ç•¥å®šä¹‰';
-
-CREATE TABLE IF NOT EXISTS rotation_signal_di (
-    id             BIGINT PRIMARY KEY AUTO_INCREMENT,
-    strategy_id    BIGINT       NOT NULL COMMENT 'rotation_strategy.id',
-    trade_date     DATE         NOT NULL COMMENT 'ä¿¡å·äº¤æ˜“æ—¥',
-    ts_code        VARCHAR(32)  NOT NULL COMMENT 'ç”³ä¸‡è¡Œä¸šæŒ‡æ•°ä»£ç ',
-    industry_name  VARCHAR(64)  NULL COMMENT 'è¡Œä¸šåç§°',
-    action         VARCHAR(8)   NOT NULL COMMENT 'BUY/HOLD/SELL',
-    rank_no        INT          NULL COMMENT 'å½“æ—¥æ‰“åˆ†æ’å(1æœ€ä¼˜)',
-    score          DECIMAL(10,4) NULL COMMENT 'ç»¼åˆæ‰“åˆ†',
-    close          DECIMAL(20,4) NULL COMMENT 'å½“æ—¥æ”¶ç›˜ç‚¹ä½',
-    factor_json    TEXT         NULL COMMENT 'å„å› å­æ˜ç»†+regime(JSON)',
-    created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_rotation_signal (strategy_id, trade_date, ts_code),
-    KEY idx_rotation_signal_date (strategy_id, trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='æ¯æ—¥æ¿å—è½®åŠ¨ä¿¡å·';
-
-CREATE TABLE IF NOT EXISTS rotation_backtest_run (
-    id             BIGINT PRIMARY KEY AUTO_INCREMENT,
-    strategy_id    BIGINT       NOT NULL COMMENT 'rotation_strategy.id',
-    owner_user_id  BIGINT       NULL COMMENT 'å‘èµ·è€… app_user.id',
-    name           VARCHAR(128) NULL COMMENT 'å›æµ‹åç§°',
-    start_date     DATE         NOT NULL,
-    end_date       DATE         NOT NULL,
-    init_capital   DECIMAL(20,2) NOT NULL DEFAULT 1000000.00,
-    params_json    TEXT         NULL COMMENT 'å›æµ‹å…¥å‚å¿«ç…§(JSON)',
-    status         VARCHAR(16)  NOT NULL DEFAULT 'pending' COMMENT 'pending/running/done/failed',
-    total_return   DECIMAL(12,4) NULL,
-    annual_return  DECIMAL(12,4) NULL,
-    max_drawdown   DECIMAL(12,4) NULL,
-    sharpe         DECIMAL(12,4) NULL,
-    win_rate       DECIMAL(12,4) NULL,
-    trade_count    INT          NULL,
-    bench_return   DECIMAL(12,4) NULL COMMENT 'æ²ªæ·±300åŒºé—´æ”¶ç›Š',
-    error_msg      VARCHAR(512) NULL,
-    created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    finished_at    DATETIME     NULL,
-    KEY idx_rot_bt_run_strategy (strategy_id),
-    KEY idx_rot_bt_run_owner (owner_user_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='æ¿å—è½®åŠ¨å›æµ‹è¿è¡Œè®°å½•';
-
-CREATE TABLE IF NOT EXISTS rotation_backtest_trade (
-    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
-    run_id       BIGINT       NOT NULL COMMENT 'rotation_backtest_run.id',
-    ts_code      VARCHAR(32)  NOT NULL,
-    stock_name   VARCHAR(64)  NULL COMMENT 'è¡Œä¸šåç§°',
-    side         VARCHAR(8)   NOT NULL COMMENT 'BUY/SELL',
-    trade_date   DATE         NOT NULL,
-    price        DECIMAL(20,4) NOT NULL,
-    shares       INT          NULL COMMENT 'æŒ‡æ•°æ¨¡æ‹Ÿå¯ç©º',
-    amount       DECIMAL(20,2) NULL,
-    pnl          DECIMAL(20,2) NULL,
-    return_pct   DECIMAL(12,4) NULL,
-    hold_days    INT          NULL,
-    reason       VARCHAR(32)  NULL,
-    KEY idx_rot_bt_trade_run (run_id, trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='æ¿å—è½®åŠ¨å›æµ‹é€ç¬”äº¤æ˜“';
-
-CREATE TABLE IF NOT EXISTS rotation_backtest_nav (
-    id             BIGINT PRIMARY KEY AUTO_INCREMENT,
-    run_id         BIGINT       NOT NULL COMMENT 'rotation_backtest_run.id',
-    trade_date     DATE         NOT NULL,
-    nav            DECIMAL(20,6) NOT NULL,
-    cash           DECIMAL(20,2) NULL,
-    position_value DECIMAL(20,2) NULL,
-    bench_nav      DECIMAL(20,6) NULL,
-    drawdown       DECIMAL(12,6) NULL,
-    UNIQUE KEY uk_rot_bt_nav (run_id, trade_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='æ¿å—è½®åŠ¨å›æµ‹å‡€å€¼æ›²çº¿';
-
-
 -- ============================================================================
 -- å¤§ç›˜æŒ‡æ•°
 -- ============================================================================
@@ -1494,3 +1405,36 @@ CREATE TABLE IF NOT EXISTS dwm_industry_vp_score_di (
 -- ALTER TABLE ai_core_pool_config ADD COLUMN llm_provider VARCHAR(32) NULL
 --   COMMENT 'å¯¹åº” data_config.db_llm_token.provider' AFTER model_name;
 
+
+CREATE TABLE IF NOT EXISTS dwm_board_timing_signal_di (
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date          DATE           NOT NULL COMMENT '½»Ò×ÈÕÆÚ',
+    industry_code       VARCHAR(32)    NOT NULL COMMENT '°å¿é´úÂë(¶«²Æ)',
+    industry_name       VARCHAR(128)   NULL COMMENT '°å¿éÃû³Æ',
+    content_type        VARCHAR(16)    NULL COMMENT 'ĞĞÒµ/¸ÅÄî/µØÓò',
+    close               DECIMAL(20, 6) NULL COMMENT 'ÊÕÅÌµãÎ»',
+    ma20                DECIMAL(20, 6) NULL COMMENT '20ÈÕ¾ùÏß',
+    ma60                DECIMAL(20, 6) NULL COMMENT '60ÈÕ¾ùÏß',
+    score               DECIMAL(10, 2) NULL COMMENT '×ÛºÏ·Ö0-100',
+    score_trend         DECIMAL(10, 2) NULL COMMENT 'Ç÷ÊÆ·Ö',
+    score_fund          DECIMAL(10, 2) NULL COMMENT '×Ê½ğ·Ö',
+    score_vp            DECIMAL(10, 2) NULL COMMENT 'Á¿¼Û·Ö',
+    score_sentiment     DECIMAL(10, 2) NULL COMMENT 'ÇéĞ÷·Ö',
+    signal_type         VARCHAR(8)     NOT NULL DEFAULT 'none' COMMENT 'buy/sell/none',
+    signal_reason       VARCHAR(512)   NULL COMMENT '´¥·¢Ô­Òò',
+    position_state      VARCHAR(16)    NULL COMMENT 'long/flat/watch',
+    mom20               DECIMAL(20, 6) NULL COMMENT '20ÈÕ¶¯Á¿(Ğ¡Êı)',
+    flow5               DECIMAL(20, 4) NULL COMMENT '5ÈÕÖ÷Á¦¾»Á÷ÈëÀÛ¼Æ(Ôª)',
+    net_inflow_days     INT            NULL COMMENT 'Á¬Ğø¾»Á÷ÈëÌìÊı',
+    amount_ratio20      DECIMAL(20, 6) NULL COMMENT '¶î/¶îMA20',
+    up_ratio            DECIMAL(20, 6) NULL COMMENT 'ÉÏÕÇ¼ÒÊıÕ¼±È',
+    limit_up_ratio      DECIMAL(20, 6) NULL COMMENT 'ÕÇÍ£À©É¢ÂÊ',
+    sentiment_overheat  TINYINT        NOT NULL DEFAULT 0 COMMENT 'ÇéĞ÷¹ıÈÈÈÛ¶Ï',
+    last_buy_close      DECIMAL(20, 6) NULL COMMENT '×î½üÂòÈë²Î¿¼¼Û(Ö¹ËğÓÃ)',
+    rank_score          INT            NULL COMMENT '×ÛºÏ·Ö½ØÃæÅÅÃû',
+    created_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_board_timing (trade_date, industry_code),
+    KEY idx_board_timing_signal (trade_date, signal_type, score),
+    KEY idx_board_timing_board (industry_code, trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='¶«²Æ°å¿éËÄÒò×ÓÔñÊ±ĞÅºÅ(Ç÷ÊÆ/×Ê½ğ/Á¿¼Û/ÇéĞ÷)';

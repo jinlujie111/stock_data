@@ -15,9 +15,9 @@ from app import (
     routes_dc,
     routes_dragon,
     routes_mainline,
-    routes_rotation,
     routes_sentiment,
     routes_sectors,
+    routes_timing,
     routes_vp,
 )
 from app.config import APP_TITLE, COOKIE_NAME
@@ -44,8 +44,8 @@ routes_mainline.init_mainline_routes(_TEMPLATES)
 routes_sentiment.init_sentiment_routes(_TEMPLATES)
 routes_sectors.init_sectors_routes(_TEMPLATES)
 routes_vp.init_vp_routes(_TEMPLATES)
+routes_timing.init_timing_routes(_TEMPLATES)
 routes_chart.init_chart_routes(_TEMPLATES)
-routes_rotation.init_rotation_routes(_TEMPLATES)
 app.include_router(routes_mainline.page_router)
 app.include_router(routes_mainline.api_router)
 app.include_router(routes_sentiment.api_router)
@@ -56,10 +56,10 @@ app.include_router(routes_dragon.page_router)
 app.include_router(routes_dragon.api_router)
 app.include_router(routes_vp.page_router)
 app.include_router(routes_vp.api_router)
+app.include_router(routes_timing.page_router)
+app.include_router(routes_timing.api_router)
 app.include_router(routes_chart.page_router)
 app.include_router(routes_chart.api_router)
-app.include_router(routes_rotation.page_router)
-app.include_router(routes_rotation.api_router)
 app.include_router(routes_dc.page_router)
 app.include_router(routes_dc.api_router)
 

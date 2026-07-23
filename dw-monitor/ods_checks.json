@@ -35,13 +35,13 @@
       "label": "个股资金流 moneyflow"
     },
     {
-      "enabled": false,
+      "enabled": true,
       "table": "ods_industry_daily_di",
       "type": "snapshot",
       "date_column": "trade_date",
       "min_rows": 30,
       "continuity": true,
-      "label": "申万行业日线 sw_daily（已停同步）"
+      "label": "申万行业日线 sw_daily"
     },
     {
       "table": "ods_industry_fund_flow_di",

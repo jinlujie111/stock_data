@@ -1,0 +1,141 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head">
+  <h1>板块择时</h1>
+</div>
+
+<div class="card vp-guide-card">
+  <div class="vp-guide-head">
+    <div>
+      <h2 class="vp-guide-title">四因子买卖点</h2>
+      <p class="vp-guide-sub">趋势 30% · 资金 30% · 量价 25% · 情绪 15% · 收盘信号 · T+1 开盘参考</p>
+    </div>
+    <div class="vp-weight-bar" aria-label="权重">
+      <span class="vp-weight-chip" style="--w-color:#3b82f6">趋势 30%</span>
+      <span class="vp-weight-chip" style="--w-color:#22c55e">资金 30%</span>
+      <span class="vp-weight-chip" style="--w-color:#f59e0b">量价 25%</span>
+      <span class="vp-weight-chip" style="--w-color:#ec4899">情绪 15%</span>
+    </div>
+  </div>
+  <dl class="vp-def-grid">
+    <div class="vp-def-item"><dt>综合分 Score</dt><dd>0–100；买入区 ≥70，卖出区 ≤40，中间观望不画新箭头</dd></div>
+    <div class="vp-def-item"><dt>买入 ↑</dt><dd>趋势≥60、资金≥55、量价≥50、情绪未过热，且 Score 上穿 70</dd></div>
+    <div class="vp-def-item"><dt>卖出 ↓</dt><dd>跌破 MA20 且趋势弱 / 资金转负连降 / 放量砸盘 / 回撤≥8% / Score 下穿 40</dd></div>
+    <div class="vp-def-item"><dt>数据</dt><dd>东财行业+概念；先跑 <code>run_board_timing_batch</code></dd></div>
+  </dl>
+</div>
+
+<div class="card filters-card vp-filters-card">
+  <div class="filters vp-filters">
+    <label class="filter-field">
+      <span>交易日期</span>
+      <select id="trade-date"></select>
+    </label>
+    <label class="filter-field">
+      <span>板块类型</span>
+      <select id="content-types">
+        <option value="行业,概念">行业+概念</option>
+        <option value="行业">行业</option>
+        <option value="概念">概念</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>信号</span>
+      <select id="signal-filter">
+        <option value="">全部买卖</option>
+        <option value="buy">仅买入</option>
+        <option value="sell">仅卖出</option>
+      </select>
+    </label>
+    <label class="filter-field filter-field--grow">
+      <span>搜索板块</span>
+      <input type="text" id="board-search" class="board-search" placeholder="名称或代码" autocomplete="off" />
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+    </div>
+  </div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<div class="card">
+  <h2 class="card-section-title">当日买卖信号</h2>
+  <div class="table-wrap">
+    <table class="data-table" id="signal-table">
+      <thead>
+        <tr>
+          <th>信号</th>
+          <th>板块</th>
+          <th>类型</th>
+          <th>Score</th>
+          <th>趋势</th>
+          <th>资金</th>
+          <th>量价</th>
+          <th>情绪</th>
+          <th>原因</th>
+        </tr>
+      </thead>
+      <tbody id="signal-body"></tbody>
+    </table>
+  </div>
+  <p id="signal-empty" class="muted hidden">当日无买卖事件（中间带不标注）</p>
+</div>
+
+<div class="card">
+  <h2 class="card-section-title">综合分排行</h2>
+  <div class="table-wrap">
+    <table class="data-table" id="rank-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>板块</th>
+          <th>类型</th>
+          <th>Score</th>
+          <th>状态</th>
+          <th>趋势</th>
+          <th>资金</th>
+          <th>量价</th>
+          <th>情绪</th>
+        </tr>
+      </thead>
+      <tbody id="rank-body"></tbody>
+    </table>
+  </div>
+  <p id="rank-empty" class="muted hidden">暂无数据，请先运行 run_board_timing_batch</p>
+</div>
+
+<div class="card hidden" id="detail-card">
+  <h2 id="detail-title">板块详情</h2>
+  <div id="detail-metrics" class="vp-detail-metrics"></div>
+  <div class="filters kline-range-filters">
+    <div class="filter-field">
+      <span>K 线区间</span>
+      <div class="chip-group" id="kline-range-presets">
+        <button type="button" class="chip" data-days="20">20日</button>
+        <button type="button" class="chip active" data-days="60">60日</button>
+        <button type="button" class="chip" data-days="120">120日</button>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-kline-refresh">刷新 K 线</button>
+    </div>
+  </div>
+  <div id="timing-kline-chart" class="kline-chart-host vp-kline-chart"></div>
+  <h3>历史买卖点</h3>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>日期</th><th>信号</th><th>Score</th><th>原因</th></tr>
+      </thead>
+      <tbody id="hist-signal-body"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="/static/js/dc_board_common.js?v=20260714b"></script>
+<script src="/static/js/dc_board_timing.js?v=20260723a"></script>
+{% endblock %}
