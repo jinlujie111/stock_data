@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from sqlalchemy import text
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -64,32 +65,57 @@ def _parse_content_types(s: str) -> list[str]:
     return [x.strip() for x in (s or "").split(",") if x.strip()]
 
 
-def _null_num(v: Any) -> Any:
+def _is_na(v: Any) -> bool:
     if v is None:
-        return None
+        return True
     try:
         import math
 
         if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
-            return None
+            return True
     except Exception:
         pass
     try:
         import pandas as pd
 
-        if pd.isna(v):
-            return None
+        # pd.isna(list) 会返回数组，只对标量判断
+        if not isinstance(v, (list, dict, tuple)) and pd.isna(v):
+            return True
     except Exception:
         pass
+    return False
+
+
+def _null_num(v: Any) -> Any:
+    if _is_na(v):
+        return None
     return v
+
+
+def _null_str(v: Any) -> str | None:
+    if _is_na(v):
+        return None
+    s = str(v).strip()
+    if not s or s.lower() == "nan":
+        return None
+    return s
+
+
+def _null_int(v: Any) -> int | None:
+    if _is_na(v):
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def _row_params(r: dict) -> dict:
     return {
         "trade_date": r["trade_date"],
-        "industry_code": r["industry_code"],
-        "industry_name": r.get("industry_name"),
-        "content_type": r.get("content_type"),
+        "industry_code": str(r["industry_code"]),
+        "industry_name": _null_str(r.get("industry_name")),
+        "content_type": _null_str(r.get("content_type")),
         "close": _null_num(r.get("close")),
         "ma20": _null_num(r.get("ma20")),
         "ma60": _null_num(r.get("ma60")),
@@ -98,22 +124,18 @@ def _row_params(r: dict) -> dict:
         "score_fund": _null_num(r.get("score_fund")),
         "score_vp": _null_num(r.get("score_vp")),
         "score_sentiment": _null_num(r.get("score_sentiment")),
-        "signal_type": r.get("signal_type") or "none",
-        "signal_reason": r.get("signal_reason"),
-        "position_state": r.get("position_state"),
+        "signal_type": _null_str(r.get("signal_type")) or "none",
+        "signal_reason": _null_str(r.get("signal_reason")),
+        "position_state": _null_str(r.get("position_state")),
         "mom20": _null_num(r.get("mom20")),
         "flow5": _null_num(r.get("flow5")),
-        "net_inflow_days": int(r["net_inflow_days"])
-        if r.get("net_inflow_days") is not None and _null_num(r.get("net_inflow_days")) is not None
-        else None,
+        "net_inflow_days": _null_int(r.get("net_inflow_days")),
         "amount_ratio20": _null_num(r.get("amount_ratio20")),
         "up_ratio": _null_num(r.get("up_ratio")),
         "limit_up_ratio": _null_num(r.get("limit_up_ratio")),
-        "sentiment_overheat": int(r.get("sentiment_overheat") or 0),
+        "sentiment_overheat": int(_null_num(r.get("sentiment_overheat")) or 0),
         "last_buy_close": _null_num(r.get("last_buy_close")),
-        "rank_score": int(r["rank_score"])
-        if r.get("rank_score") is not None and _null_num(r.get("rank_score")) is not None
-        else None,
+        "rank_score": _null_int(r.get("rank_score")),
     }
 
 
@@ -164,7 +186,9 @@ def run_batch(
     if signaled.empty:
         raise RuntimeError("择时信号未产出任何记录")
 
-    params = [_row_params(r) for r in signaled.to_dict(orient="records")]
+    # DataFrame 会把 None 变成 nan，写入前统一清洗
+    clean = signaled.astype(object).where(pd.notnull(signaled), None)
+    params = [_row_params(r) for r in clean.to_dict(orient="records")]
     with engine.begin() as conn:
         _chunk_insert(conn, UPSERT_SQL, params)
 

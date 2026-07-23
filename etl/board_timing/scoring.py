@@ -116,6 +116,9 @@ def apply_signals(
                     signal = "sell"
                     position = "flat"
                     last_buy_close = None
+                else:
+                    # 空仓时卖出条件只影响状态，不写 reason（避免噪音 + nan）
+                    reasons = []
 
             if position == "long":
                 state = "long"
@@ -125,9 +128,14 @@ def apply_signals(
                 state = "flat"
 
             if out_start <= td <= out_end:
-                row = r.to_dict()
+                row = {
+                    k: (None if (isinstance(v, float) and pd.isna(v)) else v)
+                    for k, v in r.items()
+                }
                 row["signal_type"] = signal
-                row["signal_reason"] = "；".join(reasons) if reasons else None
+                row["signal_reason"] = (
+                    "；".join(reasons) if signal in ("buy", "sell") and reasons else None
+                )
                 row["position_state"] = state
                 row["last_buy_close"] = last_buy_close
                 rows.append(row)
