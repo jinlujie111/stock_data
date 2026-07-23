@@ -191,10 +191,17 @@ def load_breadth_panel(
 def load_limit_up_ratio(
     engine: Engine,
     boards: list[dict[str, Any]],
-    trade_dates: list[date],
+    start: date,
+    end: date,
+    *,
+    use_member_join: bool = False,
 ) -> pd.DataFrame:
-    """按日聚合成分涨停扩散率（limit=U）。"""
-    if not trade_dates or not boards:
+    """涨停扩散率。
+
+    默认读 DWM（轻量）；仅 ``use_member_join=True`` 时才走
+    ods_dc_member × ods_limit_list（全区间会打爆库，禁止长回填使用）。
+    """
+    if not boards:
         return pd.DataFrame(columns=["industry_code", "trade_date", "limit_up_ratio"])
 
     variant_to_ic: dict[str, str] = {}
@@ -206,51 +213,103 @@ def load_limit_up_ratio(
             variant_to_ic[v] = ic
 
     placeholders = ", ".join(f":c{i}" for i in range(len(variants)))
-    date_ph = ", ".join(f":d{i}" for i in range(len(trade_dates)))
     params: dict[str, Any] = {
+        "start": start,
+        "end": end,
         **{f"c{i}": c for i, c in enumerate(sorted(variants))},
-        **{f"d{i}": d for i, d in enumerate(trade_dates)},
     }
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text(
-                f"""
-                SELECT
-                    m.trade_date,
-                    m.ts_code,
-                    COUNT(DISTINCT m.con_code) AS member_cnt,
-                    COUNT(DISTINCT CASE WHEN l.`limit` = 'U' THEN m.con_code END) AS limit_up_cnt
-                FROM ods_dc_member_di m
-                LEFT JOIN ods_limit_list_di l
-                  ON l.trade_date = m.trade_date
-                 AND l.ts_code = m.con_code
-                 AND l.`limit` = 'U'
-                WHERE m.trade_date IN ({date_ph})
-                  AND m.ts_code IN ({placeholders})
-                GROUP BY m.trade_date, m.ts_code
-                """
-            ),
-            params,
-        ).mappings().all()
 
-    if not rows:
+    # 优先 market_heat，其次 diffusion
+    for table in (
+        "dwm_dc_industry_market_heat_di",
+        "dwm_dc_industry_diffusion_di",
+    ):
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        f"""
+                        SELECT trade_date, industry_code AS ts_code, limit_up_ratio
+                        FROM {table}
+                        WHERE trade_date BETWEEN :start AND :end
+                          AND industry_code IN ({placeholders})
+                        """
+                    ),
+                    params,
+                ).mappings().all()
+        except Exception as exc:
+            logger.warning("load limit_up from %s failed: %s", table, exc)
+            rows = []
+        if rows:
+            df = pd.DataFrame([dict(r) for r in rows])
+            df["industry_code"] = df["ts_code"].map(variant_to_ic)
+            df = df.dropna(subset=["industry_code"])
+            df["limit_up_ratio"] = _to_float(df["limit_up_ratio"])
+            df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.date
+            logger.info(
+                "limit_up from %s rows=%d %s..%s",
+                table,
+                len(df),
+                start,
+                end,
+            )
+            return (
+                df.sort_values(["industry_code", "trade_date"])
+                .drop_duplicates(["industry_code", "trade_date"], keep="last")
+                [["industry_code", "trade_date", "limit_up_ratio"]]
+                .reset_index(drop=True)
+            )
+
+    if not use_member_join:
+        logger.warning(
+            "DWM 无 limit_up_ratio，跳过成分×涨停重 JOIN（可用 up_ratio 代替情绪）"
+        )
         return pd.DataFrame(columns=["industry_code", "trade_date", "limit_up_ratio"])
 
-    df = pd.DataFrame([dict(r) for r in rows])
-    df["industry_code"] = df["ts_code"].map(variant_to_ic)
-    df = df.dropna(subset=["industry_code"])
-    df["member_cnt"] = _to_float(df["member_cnt"])
-    df["limit_up_cnt"] = _to_float(df["limit_up_cnt"]).fillna(0)
-    df["limit_up_ratio"] = np.where(
-        df["member_cnt"] > 0, df["limit_up_cnt"] / df["member_cnt"], np.nan
-    )
-    df["trade_date"] = pd.to_datetime(df["trade_date"]).dt.date
-    return (
-        df.sort_values(["industry_code", "trade_date"])
-        .drop_duplicates(["industry_code", "trade_date"], keep="last")
-        [["industry_code", "trade_date", "limit_up_ratio"]]
-        .reset_index(drop=True)
-    )
+    # 单日兜底：按日扫（禁止一次塞几百个日期）
+    logger.info("limit_up member-join fallback %s..%s (slow)", start, end)
+    parts: list[pd.DataFrame] = []
+    d = start
+    while d <= end:
+        day_params = {
+            "td": d,
+            **{f"c{i}": c for i, c in enumerate(sorted(variants))},
+        }
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    f"""
+                    SELECT
+                        m.ts_code,
+                        COUNT(DISTINCT m.con_code) AS member_cnt,
+                        COUNT(DISTINCT CASE WHEN l.`limit` = 'U' THEN m.con_code END) AS limit_up_cnt
+                    FROM ods_dc_member_di m
+                    LEFT JOIN ods_limit_list_di l
+                      ON l.trade_date = m.trade_date
+                     AND l.ts_code = m.con_code
+                     AND l.`limit` = 'U'
+                    WHERE m.trade_date = :td
+                      AND m.ts_code IN ({placeholders})
+                    GROUP BY m.ts_code
+                    """
+                ),
+                day_params,
+            ).mappings().all()
+        if rows:
+            df = pd.DataFrame([dict(r) for r in rows])
+            df["industry_code"] = df["ts_code"].map(variant_to_ic)
+            df = df.dropna(subset=["industry_code"])
+            df["member_cnt"] = _to_float(df["member_cnt"])
+            df["limit_up_cnt"] = _to_float(df["limit_up_cnt"]).fillna(0)
+            df["limit_up_ratio"] = np.where(
+                df["member_cnt"] > 0, df["limit_up_cnt"] / df["member_cnt"], np.nan
+            )
+            df["trade_date"] = d
+            parts.append(df[["industry_code", "trade_date", "limit_up_ratio"]])
+        d += timedelta(days=1)
+    if not parts:
+        return pd.DataFrame(columns=["industry_code", "trade_date", "limit_up_ratio"])
+    return pd.concat(parts, ignore_index=True)
 
 
 def _consecutive_positive(series: pd.Series) -> pd.Series:
@@ -372,6 +431,7 @@ def build_panel_for_range(
     start: date | None = None,
     content_types: list[str] | None = None,
     cfg: TimingConfig | None = None,
+    use_member_join: bool = False,
 ) -> pd.DataFrame:
     cfg = cfg or TimingConfig()
     ctypes = content_types or list(cfg.content_types)
@@ -383,13 +443,27 @@ def build_panel_for_range(
     # 日历日约等于，真正窗口靠 rolling；再往前多取一点
     hist_start = lookback_start - timedelta(days=120)
 
+    logger.info(
+        "load panels hist=%s out=%s..%s boards=%d",
+        hist_start,
+        lookback_start,
+        end,
+        len(boards),
+    )
     daily = load_daily_panel(engine, boards, hist_start, end)
+    logger.info("daily rows=%d", len(daily))
     fund = load_fund_panel(engine, boards, hist_start, end)
+    logger.info("fund rows=%d", len(fund))
     breadth = load_breadth_panel(engine, boards, hist_start, end)
+    logger.info("breadth rows=%d", len(breadth))
 
-    trade_dates = sorted(daily["trade_date"].unique().tolist()) if not daily.empty else []
-    # 涨停扩散只算输出区间附近，减轻压力
-    limit_dates = [d for d in trade_dates if d >= lookback_start] or trade_dates[-30:]
-    limit_up = load_limit_up_ratio(engine, boards, limit_dates)
+    limit_up = load_limit_up_ratio(
+        engine,
+        boards,
+        lookback_start,
+        end,
+        use_member_join=use_member_join,
+    )
+    logger.info("limit_up rows=%d", len(limit_up))
 
     return compute_factor_frame(daily, fund, breadth, limit_up, cfg)

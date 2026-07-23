@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import logging
 import sys
+from calendar import monthrange
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -60,6 +62,9 @@ ON DUPLICATE KEY UPDATE
     updated_at=CURRENT_TIMESTAMP
 """
 
+# 超过该日历跨度则按月分块，避免一次打满内存/数据库
+CHUNK_SPAN_DAYS = 40
+
 
 def _parse_content_types(s: str) -> list[str]:
     return [x.strip() for x in (s or "").split(",") if x.strip()]
@@ -76,9 +81,6 @@ def _is_na(v: Any) -> bool:
     except Exception:
         pass
     try:
-        import pandas as pd
-
-        # pd.isna(list) 会返回数组，只对标量判断
         if not isinstance(v, (list, dict, tuple)) and pd.isna(v):
             return True
     except Exception:
@@ -139,7 +141,7 @@ def _row_params(r: dict) -> dict:
     }
 
 
-def _chunk_insert(conn, sql: str, rows: list[dict], size: int = 500) -> None:
+def _chunk_insert(conn, sql: str, rows: list[dict], size: int = 300) -> None:
     for i in range(0, len(rows), size):
         chunk = rows[i : i + size]
         if chunk:
@@ -156,12 +158,79 @@ def purge_old(engine, keep_days: int) -> int:
         return int(res.rowcount or 0)
 
 
+def _month_chunks(start: date, end: date) -> list[tuple[date, date]]:
+    """按自然月切分 [start, end]。"""
+    chunks: list[tuple[date, date]] = []
+    cur = date(start.year, start.month, 1)
+    while cur <= end:
+        last_day = monthrange(cur.year, cur.month)[1]
+        m_end = date(cur.year, cur.month, last_day)
+        c_start = max(start, cur)
+        c_end = min(end, m_end)
+        if c_start <= c_end:
+            chunks.append((c_start, c_end))
+        if cur.month == 12:
+            cur = date(cur.year + 1, 1, 1)
+        else:
+            cur = date(cur.year, cur.month + 1, 1)
+    return chunks
+
+
+def _run_one_span(
+    engine,
+    out_start: date,
+    out_end: date,
+    *,
+    content_types: list[str],
+    cfg: TimingConfig,
+    use_member_join: bool,
+) -> dict:
+    logger.info("---- chunk %s .. %s ----", out_start, out_end)
+    panel = build_panel_for_range(
+        engine,
+        out_end,
+        start=out_start,
+        content_types=content_types,
+        cfg=cfg,
+        use_member_join=use_member_join,
+    )
+    signaled = apply_signals(panel, out_start=out_start, out_end=out_end, cfg=cfg)
+    del panel
+    gc.collect()
+
+    if signaled.empty:
+        logger.warning("chunk %s..%s 无输出行，跳过写入", out_start, out_end)
+        return {"rows": 0, "buy": 0, "sell": 0}
+
+    clean = signaled.astype(object).where(pd.notnull(signaled), None)
+    params = [_row_params(r) for r in clean.to_dict(orient="records")]
+    n_buy = int((signaled["signal_type"] == "buy").sum())
+    n_sell = int((signaled["signal_type"] == "sell").sum())
+    del signaled, clean
+    gc.collect()
+
+    with engine.begin() as conn:
+        _chunk_insert(conn, UPSERT_SQL, params)
+
+    summary = {
+        "start": str(out_start),
+        "end": str(out_end),
+        "rows": len(params),
+        "buy": n_buy,
+        "sell": n_sell,
+    }
+    logger.info("chunk done %s", summary)
+    return summary
+
+
 def run_batch(
     trade_date: date,
     *,
     start_date: date | None = None,
     content_types: list[str] | None = None,
     cfg: TimingConfig | None = None,
+    use_member_join: bool = False,
+    chunk_days: int = CHUNK_SPAN_DAYS,
 ) -> dict:
     cfg = cfg or TimingConfig()
     ctypes = content_types or list(cfg.content_types)
@@ -170,37 +239,52 @@ def run_batch(
     out_end = trade_date
 
     logger.info(
-        "board_timing batch start=%s end=%s types=%s",
+        "board_timing batch start=%s end=%s types=%s member_join=%s",
         out_start,
         out_end,
         ctypes,
+        use_member_join,
     )
-    panel = build_panel_for_range(
-        engine,
-        out_end,
-        start=out_start,
-        content_types=ctypes,
-        cfg=cfg,
-    )
-    signaled = apply_signals(panel, out_start=out_start, out_end=out_end, cfg=cfg)
-    if signaled.empty:
-        raise RuntimeError("择时信号未产出任何记录")
 
-    # DataFrame 会把 None 变成 nan，写入前统一清洗
-    clean = signaled.astype(object).where(pd.notnull(signaled), None)
-    params = [_row_params(r) for r in clean.to_dict(orient="records")]
-    with engine.begin() as conn:
-        _chunk_insert(conn, UPSERT_SQL, params)
+    span = (out_end - out_start).days
+    if span > chunk_days:
+        chunks = _month_chunks(out_start, out_end)
+        logger.info("长区间按月分块: %d 段", len(chunks))
+    else:
+        chunks = [(out_start, out_end)]
 
-    deleted = purge_old(engine, cfg.retention_days)
-    n_buy = int((signaled["signal_type"] == "buy").sum())
-    n_sell = int((signaled["signal_type"] == "sell").sum())
+    total_rows = total_buy = total_sell = 0
+    for i, (cs, ce) in enumerate(chunks, 1):
+        logger.info("[%d/%d] processing %s .. %s", i, len(chunks), cs, ce)
+        part = _run_one_span(
+            engine,
+            cs,
+            ce,
+            content_types=ctypes,
+            cfg=cfg,
+            use_member_join=use_member_join and span <= 7,
+        )
+        total_rows += int(part.get("rows") or 0)
+        total_buy += int(part.get("buy") or 0)
+        total_sell += int(part.get("sell") or 0)
+
+    # 仅日批做保留期清理；长回填不在中途把刚写入的历史删掉
+    deleted = 0
+    if start_date is None or span <= 3:
+        deleted = purge_old(engine, cfg.retention_days)
+    else:
+        logger.info(
+            "跳过 purge（区间回填）；表默认保留约 %d 天，过旧数据请另跑日批清理",
+            cfg.retention_days,
+        )
+
     summary = {
         "start": str(out_start),
         "end": str(out_end),
-        "rows": len(params),
-        "buy": n_buy,
-        "sell": n_sell,
+        "chunks": len(chunks),
+        "rows": total_rows,
+        "buy": total_buy,
+        "sell": total_sell,
         "purged": deleted,
         "content_types": ctypes,
     }
@@ -218,6 +302,17 @@ def main(argv: list[str] | None = None) -> int:
         help="可选开始日 YYYYMMDD；省略则只跑结束日",
     )
     parser.add_argument("--content-types", default="行业,概念")
+    parser.add_argument(
+        "--member-join",
+        action="store_true",
+        help="强制用成分×涨停 JOIN（仅建议单日；长区间会卡库）",
+    )
+    parser.add_argument(
+        "--chunk-days",
+        type=int,
+        default=CHUNK_SPAN_DAYS,
+        help="超过该日历跨度则按月分块（默认 40）",
+    )
     args = parser.parse_args(argv)
 
     end = parse_trade_date(args.trade_date)
@@ -225,10 +320,21 @@ def main(argv: list[str] | None = None) -> int:
     if start and start > end:
         raise SystemExit("start_date 不能晚于 trade_date")
 
+    # 长回填默认只保留近半年写入窗口提示（表仍会写全区间；purge 在结束后按 retention）
+    if start and (end - start).days > 200:
+        logger.warning(
+            "长区间回填 %s..%s：已按月分块 + 禁用成分涨停重 JOIN；"
+            "请确认已先杀掉旧进程，避免双开打满机器",
+            start,
+            end,
+        )
+
     run_batch(
         end,
         start_date=start,
         content_types=_parse_content_types(args.content_types),
+        use_member_join=bool(args.member_join),
+        chunk_days=max(7, int(args.chunk_days)),
     )
     return 0
 
