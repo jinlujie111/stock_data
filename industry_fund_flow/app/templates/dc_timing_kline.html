@@ -1,0 +1,61 @@
+{% extends "app_layout.html" %}
+{% block app_content %}
+<div class="page-head page-head--row">
+  <div>
+    <h1>择时 K 线</h1>
+    <p class="muted page-head-desc">主图买卖点 · 副图：成交量/额 · 趋势 · 资金 · 量价 · 情绪（0–100）</p>
+  </div>
+</div>
+
+<div id="page-error" class="alert alert-error hidden"></div>
+
+<div class="card filters-card kline-filters">
+  <div class="filters">
+    <label class="filter-field">
+      <span>开始日期</span>
+      <input type="date" id="start-date" class="date-input" />
+    </label>
+    <label class="filter-field">
+      <span>结束日期</span>
+      <input type="date" id="end-date" class="date-input" />
+    </label>
+    <label class="filter-field">
+      <span>快捷区间</span>
+      <div class="chip-group" id="range-presets">
+        <button type="button" class="chip" data-days="20">20日</button>
+        <button type="button" class="chip active" data-days="60">60日</button>
+        <button type="button" class="chip" data-days="120">120日</button>
+      </div>
+    </label>
+    <label class="filter-field filter-field--grow">
+      <span>板块</span>
+      <div class="board-picker" id="board-picker">
+        <input type="text" id="board-search" class="board-search" placeholder="搜索板块名称或代码…" autocomplete="off" />
+        <div class="board-dropdown hidden" id="board-dropdown"></div>
+      </div>
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-load">查询</button>
+    </div>
+  </div>
+</div>
+
+<div class="card timing-kline-card">
+  <div id="timing-header" class="timing-kline-header"></div>
+  <div class="timing-vol-toggle">
+    <span class="muted">副图1</span>
+    <div class="chip-group" id="vol-mode-chips">
+      <button type="button" class="chip active" data-mode="vol">成交量</button>
+      <button type="button" class="chip" data-mode="amount">成交金额</button>
+    </div>
+  </div>
+  <div id="timing-kline-chart" class="kline-chart-host timing-kline-chart"></div>
+  <p id="timing-empty" class="muted timing-kline-hint">请选择板块并查询；默认展示近 60 个交易日</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="/static/js/dc_board_common.js?v=20260714b"></script>
+<script src="/static/js/dc_timing_kline.js?v=20260724a"></script>
+{% endblock %}

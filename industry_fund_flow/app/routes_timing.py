@@ -35,6 +35,20 @@ def board_timing_page(request: Request, user: dict = Depends(require_user)):
     )
 
 
+@page_router.get("/dc/timing-kline", response_class=HTMLResponse)
+def timing_kline_page(request: Request, user: dict = Depends(require_user)):
+    return _templates.TemplateResponse(
+        request,
+        "dc_timing_kline.html",
+        {
+            "user": user,
+            "nav_items": NAV_ITEMS,
+            "active_nav": "timing-kline",
+            "title": "择时K线",
+        },
+    )
+
+
 @api_router.get("/trade-dates")
 def api_timing_trade_dates(
     limit: int = Query(120, ge=1, le=183),

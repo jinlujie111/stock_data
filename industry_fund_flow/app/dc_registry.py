@@ -146,6 +146,7 @@ RESERVED_DC_PAGE_SLUGS = frozenset(
         "kline",
         "volume-price",
         "board-timing",
+        "timing-kline",
     }
 )
 
@@ -156,6 +157,7 @@ _NAV_RAW: list[dict[str, str]] = [
     {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "决策链路"},
     {"slug": "volume-price", "label": "板块量价", "href": "/dc/volume-price", "section": "决策链路"},
     {"slug": "board-timing", "label": "板块择时", "href": "/dc/board-timing", "section": "决策链路"},
+    {"slug": "timing-kline", "label": "择时K线", "href": "/dc/timing-kline", "section": "决策链路"},
     {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "决策链路"},
     {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "决策链路"},
     {"slug": "kline", "label": "K线分析", "href": "/dc/kline", "section": "决策链路"},

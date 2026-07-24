@@ -2050,6 +2050,47 @@ body {
   min-height: 560px;
 }
 
+.timing-kline-chart {
+  min-height: 780px;
+  height: 78vh;
+}
+
+.timing-kline-card {
+  padding-bottom: 0.5rem;
+}
+
+.timing-kline-header {
+  margin-bottom: 0.75rem;
+}
+
+.timing-kline-title {
+  margin-bottom: 0.5rem;
+  font-size: 1.05rem;
+}
+
+.timing-kline-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.timing-kline-metrics .vp-metric-val.strong {
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.timing-vol-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.timing-kline-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+
 .kline-loading,
 .kline-error {
   display: flex;

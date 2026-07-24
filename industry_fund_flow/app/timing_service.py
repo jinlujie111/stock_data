@@ -193,6 +193,18 @@ def get_board_detail(industry_code: str, trade_date: str | None = None) -> dict:
     return {"trade_date": td, "item": _serialize_row(row)}
 
 
+def _norm_iso(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    s = str(raw).strip()
+    if len(s) >= 10 and s[4] == "-" and s[7] == "-":
+        return s[:10]
+    digits = s.replace("-", "")[:8]
+    if len(digits) == 8 and digits.isdigit():
+        return f"{digits[:4]}-{digits[4:6]}-{digits[6:8]}"
+    return None
+
+
 def get_board_kline(
     industry_code: str,
     trade_date: str | None = None,
@@ -203,13 +215,20 @@ def get_board_kline(
     td = _resolve_trade_date(trade_date)
     code = industry_code.strip()
     codes = _board_code_variants(code)
-    chart = chart_svc.get_board_kline(code, td, days=days, start_date=start_date)
+    start_iso = _norm_iso(start_date)
+    end_iso = _norm_iso(td) or td
+    chart = chart_svc.get_board_kline(
+        code,
+        end_iso,
+        days=days,
+        start_date=start_iso,
+    )
     bars = chart.get("bars") or []
     if not bars:
         raise ValueError(f"板块 {code} 暂无 K 线")
 
-    start = bars[0].get("trade_date") or td
-    end = bars[-1].get("trade_date") or td
+    start = bars[0].get("trade_date") or end_iso
+    end = bars[-1].get("trade_date") or end_iso
     ph = ", ".join(f":c{i}" for i in range(len(codes)))
     params: dict[str, Any] = {
         "start": start,
@@ -220,7 +239,8 @@ def get_board_kline(
         f"""
         SELECT trade_date, score, score_trend, score_fund, score_vp, score_sentiment,
                signal_type, signal_reason, position_state, flow5, amount_ratio20,
-               ma20, ma60, close
+               ma20, ma60, close, mom20, net_inflow_days, up_ratio, limit_up_ratio,
+               sentiment_overheat
         FROM {SIGNAL_TABLE}
         WHERE industry_code IN ({ph})
           AND trade_date BETWEEN :start AND :end
@@ -235,13 +255,16 @@ def get_board_kline(
         row = by_date.get(d)
         series.append(row if row else {"trade_date": d})
 
+    last_timing = next((t for t in reversed(series) if t and t.get("score") is not None), None)
+
     return {
         **chart,
-        "trade_date": td,
+        "trade_date": end_iso,
         "industry_code": code,
         "start_date": start,
         "end_date": end,
         "timing": series,
+        "latest_timing": last_timing,
         "signals": [
             _serialize_row(r)
             for r in sig_rows

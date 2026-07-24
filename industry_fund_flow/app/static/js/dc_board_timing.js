@@ -158,31 +158,17 @@
 
   async function openDetail(code) {
     if (!code) return;
-    currentCode = code;
     const td = selectedDate();
-    const detail = await fetchJson(
-      `/api/v1/timing/boards/${encodeURIComponent(code)}?trade_date=${td}`
-    );
-    const item = detail.item || {};
-    elDetailCard.classList.remove("hidden");
-    elDetailTitle.textContent = `${item.industry_name || code} · ${item.industry_code || code}`;
-    elDetailMetrics.innerHTML = [
-      ["综合分", fmt(item.score)],
-      ["趋势", fmt(item.score_trend)],
-      ["资金", fmt(item.score_fund)],
-      ["量价", fmt(item.score_vp)],
-      ["情绪", fmt(item.score_sentiment)],
-      ["状态", labelState(item.position_state)],
-      ["信号", labelSignal(item.signal_type)],
-      ["过热", item.sentiment_overheat ? "是" : "否"],
-    ]
-      .map(
-        ([k, v]) =>
-          `<div class="vp-metric"><span class="vp-metric-label">${k}</span><span class="vp-metric-val">${v}</span></div>`
-      )
-      .join("");
-    await loadKline();
-    elDetailCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    const iso = elDate.options[elDate.selectedIndex]
+      ? elDate.options[elDate.selectedIndex].textContent.trim()
+      : "";
+    const qs = new URLSearchParams({
+      code: code,
+      trade_date: td || "",
+      days: "60",
+    });
+    if (iso) qs.set("end", iso);
+    window.location.href = `/dc/timing-kline?${qs.toString()}`;
   }
 
   function renderChart(payload) {

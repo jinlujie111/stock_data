@@ -309,6 +309,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | **板块量价**（需求5） | `/dc/vp` | ⑨ | `dwm_industry_vp_score_di` 等 |
 | **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
 | **板块择时**（四因子买卖点） | `/dc/board-timing` | ⑪ | `dwm_board_timing_signal_di` |
+| **择时K线** | `/dc/timing-kline` | ⑪ | `dwm_board_timing_signal_di` + `ods_dc_daily_di` |
 | 登录 / 注册 | `/login` `/register` | — | `data_industry.app_user` |
 
 导航栏与各 `/dc/{slug}` 页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册（五维单页可已下架导航，ETL 仍写库供主线）。
