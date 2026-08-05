@@ -2456,9 +2456,82 @@ body {
 
 .timing-wb-toolbar {
   display: grid;
-  grid-template-columns: repeat(4, minmax(6.5rem, 1fr)) minmax(10rem, 1.5fr) auto;
+  grid-template-columns: minmax(15rem, 1.15fr) repeat(3, minmax(6.5rem, 0.85fr)) minmax(11rem, 1.6fr) auto;
   gap: 0.65rem 0.75rem;
   align-items: end;
+}
+
+.timing-wb-toolbar--signals {
+  grid-template-columns: minmax(15rem, 1.15fr) minmax(6.5rem, 0.85fr) minmax(6.5rem, 0.85fr) minmax(11rem, 1.6fr) auto;
+}
+
+.timing-wb-toolbar--rank {
+  grid-template-columns: minmax(15rem, 1.15fr) repeat(3, minmax(6.5rem, 0.85fr)) minmax(11rem, 1.6fr) auto;
+}
+
+.timing-wb-toolbar--backtest {
+  grid-template-columns: minmax(15rem, 1.15fr) minmax(6.5rem, 0.85fr) minmax(11rem, 1.6fr) auto;
+}
+
+.timing-wb-table-wrap--tall {
+  max-height: min(62vh, 640px);
+}
+
+.timing-wb-params--open {
+  padding: 1rem 1.15rem 1.1rem;
+}
+
+.tw-field--date {
+  min-width: 0;
+}
+
+.tw-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.tw-date-nav .date-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.5rem 0.55rem;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 20, 0.9);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.tw-date-btn {
+  min-width: 2rem;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tw-board-picker {
+  width: 100%;
+}
+
+.tw-board-picker .board-search,
+.tw-board-picker input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 20, 0.9);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.tw-filter-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.75rem;
+}
+
+.timing-wb .board-dropdown {
+  z-index: 40;
 }
 
 .tw-field {
@@ -2692,9 +2765,10 @@ body {
   }
 
   .timing-wb-toolbar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tw-field--date,
   .tw-field--grow,
   .tw-actions {
     grid-column: 1 / -1;

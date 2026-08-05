@@ -77,7 +77,7 @@
   };
 
   function labelSignal(v) {
-    // 量价 signal_type 是状态标签(regime)，不是买卖点；买卖事件见 /dc/board-timing
+    // 量价 signal_type 是状态标签(regime)，不是买卖点；买卖事件见 /dc/timing-signals
     if (!v || v === "none") return "—";
     return SIGNAL_LABEL[v] || v;
   }

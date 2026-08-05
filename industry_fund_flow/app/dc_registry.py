@@ -145,7 +145,7 @@ DISABLED_DC_SLUGS = frozenset(
     }
 )
 
-# 决策链路整段下线（页面 404）；板块择时保留；timing-kline 302 → board-timing
+# 决策链路整段下线（页面 404）；板块择时拆分为信号/排行/回测
 RETIRED_DC_PAGES = frozenset(
     {
         "mainline",
@@ -165,13 +165,18 @@ RESERVED_DC_PAGE_SLUGS = frozenset(
         "kline",
         "volume-price",
         "board-timing",
-        "timing-kline",  # 302 → board-timing
+        "timing-kline",
+        "timing-signals",
+        "timing-rank",
+        "timing-backtest",
     }
 )
 
-# 产品主脊：板块择时（买卖点+回测）。决策链路/龙头已下线；ODS 同步不停。
+# 产品主脊：板块择时拆分入口；ODS 同步不停。
 _NAV_RAW: list[dict[str, str]] = [
-    {"slug": "board-timing", "label": "板块择时", "href": "/dc/board-timing", "section": "板块择时"},
+    {"slug": "timing-signals", "label": "买卖信号", "href": "/dc/timing-signals", "section": "板块择时"},
+    {"slug": "timing-rank", "label": "综合排行", "href": "/dc/timing-rank", "section": "板块择时"},
+    {"slug": "timing-backtest", "label": "回测分析", "href": "/dc/timing-backtest", "section": "板块择时"},
     {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
 ]
 

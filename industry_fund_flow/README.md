@@ -32,7 +32,10 @@ export IFF_JWT_SECRET='请改为随机长字符串'   # 生产环境必设
 |------|------|
 | `/login` `/register` | 登录 / 注册 |
 | `/` | 登录后首页（市场广度 / 大盘情绪） |
-| `/dc/board-timing` | **板块择时**（买卖点 + T+1 回测；`/dc/timing-kline` 302 到此） |
+| `/dc/timing-signals` | **买卖信号**（当日 buy/sell + K 线标注） |
+| `/dc/timing-rank` | **综合排行**（Score + 回测指标） |
+| `/dc/timing-backtest` | **回测分析**（参数 / 净值 / 成交明细） |
+| `/dc/board-timing` `/dc/timing-kline` | 兼容旧入口，302 → 买卖信号 |
 | `/favorites/boards` | 板块自选 |
 | `/favorites/stocks` | **已下线 404** |
 | `/dc/fund-flow` `/dc/mainline` `/dc/volume-price` `/dc/dragon` `/dc/sectors` `/dc/kline` | **已下线 404** |

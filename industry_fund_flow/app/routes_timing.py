@@ -21,25 +21,56 @@ def init_timing_routes(templates: Jinja2Templates) -> None:
     _templates = templates
 
 
-@page_router.get("/dc/board-timing", response_class=HTMLResponse)
-def board_timing_page(request: Request, user: dict = Depends(require_user)):
+def _timing_page(request: Request, user: dict, *, timing_page: str, active_nav: str, title: str):
     return _templates.TemplateResponse(
         request,
         "dc_board_timing.html",
         {
             "user": user,
             "nav_items": NAV_ITEMS,
-            "active_nav": "board-timing",
-            "title": "板块择时",
+            "active_nav": active_nav,
+            "title": title,
+            "timing_page": timing_page,
         },
     )
 
 
+@page_router.get("/dc/timing-signals", response_class=HTMLResponse)
+def timing_signals_page(request: Request, user: dict = Depends(require_user)):
+    return _timing_page(
+        request, user, timing_page="signals", active_nav="timing-signals", title="买卖信号"
+    )
+
+
+@page_router.get("/dc/timing-rank", response_class=HTMLResponse)
+def timing_rank_page(request: Request, user: dict = Depends(require_user)):
+    return _timing_page(
+        request, user, timing_page="rank", active_nav="timing-rank", title="综合排行"
+    )
+
+
+@page_router.get("/dc/timing-backtest", response_class=HTMLResponse)
+def timing_backtest_page(request: Request, user: dict = Depends(require_user)):
+    return _timing_page(
+        request, user, timing_page="backtest", active_nav="timing-backtest", title="回测分析"
+    )
+
+
+@page_router.get("/dc/board-timing", response_class=HTMLResponse)
+def board_timing_page(request: Request, user: dict = Depends(require_user)):
+    """兼容旧入口 → 买卖信号。"""
+    qs = request.url.query
+    target = "/dc/timing-signals"
+    if qs:
+        target = f"{target}?{qs}"
+    return RedirectResponse(url=target, status_code=302)
+
+
 @page_router.get("/dc/timing-kline", response_class=HTMLResponse)
 def timing_kline_page(request: Request, user: dict = Depends(require_user)):
-    """兼容旧入口：合并进板块择时工作台。"""
+    """兼容旧入口：合并进买卖信号页。"""
     qs = request.url.query
-    target = "/dc/board-timing"
+    target = "/dc/timing-signals"
     if qs:
         target = f"{target}?{qs}"
     return RedirectResponse(url=target, status_code=302)
@@ -63,6 +94,7 @@ def api_timing_rank(
     trade_date: str | None = Query(None),
     content_types: str = Query("行业,概念"),
     signal_type: str | None = Query(None),
+    keyword: str | None = Query(None, description="板块名称/代码模糊搜索"),
     top: int = Query(50, ge=1, le=200),
     sort: str = Query("score"),
     mainline_levels: str | None = Query(None, description="主线等级过滤,逗号分隔"),
@@ -75,6 +107,7 @@ def api_timing_rank(
             trade_date,
             content_types=content_types,
             signal_type=signal_type,
+            keyword=keyword,
             top=top,
             sort=sort,
             mainline_levels=mainline_levels,
@@ -92,6 +125,7 @@ def api_timing_signals(
     trade_date: str | None = Query(None),
     signal_type: str | None = Query(None),
     content_types: str = Query("行业,概念"),
+    keyword: str | None = Query(None, description="板块名称/代码模糊搜索"),
     top: int = Query(100, ge=1, le=200),
     _user: dict = Depends(require_user),
 ):
@@ -100,6 +134,7 @@ def api_timing_signals(
             trade_date,
             signal_type=signal_type,
             content_types=content_types,
+            keyword=keyword,
             top=top,
         )
     except ValueError as exc:

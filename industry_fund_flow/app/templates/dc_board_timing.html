@@ -1,10 +1,24 @@
 {% extends "app_layout.html" %}
+{# timing_page: signals | rank | backtest #}
+{% set page = timing_page or "signals" %}
 {% block app_content %}
-<div class="timing-wb">
+<div class="timing-wb" data-timing-page="{{ page }}">
   <header class="timing-wb-head">
     <div>
-      <h1>板块择时</h1>
-      <p class="timing-wb-sub">收盘确认信号 · <strong>T+1 开盘成交</strong> · 趋势30 / 资金30 / 量价25 / 情绪15</p>
+      <h1>
+        {% if page == "signals" %}买卖信号
+        {% elif page == "rank" %}综合排行
+        {% else %}回测分析{% endif %}
+      </h1>
+      <p class="timing-wb-sub">
+        {% if page == "signals" %}
+          当日 buy / sell · 收盘确认 · <strong>T+1 开盘成交</strong>
+        {% elif page == "rank" %}
+          Score + 回测指标排行 · 趋势30 / 资金30 / 量价25 / 情绪15
+        {% else %}
+          参数可复现 · 净值曲线 · 成交明细 · <strong>T+1 开盘成交</strong>
+        {% endif %}
+      </p>
     </div>
     <div class="timing-wb-weights" aria-label="权重">
       <span class="tw-wchip tw-wchip--trend">趋势</span>
@@ -14,6 +28,7 @@
     </div>
   </header>
 
+  {% if page == "backtest" %}
   <section class="timing-wb-card timing-wb-kpi-card">
     <div class="timing-wb-card-head">
       <h2>回测总览</h2>
@@ -21,12 +36,20 @@
     </div>
     <div id="bt-summary" class="tw-kpi-grid"></div>
   </section>
+  {% else %}
+  <div id="bt-summary" class="hidden" aria-hidden="true"></div>
+  {% endif %}
 
   <section class="timing-wb-card timing-wb-toolbar-card">
-    <div class="timing-wb-toolbar" id="bt-query-bar">
-      <label class="tw-field">
+    <div class="timing-wb-toolbar timing-wb-toolbar--{{ page }}" id="bt-query-bar">
+      <label class="tw-field tw-field--date">
         <span>交易日</span>
-        <select id="trade-date"></select>
+        <div class="tw-date-nav">
+          <button type="button" class="btn btn-ghost btn-sm tw-date-btn" id="btn-date-prev" title="上一交易日">‹</button>
+          <input type="date" id="trade-date" class="date-input" />
+          <button type="button" class="btn btn-ghost btn-sm tw-date-btn" id="btn-date-next" title="下一交易日">›</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-date-latest" title="最新交易日">最新</button>
+        </div>
       </label>
       <label class="tw-field">
         <span>板块</span>
@@ -36,6 +59,7 @@
           <option value="概念">概念</option>
         </select>
       </label>
+      {% if page != "backtest" %}
       <label class="tw-field">
         <span>信号</span>
         <select id="signal-filter">
@@ -44,6 +68,10 @@
           <option value="sell">仅卖出</option>
         </select>
       </label>
+      {% else %}
+      <select id="signal-filter" class="hidden" aria-hidden="true"><option value="" selected></option></select>
+      {% endif %}
+      {% if page == "rank" %}
       <label class="tw-field">
         <span>排序</span>
         <select id="sort-key">
@@ -54,22 +82,30 @@
           <option value="max_drawdown">回撤(小优先)</option>
         </select>
       </label>
+      {% else %}
+      <select id="sort-key" class="hidden" aria-hidden="true"><option value="score" selected></option></select>
+      {% endif %}
       <label class="tw-field tw-field--grow">
-        <span>搜索</span>
-        <input type="text" id="board-search" placeholder="名称或代码" autocomplete="off" />
+        <span>搜索板块</span>
+        <div class="board-picker tw-board-picker">
+          <input type="text" id="board-search" placeholder="名称或代码，回车筛选 / 点选打开" autocomplete="off" />
+          <div class="board-dropdown hidden" id="board-dropdown"></div>
+        </div>
       </label>
       <div class="tw-actions">
         <button type="button" class="btn btn-primary" id="btn-query">查询</button>
       </div>
     </div>
+    <p id="filter-hint" class="tw-filter-hint muted"></p>
   </section>
 
-  <details class="timing-wb-card timing-wb-params">
-    <summary>
-      <span>回测参数 · 可复现</span>
+  {% if page == "backtest" %}
+  <section class="timing-wb-card timing-wb-params timing-wb-params--open">
+    <div class="timing-wb-card-head">
+      <h2>回测参数</h2>
       <span class="timing-wb-hint">改参数只重配成交，不重算信号</span>
-    </summary>
-    <div class="timing-wb-params-body">
+    </div>
+    <div class="timing-wb-params-body" style="border-top:none;padding:0">
       <div class="timing-wb-toolbar" id="bt-param-form">
         <label class="tw-field">
           <span>Run</span>
@@ -101,8 +137,7 @@
       </div>
       <div id="bt-params-view" class="tw-kpi-grid tw-kpi-grid--compact"></div>
     </div>
-  </details>
-
+  </section>
   <details class="timing-wb-rules">
     <summary>规则说明</summary>
     <ul>
@@ -111,67 +146,91 @@
       <li><strong>回测</strong> 成功率=盈利笔数/已平仓；未平仓按末日收盘盯市</li>
     </ul>
   </details>
+  {% else %}
+  <div id="bt-param-form" class="hidden" aria-hidden="true">
+    <select id="bt-run-code"></select>
+    <input type="hidden" id="bt-cost-bps" value="3" />
+    <input type="hidden" id="bt-lookback" value="120" />
+    <input type="hidden" id="bt-buy-score" value="70" />
+    <input type="hidden" id="bt-sell-score" value="40" />
+    <input type="hidden" id="bt-stop-loss" value="0.08" />
+    <button type="button" id="btn-bt-run" class="hidden"></button>
+  </div>
+  <div id="bt-params-view" class="hidden" aria-hidden="true"></div>
+  {% endif %}
 
   <div id="page-error" class="alert alert-error hidden"></div>
 
-  <div class="timing-wb-split">
-    <section class="timing-wb-card">
-      <div class="timing-wb-card-head">
-        <h2>当日信号</h2>
-        <span class="timing-wb-hint">点击行打开详情</span>
-      </div>
-      <div class="table-wrap timing-wb-table-wrap">
-        <table class="data-table timing-wb-table" id="signal-table">
-          <thead>
-            <tr>
-              <th>信号</th>
-              <th>板块</th>
-              <th>类型</th>
-              <th>Score</th>
-              <th>趋势</th>
-              <th>资金</th>
-              <th>量价</th>
-              <th>情绪</th>
-              <th>原因</th>
-            </tr>
-          </thead>
-          <tbody id="signal-body"></tbody>
-        </table>
-      </div>
-      <p id="signal-empty" class="tw-empty hidden">当日无买卖事件</p>
-    </section>
-
-    <section class="timing-wb-card">
-      <div class="timing-wb-card-head">
-        <h2>综合排行</h2>
-        <span class="timing-wb-hint">Score + 回测</span>
-      </div>
-      <div class="table-wrap timing-wb-table-wrap">
-        <table class="data-table timing-wb-table" id="rank-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>板块</th>
-              <th>类型</th>
-              <th>Score</th>
-              <th>状态</th>
-              <th>收益</th>
-              <th>成功率</th>
-              <th>笔数</th>
-              <th>回撤</th>
-            </tr>
-          </thead>
-          <tbody id="rank-body"></tbody>
-        </table>
-      </div>
-      <p id="rank-empty" class="tw-empty hidden">暂无数据，请先跑日批</p>
-    </section>
-  </div>
+  {% if page == "signals" %}
+  <section class="timing-wb-card">
+    <div class="timing-wb-card-head">
+      <h2>当日买卖信号</h2>
+      <span class="timing-wb-hint">点击行查看 K 线标注</span>
+    </div>
+    <div class="table-wrap timing-wb-table-wrap timing-wb-table-wrap--tall">
+      <table class="data-table timing-wb-table" id="signal-table">
+        <thead>
+          <tr>
+            <th>信号</th>
+            <th>板块</th>
+            <th>类型</th>
+            <th>Score</th>
+            <th>趋势</th>
+            <th>资金</th>
+            <th>量价</th>
+            <th>情绪</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody id="signal-body"></tbody>
+      </table>
+    </div>
+    <p id="signal-empty" class="tw-empty hidden">当日无买卖事件</p>
+  </section>
+  {% elif page == "rank" %}
+  <section class="timing-wb-card">
+    <div class="timing-wb-card-head">
+      <h2>综合分 / 回测排行</h2>
+      <span class="timing-wb-hint">点击行打开详情</span>
+    </div>
+    <div class="table-wrap timing-wb-table-wrap timing-wb-table-wrap--tall">
+      <table class="data-table timing-wb-table" id="rank-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>板块</th>
+            <th>类型</th>
+            <th>Score</th>
+            <th>状态</th>
+            <th>收益</th>
+            <th>成功率</th>
+            <th>笔数</th>
+            <th>回撤</th>
+          </tr>
+        </thead>
+        <tbody id="rank-body"></tbody>
+      </table>
+    </div>
+    <p id="rank-empty" class="tw-empty hidden">暂无数据，请先跑日批</p>
+  </section>
+  {% else %}
+  <section class="timing-wb-card" id="backtest-pick-card">
+    <div class="timing-wb-card-head">
+      <h2>选择板块</h2>
+      <span class="timing-wb-hint">搜索点选，或从「买卖信号 / 综合排行」带 code 跳入</span>
+    </div>
+    <p class="tw-empty" id="backtest-pick-hint">请搜索并选择板块，查看净值曲线与成交明细。</p>
+  </section>
+  {% endif %}
 
   <section class="timing-wb-card timing-wb-detail hidden" id="detail-card">
     <div class="timing-wb-card-head">
       <h2 id="detail-title">板块详情</h2>
-      <span class="timing-wb-hint">三角=信号日 · 圆点=T+1成交 · 虚线=买入持有</span>
+      <span class="timing-wb-hint">
+        {% if page == "backtest" %}净值 · 成交 · 历史信号
+        {% elif page == "signals" %}三角=信号日 · 圆点=T+1成交
+        {% else %}Score / 回测指标 · K 线{% endif %}
+      </span>
     </div>
     <div id="detail-metrics" class="tw-kpi-grid"></div>
 
@@ -186,16 +245,22 @@
         <button type="button" class="chip" data-vol="amount">成交额</button>
       </div>
       <button type="button" class="btn btn-ghost btn-sm" id="btn-kline-refresh">刷新图表</button>
+      {% if page != "backtest" %}
+      <a class="btn btn-ghost btn-sm" id="link-to-backtest" href="/dc/timing-backtest">去回测分析</a>
+      {% endif %}
     </div>
 
     <div id="timing-kline-chart" class="kline-chart-host timing-kline-chart"></div>
 
-    <div class="timing-wb-subhead">
+    {% if page == "backtest" or page == "rank" %}
+    <div class="timing-wb-subhead" data-detail-block="equity">
       <h3>净值曲线</h3>
       <span class="timing-wb-hint">策略 vs 买入持有 · 基期=100</span>
     </div>
     <div id="timing-equity-chart" class="kline-chart-host timing-equity-chart"></div>
+    {% endif %}
 
+    {% if page == "backtest" %}
     <div class="timing-wb-subhead">
       <h3>成交明细</h3>
     </div>
@@ -211,7 +276,9 @@
         <tbody id="bt-trade-body"></tbody>
       </table>
     </div>
+    {% endif %}
 
+    {% if page == "signals" or page == "backtest" %}
     <div class="timing-wb-subhead">
       <h3>历史买卖点</h3>
     </div>
@@ -223,6 +290,7 @@
         <tbody id="hist-signal-body"></tbody>
       </table>
     </div>
+    {% endif %}
   </section>
 </div>
 {% endblock %}
@@ -231,5 +299,5 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260805a"></script>
 <script src="/static/js/dc_kline_chart.js?v=20260805d"></script>
-<script src="/static/js/dc_board_timing.js?v=20260805d"></script>
+<script src="/static/js/dc_board_timing.js?v=20260805f"></script>
 {% endblock %}

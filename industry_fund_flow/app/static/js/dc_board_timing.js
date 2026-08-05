@@ -3,11 +3,24 @@
   const kline = window.DcKline || {};
   const { normalizeIsoDate, toApiTradeDate } = board;
 
+  const PAGE =
+    (document.querySelector(".timing-wb") &&
+      document.querySelector(".timing-wb").getAttribute("data-timing-page")) ||
+    "signals";
+  const SHOW_SIGNALS = PAGE === "signals";
+  const SHOW_RANK = PAGE === "rank";
+  const SHOW_BACKTEST = PAGE === "backtest";
+
   const elDate = document.getElementById("trade-date");
   const elTypes = document.getElementById("content-types");
   const elSigFilter = document.getElementById("signal-filter");
   const elSort = document.getElementById("sort-key");
   const elSearch = document.getElementById("board-search");
+  const elDropdown = document.getElementById("board-dropdown");
+  const elFilterHint = document.getElementById("filter-hint");
+  const btnDatePrev = document.getElementById("btn-date-prev");
+  const btnDateNext = document.getElementById("btn-date-next");
+  const btnDateLatest = document.getElementById("btn-date-latest");
   const btnQuery = document.getElementById("btn-query");
   const elError = document.getElementById("page-error");
   const elBtSummary = document.getElementById("bt-summary");
@@ -33,6 +46,9 @@
   const elPresets = document.getElementById("kline-range-presets");
   const elVolChips = document.getElementById("vol-mode-chips");
   const btnKline = document.getElementById("btn-kline-refresh");
+  const elLinkBacktest = document.getElementById("link-to-backtest");
+  const elPickHint = document.getElementById("backtest-pick-hint");
+  const elPickCard = document.getElementById("backtest-pick-card");
 
   let chartInst = null;
   let equityInst = null;
@@ -41,6 +57,8 @@
   let volMode = "vol";
   let lastPayload = null;
   let activeRunCode = "daily_default";
+  let tradeDatesIso = []; // desc: latest first
+  let searchTimer = null;
 
   function showError(msg) {
     if (!elError) return;
@@ -126,24 +144,137 @@
   }
 
   async function loadDates() {
-    const data = await fetchJson("/api/v1/timing/trade-dates?limit=240");
-    const dates = data.dates || [];
-    elDate.innerHTML = dates
-      .map((d) => {
-        const iso = normalizeIsoDate ? normalizeIsoDate(d) : d;
-        const api = toApiTradeDate ? toApiTradeDate(iso) : String(d).replace(/-/g, "");
-        return `<option value="${api}">${iso}</option>`;
-      })
-      .join("");
-    if (!dates.length) showError("暂无择时数据，请先运行 run_board_timing_batch");
+    const data = await fetchJson("/api/v1/timing/trade-dates?limit=500");
+    tradeDatesIso = (data.dates || [])
+      .map((d) => (normalizeIsoDate ? normalizeIsoDate(d) : String(d).slice(0, 10)))
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+    const latest = (normalizeIsoDate && normalizeIsoDate(data.latest)) || tradeDatesIso[0] || "";
+    if (!tradeDatesIso.length) {
+      showError("暂无择时数据，请先运行 run_board_timing_batch");
+      updateDateHint();
+      return;
+    }
+    if (elDate) {
+      elDate.min = tradeDatesIso[tradeDatesIso.length - 1];
+      elDate.max = tradeDatesIso[0];
+      elDate.value = latest;
+    }
+    updateDateHint();
+    updateDateNavState();
   }
 
   function selectedDate() {
-    return elDate.value || "";
+    if (!elDate || !elDate.value) return "";
+    return toApiTradeDate ? toApiTradeDate(elDate.value) : String(elDate.value).replace(/-/g, "");
+  }
+
+  function searchKeyword() {
+    return (elSearch && elSearch.value ? elSearch.value : "").trim();
+  }
+
+  /** 对齐到最近有效交易日：优先同日，否则往前找，再往后找 */
+  function snapToTradeDate(iso) {
+    if (!iso || !tradeDatesIso.length) return iso || "";
+    if (tradeDatesIso.includes(iso)) return iso;
+    for (const d of tradeDatesIso) {
+      if (d <= iso) return d;
+    }
+    return tradeDatesIso[tradeDatesIso.length - 1];
+  }
+
+  function setTradeDate(iso, { refresh = true } = {}) {
+    const snapped = snapToTradeDate(iso);
+    if (!snapped || !elDate) return;
+    if (elDate.value !== snapped) elDate.value = snapped;
+    updateDateHint(iso !== snapped ? iso : "");
+    updateDateNavState();
+    if (refresh) refreshAll().catch((e) => showError(e.message));
+  }
+
+  function updateDateHint(requested) {
+    if (!elFilterHint) return;
+    const cur = elDate && elDate.value ? elDate.value : "—";
+    const latest = tradeDatesIso[0] || "—";
+    const parts = [`当前 ${cur}`, `最新 ${latest}`, `共 ${tradeDatesIso.length} 个交易日`];
+    if (requested && requested !== cur) parts.unshift(`已对齐到最近交易日（原 ${requested}）`);
+    const kw = searchKeyword();
+    if (kw) parts.push(`搜索「${kw}」`);
+    elFilterHint.textContent = parts.join(" · ");
+  }
+
+  function updateDateNavState() {
+    const idx = tradeDatesIso.indexOf(elDate && elDate.value);
+    if (btnDatePrev) btnDatePrev.disabled = idx < 0 || idx >= tradeDatesIso.length - 1;
+    if (btnDateNext) btnDateNext.disabled = idx <= 0;
+    if (btnDateLatest) btnDateLatest.disabled = !tradeDatesIso.length || idx === 0;
+  }
+
+  function shiftTradeDate(delta) {
+    if (!elDate || !tradeDatesIso.length) return;
+    const idx = tradeDatesIso.indexOf(elDate.value);
+    const cur = idx >= 0 ? idx : 0;
+    // tradeDatesIso 降序：+1 = 更早，-1 = 更新
+    const next = Math.max(0, Math.min(tradeDatesIso.length - 1, cur + delta));
+    setTradeDate(tradeDatesIso[next]);
+  }
+
+  function hideDropdown() {
+    if (elDropdown) elDropdown.classList.add("hidden");
+  }
+
+  function showDropdown(items) {
+    if (!elDropdown) return;
+    if (!items.length) {
+      elDropdown.innerHTML = '<div class="board-option board-option--empty">无匹配板块</div>';
+    } else {
+      elDropdown.innerHTML = items
+        .map((it) => {
+          const code = it.industry_code || "";
+          const name = it.industry_name || code;
+          const ct = it.content_type || "—";
+          const score = it.score != null ? ` · ${fmt(it.score)}` : "";
+          const sig =
+            it.signal_type === "buy" ? "买" : it.signal_type === "sell" ? "卖" : "";
+          const sigHtml = sig ? ` <span class="sig-badge sig-badge--${it.signal_type}">${sig}</span>` : "";
+          return (
+            `<button type="button" class="board-option" data-code="${code}" data-name="${name}">` +
+            `[${ct}] ${name} (${code})${score}${sigHtml}</button>`
+          );
+        })
+        .join("");
+    }
+    elDropdown.classList.remove("hidden");
+  }
+
+  async function searchBoardsSuggest(keyword) {
+    const kw = (keyword || "").trim();
+    if (!kw) {
+      hideDropdown();
+      return;
+    }
+    const td = selectedDate();
+    const types = encodeURIComponent(elTypes.value || "行业,概念");
+    const tdQ = td ? `&trade_date=${encodeURIComponent(td)}` : "";
+    try {
+      const data = await fetchJson(
+        `/api/v1/timing/boards/search?keyword=${encodeURIComponent(kw)}&content_types=${types}&limit=20${tdQ}`
+      );
+      showDropdown(data.items || []);
+    } catch (e) {
+      showDropdown([]);
+      showError(e.message || String(e));
+    }
+  }
+
+  function scheduleSearchSuggest() {
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchBoardsSuggest(searchKeyword()).catch((e) => showError(e.message));
+    }, 220);
   }
 
   async function loadBtSummary() {
-    if (!elBtSummary) return;
+    if (!SHOW_BACKTEST || !elBtSummary || elBtSummary.classList.contains("hidden")) return;
     try {
       const data = await fetchJson(
         `/api/v1/timing/backtest/summary?run_code=${encodeURIComponent(activeRunCode)}`
@@ -192,6 +323,7 @@
   }
 
   async function loadParamsAndRuns() {
+    if (!SHOW_BACKTEST) return;
     try {
       const [cfg, runs] = await Promise.all([
         fetchJson(`/api/v1/timing/config?run_code=${encodeURIComponent(activeRunCode)}`),
@@ -224,6 +356,7 @@
   }
 
   async function runCustomBacktest() {
+    if (!SHOW_BACKTEST) return;
     const td = selectedDate();
     const qs = new URLSearchParams({
       run_code: (elBtRunCode && elBtRunCode.value) || "web_custom",
@@ -256,12 +389,15 @@
   }
 
   async function loadSignals() {
+    if (!SHOW_SIGNALS || !elSigBody) return;
     const td = selectedDate();
     if (!td) return;
     const sig = elSigFilter.value;
     const types = encodeURIComponent(elTypes.value);
+    const kw = searchKeyword();
     let url = `/api/v1/timing/signals?trade_date=${td}&content_types=${types}&top=100`;
     if (sig === "buy" || sig === "sell") url += `&signal_type=${sig}`;
+    if (kw) url += `&keyword=${encodeURIComponent(kw)}`;
     const data = await fetchJson(url);
     const items = data.items || [];
     elSigBody.innerHTML = items
@@ -281,7 +417,7 @@
         );
       })
       .join("");
-    elSigEmpty.classList.toggle("hidden", items.length > 0);
+    elSigEmpty && elSigEmpty.classList.toggle("hidden", items.length > 0);
     elSigBody.querySelectorAll("tr[data-code]").forEach((tr) => {
       tr.addEventListener("click", () => openDetail(tr.getAttribute("data-code")));
     });
@@ -289,25 +425,20 @@
   }
 
   async function loadRank() {
+    if (!SHOW_RANK || !elRankBody) return;
     const td = selectedDate();
     if (!td) return;
     const types = encodeURIComponent(elTypes.value);
-    const kw = (elSearch.value || "").trim();
+    const kw = searchKeyword();
     const sort = encodeURIComponent(elSort.value || "score");
     const sig = elSigFilter.value;
+    const top = kw ? 120 : 80;
     let url =
-      `/api/v1/timing/rank?trade_date=${td}&content_types=${types}&top=80&sort=${sort}&with_metrics=true`;
+      `/api/v1/timing/rank?trade_date=${td}&content_types=${types}&top=${top}&sort=${sort}&with_metrics=true`;
     if (sig === "buy" || sig === "sell") url += `&signal_type=${sig}`;
+    if (kw) url += `&keyword=${encodeURIComponent(kw)}`;
     const data = await fetchJson(url);
-    let items = data.items || [];
-    if (kw) {
-      const k = kw.toLowerCase();
-      items = items.filter(
-        (r) =>
-          String(r.industry_name || "").toLowerCase().includes(k) ||
-          String(r.industry_code || "").toLowerCase().includes(k)
-      );
-    }
+    const items = data.items || [];
     elRankBody.innerHTML = items
       .map((r, i) => {
         return (
@@ -325,11 +456,17 @@
         );
       })
       .join("");
-    elRankEmpty.classList.toggle("hidden", items.length > 0);
+    elRankEmpty && elRankEmpty.classList.toggle("hidden", items.length > 0);
+    if (elRankEmpty) {
+      elRankEmpty.textContent = kw
+        ? `未找到匹配「${kw}」的板块`
+        : "暂无数据，请先跑日批";
+    }
     elRankBody.querySelectorAll("tr[data-code]").forEach((tr) => {
       tr.addEventListener("click", () => openDetail(tr.getAttribute("data-code")));
     });
     if (currentCode) markActiveRow(currentCode);
+    updateDateHint();
   }
 
   function renderDetailHeader(payload) {
@@ -357,6 +494,7 @@
   }
 
   function renderTrades(payload) {
+    if (!elBtTradeBody) return;
     const trades = (payload.backtest && payload.backtest.trades) || [];
     elBtTradeBody.innerHTML = trades
       .map((t) => {
@@ -379,6 +517,7 @@
   }
 
   function renderHist(payload) {
+    if (!elHistBody) return;
     const sigs = payload.signals || [];
     elHistBody.innerHTML = sigs
       .slice()
@@ -397,15 +536,15 @@
   }
 
   function renderCharts(payload) {
-    if (kline.renderTimingKlineChart) {
+    if (elChart && kline.renderTimingKlineChart) {
       chartInst = kline.renderTimingKlineChart(elChart, payload, {
         chartInst,
         volMode,
       });
     }
-    const curve = (payload.backtest && payload.backtest.equity_curve) || [];
-    const buyhold = (payload.backtest && payload.backtest.buyhold_curve) || [];
-    if (kline.renderTimingEquityChart) {
+    if (elEquity && kline.renderTimingEquityChart) {
+      const curve = (payload.backtest && payload.backtest.equity_curve) || [];
+      const buyhold = (payload.backtest && payload.backtest.buyhold_curve) || [];
       equityInst = kline.renderTimingEquityChart(elEquity, curve, {
         chartInst: equityInst,
         buyholdCurve: buyhold,
@@ -413,10 +552,19 @@
     }
   }
 
+  function syncBacktestLink(code) {
+    if (!elLinkBacktest || !code) return;
+    const td = selectedDate();
+    const qs = new URLSearchParams({ code });
+    if (td) qs.set("trade_date", td);
+    elLinkBacktest.href = `/dc/timing-backtest?${qs.toString()}`;
+  }
+
   async function openDetail(code) {
     if (!code) return;
     currentCode = code;
     markActiveRow(code);
+    syncBacktestLink(code);
     const td = selectedDate();
     const url =
       `/api/v1/timing/boards/${encodeURIComponent(code)}/kline?days=${klineDays}` +
@@ -425,6 +573,8 @@
       showError("");
       const payload = await fetchJson(url);
       lastPayload = payload;
+      if (elPickCard) elPickCard.classList.add("hidden");
+      if (elPickHint) elPickHint.classList.add("hidden");
       elDetailCard.classList.remove("hidden");
       renderDetailHeader(payload);
       renderCharts(payload);
@@ -438,13 +588,22 @@
 
   async function refreshAll() {
     showError("");
-    await Promise.all([loadParamsAndRuns(), loadBtSummary(), loadSignals(), loadRank()]);
+    updateDateHint();
+    const tasks = [];
+    if (SHOW_BACKTEST) {
+      tasks.push(loadParamsAndRuns(), loadBtSummary());
+    }
+    if (SHOW_SIGNALS) tasks.push(loadSignals());
+    if (SHOW_RANK) tasks.push(loadRank());
+    await Promise.all(tasks);
   }
 
   function applyQueryParams() {
     const qs = new URLSearchParams(window.location.search);
     const code = qs.get("code");
     const days = Number(qs.get("days") || 0);
+    const td = qs.get("trade_date");
+    const kw = qs.get("keyword") || qs.get("q");
     if (days === 20 || days === 60 || days === 120) {
       klineDays = days;
       if (elPresets) {
@@ -453,13 +612,68 @@
         });
       }
     }
+    if (kw && elSearch) elSearch.value = kw;
+    if (td) {
+      const iso = normalizeIsoDate ? normalizeIsoDate(td) : td;
+      if (iso) {
+        setTradeDate(iso, { refresh: false });
+        return refreshAll().then(() => {
+          if (code) openDetail(code);
+        });
+      }
+    }
     if (code) {
       setTimeout(() => openDetail(code), 0);
     }
   }
 
-  btnQuery && btnQuery.addEventListener("click", () => refreshAll().catch((e) => showError(e.message)));
-  elDate && elDate.addEventListener("change", () => refreshAll().catch((e) => showError(e.message)));
+  btnQuery &&
+    btnQuery.addEventListener("click", () => {
+      hideDropdown();
+      refreshAll().catch((e) => showError(e.message));
+    });
+  elDate &&
+    elDate.addEventListener("change", () => {
+      setTradeDate(elDate.value);
+    });
+  btnDatePrev && btnDatePrev.addEventListener("click", () => shiftTradeDate(1));
+  btnDateNext && btnDateNext.addEventListener("click", () => shiftTradeDate(-1));
+  btnDateLatest &&
+    btnDateLatest.addEventListener("click", () => {
+      if (tradeDatesIso[0]) setTradeDate(tradeDatesIso[0]);
+    });
+  elSearch &&
+    elSearch.addEventListener("input", () => {
+      scheduleSearchSuggest();
+      updateDateHint();
+    });
+  elSearch &&
+    elSearch.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        hideDropdown();
+        refreshAll().catch((e) => showError(e.message));
+      } else if (ev.key === "Escape") {
+        hideDropdown();
+      }
+    });
+  elDropdown &&
+    elDropdown.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".board-option[data-code]");
+      if (!btn) return;
+      const code = btn.getAttribute("data-code");
+      const name = btn.getAttribute("data-name") || code;
+      if (elSearch) elSearch.value = name;
+      hideDropdown();
+      refreshAll()
+        .then(() => openDetail(code))
+        .catch((e) => showError(e.message));
+    });
+  document.addEventListener("click", (ev) => {
+    if (!elDropdown || elDropdown.classList.contains("hidden")) return;
+    if (ev.target.closest(".tw-board-picker")) return;
+    hideDropdown();
+  });
   btnBtRun && btnBtRun.addEventListener("click", () => runCustomBacktest());
   elBtRunCode &&
     elBtRunCode.addEventListener("change", () => {

@@ -153,6 +153,7 @@ def rank_boards(
     *,
     content_types: str = "行业,概念",
     signal_type: str | None = None,
+    keyword: str | None = None,
     top: int = 50,
     sort: str = "score",
     mainline_levels: str | None = None,
@@ -185,6 +186,11 @@ def rank_boards(
     if signal_type and signal_type in {"buy", "sell", "none"}:
         where_sig = " AND s.signal_type = :sig"
         params["sig"] = signal_type
+
+    where_kw = ""
+    if keyword and keyword.strip():
+        where_kw = " AND (s.industry_name LIKE :kw OR s.industry_code LIKE :kw)"
+        params["kw"] = f"%{keyword.strip()}%"
 
     join_ml = f"""
         LEFT JOIN {MAINLINE_TABLE} m
@@ -272,6 +278,7 @@ def rank_boards(
         WHERE s.trade_date = :td
           AND s.content_type IN ({ph})
           {where_sig}
+          {where_kw}
           {where_ml}
           {where_vp}
         ORDER BY {order}
@@ -293,6 +300,7 @@ def list_signals(
     *,
     signal_type: str | None = None,
     content_types: str = "行业,概念",
+    keyword: str | None = None,
     top: int = 100,
 ) -> dict:
     td = _resolve_trade_date(trade_date)
@@ -306,6 +314,11 @@ def list_signals(
     else:
         where_sig = "AND signal_type IN ('buy', 'sell')"
 
+    where_kw = ""
+    if keyword and keyword.strip():
+        where_kw = " AND (industry_name LIKE :kw OR industry_code LIKE :kw)"
+        params["kw"] = f"%{keyword.strip()}%"
+
     rows = fetch_all_stock(
         f"""
         SELECT {_SCORE_COLS}
@@ -313,6 +326,7 @@ def list_signals(
         WHERE trade_date = :td
           AND content_type IN ({ph})
           {where_sig}
+          {where_kw}
         ORDER BY
           CASE signal_type WHEN 'buy' THEN 0 WHEN 'sell' THEN 1 ELSE 2 END,
           score DESC
