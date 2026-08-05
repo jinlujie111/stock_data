@@ -185,6 +185,9 @@ def api_timing_bt_run(
     buy_score: float | None = Query(None),
     sell_score: float | None = Query(None),
     stop_loss_pct: float | None = Query(None),
+    min_hold_days: int | None = Query(None, ge=1, le=20),
+    confirm_days: int | None = Query(None, ge=1, le=10),
+    cooldown_days: int | None = Query(None, ge=0, le=20),
     _user: dict = Depends(require_user),
 ):
     """按参数触发一次回测写入（params_json 可复现）。不重算信号，仅重配对成交。"""
@@ -223,6 +226,12 @@ def api_timing_bt_run(
             cfg = replace(cfg, sell_score=float(sell_score))
         if stop_loss_pct is not None:
             cfg = replace(cfg, stop_loss_pct=float(stop_loss_pct))
+        if min_hold_days is not None:
+            cfg = replace(cfg, min_hold_days=int(min_hold_days))
+        if confirm_days is not None:
+            cfg = replace(cfg, confirm_days=int(confirm_days))
+        if cooldown_days is not None:
+            cfg = replace(cfg, cooldown_days=int(cooldown_days))
         out = run_backtest(end, cfg=cfg, run_code=run_code or "web_custom")
         return {"ok": True, "result": out, "params": cfg.to_dict()}
     except ValueError as exc:

@@ -30,6 +30,9 @@
   const elBtBuy = document.getElementById("bt-buy-score");
   const elBtSell = document.getElementById("bt-sell-score");
   const elBtStop = document.getElementById("bt-stop-loss");
+  const elBtMinHold = document.getElementById("bt-min-hold");
+  const elBtConfirm = document.getElementById("bt-confirm");
+  const elBtCooldown = document.getElementById("bt-cooldown");
   const elBtParamsView = document.getElementById("bt-params-view");
   const btnBtRun = document.getElementById("btn-bt-run");
   const elSigBody = document.getElementById("signal-body");
@@ -320,6 +323,9 @@
     if (elBtBuy && params.buy_score != null) elBtBuy.value = params.buy_score;
     if (elBtSell && params.sell_score != null) elBtSell.value = params.sell_score;
     if (elBtStop && params.stop_loss_pct != null) elBtStop.value = params.stop_loss_pct;
+    if (elBtMinHold && params.min_hold_days != null) elBtMinHold.value = params.min_hold_days;
+    if (elBtConfirm && params.confirm_days != null) elBtConfirm.value = params.confirm_days;
+    if (elBtCooldown && params.cooldown_days != null) elBtCooldown.value = params.cooldown_days;
   }
 
   async function loadParamsAndRuns() {
@@ -344,6 +350,9 @@
           metric("买入阈值", fmt(p.buy_score, 0), true),
           metric("卖出阈值", fmt(p.sell_score, 0)),
           metric("止损", fmtPct(p.stop_loss_pct)),
+          metric("最短持仓", p.min_hold_days != null ? String(p.min_hold_days) : "3"),
+          metric("确认日", p.confirm_days != null ? String(p.confirm_days) : "2"),
+          metric("冷却日", p.cooldown_days != null ? String(p.cooldown_days) : "2"),
           metric("成本bp", fmt(p.cost_bps, 1)),
           metric("回看日", p.backtest_lookback_days != null ? String(p.backtest_lookback_days) : "—"),
           metric("exec", p.exec_model || "t1_open"),
@@ -367,6 +376,9 @@
     if (elBtBuy && elBtBuy.value !== "") qs.set("buy_score", elBtBuy.value);
     if (elBtSell && elBtSell.value !== "") qs.set("sell_score", elBtSell.value);
     if (elBtStop && elBtStop.value !== "") qs.set("stop_loss_pct", elBtStop.value);
+    if (elBtMinHold && elBtMinHold.value !== "") qs.set("min_hold_days", elBtMinHold.value);
+    if (elBtConfirm && elBtConfirm.value !== "") qs.set("confirm_days", elBtConfirm.value);
+    if (elBtCooldown && elBtCooldown.value !== "") qs.set("cooldown_days", elBtCooldown.value);
     showError("");
     btnBtRun && (btnBtRun.disabled = true);
     try {

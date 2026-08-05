@@ -30,6 +30,12 @@ class TimingConfig:
     gate_vp: float = 50.0
     sell_trend: float = 45.0
     stop_loss_pct: float = 0.08
+    # 抗抖动：买入信号日起未满 N 个交易日仅允许止损卖出
+    min_hold_days: int = 3
+    # Score 上穿买入 / 下穿卖出需连续 N 日满足阈值侧（含当日）
+    confirm_days: int = 2
+    # 卖出后冷却 N 个交易日禁止新买入
+    cooldown_days: int = 2
     overheat_limit_up_ratio: float = 0.12
     lookback_days: int = 90
     content_types: tuple[str, ...] = ("行业", "概念")
