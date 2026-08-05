@@ -2051,8 +2051,20 @@ body {
 }
 
 .timing-kline-chart {
-  min-height: 780px;
-  height: 78vh;
+  min-height: 520px;
+  height: 58vh;
+  max-height: 720px;
+  border-radius: 10px;
+  border: 1px solid rgba(45, 58, 79, 0.7);
+  background: rgba(8, 12, 20, 0.55);
+}
+
+.timing-equity-chart {
+  min-height: 220px;
+  height: 240px;
+  border-radius: 10px;
+  border: 1px solid rgba(45, 58, 79, 0.7);
+  background: rgba(8, 12, 20, 0.55);
 }
 
 .timing-kline-card {
@@ -2275,5 +2287,428 @@ body {
 }
 .funnel-link--primary:hover {
   background: rgba(37, 99, 235, 0.4);
+}
+
+/* ========== 板块择时工作台 ========== */
+.timing-wb {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.timing-wb-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.15rem 0.15rem 0.35rem;
+}
+
+.timing-wb-head h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.timing-wb-sub {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.timing-wb-sub strong {
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.timing-wb-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tw-wchip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.tw-wchip--trend {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.28);
+}
+.tw-wchip--fund {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.28);
+}
+.tw-wchip--vp {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+.tw-wchip--sent {
+  color: #f9a8d4;
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.28);
+}
+
+.timing-wb-card {
+  background: linear-gradient(180deg, rgba(26, 35, 50, 0.95), rgba(18, 26, 38, 0.98));
+  border: 1px solid rgba(45, 58, 79, 0.9);
+  border-radius: 14px;
+  padding: 1rem 1.15rem 1.1rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+.timing-wb-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.timing-wb-card-head h2,
+.timing-wb-subhead h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.timing-wb-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.timing-wb-subhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin: 1.15rem 0 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(45, 58, 79, 0.65);
+}
+
+.tw-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 0.55rem;
+}
+
+.tw-kpi-grid--compact {
+  margin-top: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.tw-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(8, 12, 20, 0.72);
+  border: 1px solid rgba(45, 58, 79, 0.75);
+}
+
+.tw-kpi-label {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tw-kpi-val {
+  font-size: 1rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.tw-kpi-val.strong {
+  color: #7dd3fc;
+}
+
+.tw-kpi-val.tone-up {
+  color: #4ade80;
+}
+
+.tw-kpi-val.tone-down {
+  color: #f87171;
+}
+
+.timing-wb-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(6.5rem, 1fr)) minmax(10rem, 1.5fr) auto;
+  gap: 0.65rem 0.75rem;
+  align-items: end;
+}
+
+.tw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.tw-field--grow {
+  min-width: 0;
+}
+
+.tw-field select,
+.tw-field input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 20, 0.9);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.tw-field select:focus,
+.tw-field input:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.tw-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.timing-wb-params {
+  padding: 0;
+  overflow: hidden;
+}
+
+.timing-wb-params > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  padding: 0.85rem 1.15rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+
+.timing-wb-params > summary::-webkit-details-marker {
+  display: none;
+}
+
+.timing-wb-params > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.45rem;
+  color: #64748b;
+  transition: transform 0.15s ease;
+}
+
+.timing-wb-params[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.timing-wb-params-body {
+  padding: 0 1.15rem 1.1rem;
+  border-top: 1px solid rgba(45, 58, 79, 0.65);
+}
+
+.timing-wb-rules {
+  margin: 0;
+  padding: 0.35rem 0.15rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.timing-wb-rules > summary {
+  cursor: pointer;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.timing-wb-rules ul {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+  line-height: 1.5;
+}
+
+.timing-wb-rules strong {
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.timing-wb-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.timing-wb-table-wrap {
+  max-height: 420px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(45, 58, 79, 0.55);
+}
+
+.timing-wb-table {
+  margin: 0;
+}
+
+.timing-wb-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #152033;
+  box-shadow: 0 1px 0 rgba(45, 58, 79, 0.9);
+}
+
+.timing-wb-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.timing-wb-table tbody tr.clickable-row:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.timing-wb-table tbody tr.is-active {
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.tw-empty {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.timing-wb .muted {
+  margin-bottom: 0;
+  font-size: inherit;
+}
+
+.sig-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.sig-badge--buy {
+  color: #bbf7d0;
+  background: rgba(22, 163, 74, 0.22);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.sig-badge--sell {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.22);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.pos-pill {
+  display: inline-flex;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.pos-pill--long {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.pos-pill--flat {
+  color: #94a3b8;
+}
+
+.pos-pill--watch {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.tone-up {
+  color: #4ade80;
+}
+
+.tone-down {
+  color: #f87171;
+}
+
+.timing-wb-chart-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin: 0.85rem 0 0.75rem;
+}
+
+.timing-wb-detail {
+  scroll-margin-top: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .timing-wb-split {
+    grid-template-columns: 1fr;
+  }
+
+  .timing-wb-toolbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tw-field--grow,
+  .tw-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .timing-wb-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .timing-kline-chart {
+    height: 460px;
+    max-height: none;
+  }
 }
 

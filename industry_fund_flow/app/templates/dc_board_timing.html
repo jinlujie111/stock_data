@@ -1,211 +1,235 @@
 {% extends "app_layout.html" %}
 {% block app_content %}
-<div class="page-head">
-  <h1>板块择时</h1>
-</div>
-
-<div class="card vp-guide-card">
-  <div class="vp-guide-head">
+<div class="timing-wb">
+  <header class="timing-wb-head">
     <div>
-      <h2 class="vp-guide-title">买卖点 + 回测工作台</h2>
-      <p class="vp-guide-sub">趋势 30% · 资金 30% · 量价 25% · 情绪 15% · 收盘确认信号 · <strong>T+1 开盘成交</strong></p>
+      <h1>板块择时</h1>
+      <p class="timing-wb-sub">收盘确认信号 · <strong>T+1 开盘成交</strong> · 趋势30 / 资金30 / 量价25 / 情绪15</p>
     </div>
-    <div class="vp-weight-bar" aria-label="权重">
-      <span class="vp-weight-chip" style="--w-color:#3b82f6">趋势 30%</span>
-      <span class="vp-weight-chip" style="--w-color:#22c55e">资金 30%</span>
-      <span class="vp-weight-chip" style="--w-color:#f59e0b">量价 25%</span>
-      <span class="vp-weight-chip" style="--w-color:#ec4899">情绪 15%</span>
+    <div class="timing-wb-weights" aria-label="权重">
+      <span class="tw-wchip tw-wchip--trend">趋势</span>
+      <span class="tw-wchip tw-wchip--fund">资金</span>
+      <span class="tw-wchip tw-wchip--vp">量价</span>
+      <span class="tw-wchip tw-wchip--sent">情绪</span>
     </div>
-  </div>
-  <dl class="vp-def-grid">
-    <div class="vp-def-item"><dt>交易信号</dt><dd>buy / sell（唯一买卖事件）；量价页的「主升/退潮」是状态，不是买卖点</dd></div>
-    <div class="vp-def-item"><dt>买入 ↑</dt><dd>趋势≥60、资金≥55、量价≥50、情绪未过热，且 Score 上穿 70 → 次日开盘买</dd></div>
-    <div class="vp-def-item"><dt>卖出 ↓</dt><dd>破 MA20+趋势弱 / 资金连降 / 砸盘 / 回撤≥8% / Score 下穿 40 → 次日开盘卖</dd></div>
-    <div class="vp-def-item"><dt>回测</dt><dd>日批 <code>run_board_timing_backtest</code>；成功率=盈利笔数/已平仓；未平仓按末日收盘盯市</dd></div>
-  </dl>
-  <div id="bt-summary" class="vp-detail-metrics"></div>
-</div>
+  </header>
 
-<div class="card">
-  <h2 class="card-section-title">回测参数（可复现）</h2>
-  <p class="muted" style="margin:0 0 12px">信号日收盘确认 · T+1 开盘成交。改参数只重跑成交配对，不重算买卖信号。</p>
-  <div class="filters vp-filters" id="bt-param-form">
-    <label class="filter-field">
-      <span>Run</span>
-      <select id="bt-run-code"></select>
-    </label>
-    <label class="filter-field">
-      <span>成本(bp)</span>
-      <input type="number" id="bt-cost-bps" step="0.5" min="0" max="50" value="3" />
-    </label>
-    <label class="filter-field">
-      <span>回看交易日</span>
-      <input type="number" id="bt-lookback" step="1" min="20" max="500" value="120" />
-    </label>
-    <label class="filter-field">
-      <span>买入阈值</span>
-      <input type="number" id="bt-buy-score" step="1" min="50" max="90" value="70" />
-    </label>
-    <label class="filter-field">
-      <span>卖出阈值</span>
-      <input type="number" id="bt-sell-score" step="1" min="20" max="60" value="40" />
-    </label>
-    <label class="filter-field">
-      <span>止损</span>
-      <input type="number" id="bt-stop-loss" step="0.01" min="0.02" max="0.2" value="0.08" />
-    </label>
-    <div class="filter-actions">
-      <button type="button" class="btn btn-primary" id="btn-bt-run">按参数回测</button>
+  <section class="timing-wb-card timing-wb-kpi-card">
+    <div class="timing-wb-card-head">
+      <h2>回测总览</h2>
+      <span class="timing-wb-hint">等权汇总 · 当前 Run</span>
     </div>
-  </div>
-  <div id="bt-params-view" class="vp-detail-metrics"></div>
-</div>
+    <div id="bt-summary" class="tw-kpi-grid"></div>
+  </section>
 
-<div class="card filters-card vp-filters-card">
-  <div class="filters vp-filters">
-    <label class="filter-field">
-      <span>交易日期</span>
-      <select id="trade-date"></select>
-    </label>
-    <label class="filter-field">
-      <span>板块类型</span>
-      <select id="content-types">
-        <option value="行业,概念">行业+概念</option>
-        <option value="行业">行业</option>
-        <option value="概念">概念</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>信号</span>
-      <select id="signal-filter">
-        <option value="">排行不限</option>
-        <option value="buy">仅买入</option>
-        <option value="sell">仅卖出</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>排序</span>
-      <select id="sort-key">
-        <option value="score">综合分</option>
-        <option value="total_return">回测收益率</option>
-        <option value="win_rate">成功率</option>
-        <option value="trade_count">交易次数</option>
-        <option value="max_drawdown">最大回撤(小优先)</option>
-      </select>
-    </label>
-    <label class="filter-field filter-field--grow">
-      <span>搜索板块</span>
-      <input type="text" id="board-search" class="board-search" placeholder="名称或代码" autocomplete="off" />
-    </label>
-    <div class="filter-actions">
-      <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+  <section class="timing-wb-card timing-wb-toolbar-card">
+    <div class="timing-wb-toolbar" id="bt-query-bar">
+      <label class="tw-field">
+        <span>交易日</span>
+        <select id="trade-date"></select>
+      </label>
+      <label class="tw-field">
+        <span>板块</span>
+        <select id="content-types">
+          <option value="行业,概念">行业+概念</option>
+          <option value="行业">行业</option>
+          <option value="概念">概念</option>
+        </select>
+      </label>
+      <label class="tw-field">
+        <span>信号</span>
+        <select id="signal-filter">
+          <option value="">全部</option>
+          <option value="buy">仅买入</option>
+          <option value="sell">仅卖出</option>
+        </select>
+      </label>
+      <label class="tw-field">
+        <span>排序</span>
+        <select id="sort-key">
+          <option value="score">综合分</option>
+          <option value="total_return">收益率</option>
+          <option value="win_rate">成功率</option>
+          <option value="trade_count">交易次数</option>
+          <option value="max_drawdown">回撤(小优先)</option>
+        </select>
+      </label>
+      <label class="tw-field tw-field--grow">
+        <span>搜索</span>
+        <input type="text" id="board-search" placeholder="名称或代码" autocomplete="off" />
+      </label>
+      <div class="tw-actions">
+        <button type="button" class="btn btn-primary" id="btn-query">查询</button>
+      </div>
     </div>
+  </section>
+
+  <details class="timing-wb-card timing-wb-params">
+    <summary>
+      <span>回测参数 · 可复现</span>
+      <span class="timing-wb-hint">改参数只重配成交，不重算信号</span>
+    </summary>
+    <div class="timing-wb-params-body">
+      <div class="timing-wb-toolbar" id="bt-param-form">
+        <label class="tw-field">
+          <span>Run</span>
+          <select id="bt-run-code"></select>
+        </label>
+        <label class="tw-field">
+          <span>成本(bp)</span>
+          <input type="number" id="bt-cost-bps" step="0.5" min="0" max="50" value="3" />
+        </label>
+        <label class="tw-field">
+          <span>回看日</span>
+          <input type="number" id="bt-lookback" step="1" min="20" max="500" value="120" />
+        </label>
+        <label class="tw-field">
+          <span>买入阈值</span>
+          <input type="number" id="bt-buy-score" step="1" min="50" max="90" value="70" />
+        </label>
+        <label class="tw-field">
+          <span>卖出阈值</span>
+          <input type="number" id="bt-sell-score" step="1" min="20" max="60" value="40" />
+        </label>
+        <label class="tw-field">
+          <span>止损</span>
+          <input type="number" id="bt-stop-loss" step="0.01" min="0.02" max="0.2" value="0.08" />
+        </label>
+        <div class="tw-actions">
+          <button type="button" class="btn btn-primary" id="btn-bt-run">按参数回测</button>
+        </div>
+      </div>
+      <div id="bt-params-view" class="tw-kpi-grid tw-kpi-grid--compact"></div>
+    </div>
+  </details>
+
+  <details class="timing-wb-rules">
+    <summary>规则说明</summary>
+    <ul>
+      <li><strong>买入</strong> 趋势≥60、资金≥55、量价≥50、情绪未过热，Score 上穿 70 → 次日开盘买</li>
+      <li><strong>卖出</strong> 破 MA20+趋势弱 / 资金连降 / 砸盘 / 回撤≥8% / Score 下穿 40 → 次日开盘卖</li>
+      <li><strong>回测</strong> 成功率=盈利笔数/已平仓；未平仓按末日收盘盯市</li>
+    </ul>
+  </details>
+
+  <div id="page-error" class="alert alert-error hidden"></div>
+
+  <div class="timing-wb-split">
+    <section class="timing-wb-card">
+      <div class="timing-wb-card-head">
+        <h2>当日信号</h2>
+        <span class="timing-wb-hint">点击行打开详情</span>
+      </div>
+      <div class="table-wrap timing-wb-table-wrap">
+        <table class="data-table timing-wb-table" id="signal-table">
+          <thead>
+            <tr>
+              <th>信号</th>
+              <th>板块</th>
+              <th>类型</th>
+              <th>Score</th>
+              <th>趋势</th>
+              <th>资金</th>
+              <th>量价</th>
+              <th>情绪</th>
+              <th>原因</th>
+            </tr>
+          </thead>
+          <tbody id="signal-body"></tbody>
+        </table>
+      </div>
+      <p id="signal-empty" class="tw-empty hidden">当日无买卖事件</p>
+    </section>
+
+    <section class="timing-wb-card">
+      <div class="timing-wb-card-head">
+        <h2>综合排行</h2>
+        <span class="timing-wb-hint">Score + 回测</span>
+      </div>
+      <div class="table-wrap timing-wb-table-wrap">
+        <table class="data-table timing-wb-table" id="rank-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>板块</th>
+              <th>类型</th>
+              <th>Score</th>
+              <th>状态</th>
+              <th>收益</th>
+              <th>成功率</th>
+              <th>笔数</th>
+              <th>回撤</th>
+            </tr>
+          </thead>
+          <tbody id="rank-body"></tbody>
+        </table>
+      </div>
+      <p id="rank-empty" class="tw-empty hidden">暂无数据，请先跑日批</p>
+    </section>
   </div>
-</div>
 
-<div id="page-error" class="alert alert-error hidden"></div>
+  <section class="timing-wb-card timing-wb-detail hidden" id="detail-card">
+    <div class="timing-wb-card-head">
+      <h2 id="detail-title">板块详情</h2>
+      <span class="timing-wb-hint">三角=信号日 · 圆点=T+1成交 · 虚线=买入持有</span>
+    </div>
+    <div id="detail-metrics" class="tw-kpi-grid"></div>
 
-<div class="card">
-  <h2 class="card-section-title">当日买卖信号</h2>
-  <div class="table-wrap">
-    <table class="data-table" id="signal-table">
-      <thead>
-        <tr>
-          <th>信号</th>
-          <th>板块</th>
-          <th>类型</th>
-          <th>Score</th>
-          <th>趋势</th>
-          <th>资金</th>
-          <th>量价</th>
-          <th>情绪</th>
-          <th>原因</th>
-        </tr>
-      </thead>
-      <tbody id="signal-body"></tbody>
-    </table>
-  </div>
-  <p id="signal-empty" class="muted hidden">当日无买卖事件（中间带不标注）</p>
-</div>
-
-<div class="card">
-  <h2 class="card-section-title">综合分 / 回测排行</h2>
-  <div class="table-wrap">
-    <table class="data-table" id="rank-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>板块</th>
-          <th>类型</th>
-          <th>Score</th>
-          <th>状态</th>
-          <th>收益率</th>
-          <th>成功率</th>
-          <th>交易数</th>
-          <th>回撤</th>
-        </tr>
-      </thead>
-      <tbody id="rank-body"></tbody>
-    </table>
-  </div>
-  <p id="rank-empty" class="muted hidden">暂无数据，请先运行 run_board_timing_batch / run_board_timing_backtest</p>
-</div>
-
-<div class="card hidden" id="detail-card">
-  <h2 id="detail-title">板块详情</h2>
-  <div id="detail-metrics" class="vp-detail-metrics"></div>
-  <div class="filters kline-range-filters">
-    <div class="filter-field">
-      <span>K 线区间</span>
+    <div class="timing-wb-chart-bar">
       <div class="chip-group" id="kline-range-presets">
         <button type="button" class="chip" data-days="20">20日</button>
         <button type="button" class="chip active" data-days="60">60日</button>
         <button type="button" class="chip" data-days="120">120日</button>
       </div>
-    </div>
-    <div class="filter-field">
-      <span>量能</span>
       <div class="chip-group" id="vol-mode-chips">
         <button type="button" class="chip active" data-vol="vol">成交量</button>
         <button type="button" class="chip" data-vol="amount">成交额</button>
       </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-kline-refresh">刷新图表</button>
     </div>
-    <div class="filter-actions">
-      <button type="button" class="btn btn-primary" id="btn-kline-refresh">刷新</button>
+
+    <div id="timing-kline-chart" class="kline-chart-host timing-kline-chart"></div>
+
+    <div class="timing-wb-subhead">
+      <h3>净值曲线</h3>
+      <span class="timing-wb-hint">策略 vs 买入持有 · 基期=100</span>
     </div>
-  </div>
-  <div id="timing-kline-chart" class="kline-chart-host timing-kline-chart" style="min-height:520px"></div>
-  <h3>回测权益（策略 vs 买入持有 · 基期=100）</h3>
-  <div id="timing-equity-chart" class="kline-chart-host" style="min-height:240px"></div>
-  <p class="muted">三角=信号日；圆点=T+1 开盘成交。虚线=同期买入持有。</p>
-  <h3>回测成交明细</h3>
-  <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>信号买</th><th>成交买</th><th>买价</th>
-          <th>信号卖</th><th>成交卖</th><th>卖价</th>
-          <th>收益</th><th>持仓日</th><th>状态</th><th>原因</th>
-        </tr>
-      </thead>
-      <tbody id="bt-trade-body"></tbody>
-    </table>
-  </div>
-  <h3>历史买卖点（信号日）</h3>
-  <div class="table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr><th>日期</th><th>信号</th><th>Score</th><th>原因</th></tr>
-      </thead>
-      <tbody id="hist-signal-body"></tbody>
-    </table>
-  </div>
+    <div id="timing-equity-chart" class="kline-chart-host timing-equity-chart"></div>
+
+    <div class="timing-wb-subhead">
+      <h3>成交明细</h3>
+    </div>
+    <div class="table-wrap timing-wb-table-wrap">
+      <table class="data-table timing-wb-table">
+        <thead>
+          <tr>
+            <th>信号买</th><th>成交买</th><th>买价</th>
+            <th>信号卖</th><th>成交卖</th><th>卖价</th>
+            <th>收益</th><th>持仓日</th><th>状态</th><th>原因</th>
+          </tr>
+        </thead>
+        <tbody id="bt-trade-body"></tbody>
+      </table>
+    </div>
+
+    <div class="timing-wb-subhead">
+      <h3>历史买卖点</h3>
+    </div>
+    <div class="table-wrap timing-wb-table-wrap">
+      <table class="data-table timing-wb-table">
+        <thead>
+          <tr><th>日期</th><th>信号</th><th>Score</th><th>原因</th></tr>
+        </thead>
+        <tbody id="hist-signal-body"></tbody>
+      </table>
+    </div>
+  </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260805a"></script>
-<script src="/static/js/dc_kline_chart.js?v=20260805c"></script>
-<script src="/static/js/dc_board_timing.js?v=20260805c"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260805d"></script>
+<script src="/static/js/dc_board_timing.js?v=20260805d"></script>
 {% endblock %}

@@ -87,6 +87,18 @@
     return s || "—";
   }
 
+  function signalBadge(s) {
+    if (s === "buy") return `<span class="sig-badge sig-badge--buy">买入</span>`;
+    if (s === "sell") return `<span class="sig-badge sig-badge--sell">卖出</span>`;
+    return `<span class="muted">—</span>`;
+  }
+
+  function statePill(s) {
+    const cls =
+      s === "long" ? "pos-pill--long" : s === "watch" ? "pos-pill--watch" : s === "flat" ? "pos-pill--flat" : "";
+    return `<span class="pos-pill ${cls}">${labelState(s)}</span>`;
+  }
+
   function signalClass(s) {
     if (s === "buy") return "tone-up";
     if (s === "sell") return "tone-down";
@@ -98,8 +110,19 @@
     return Number(n) >= 0 ? "tone-up" : "tone-down";
   }
 
-  function metric(label, val, strong) {
-    return `<div class="vp-metric"><span class="vp-metric-label">${label}</span><span class="vp-metric-val${strong ? " strong" : ""}">${val}</span></div>`;
+  function metric(label, val, strong, tone) {
+    const toneCls = tone ? ` ${tone}` : "";
+    const strongCls = strong ? " strong" : "";
+    return (
+      `<div class="tw-kpi"><span class="tw-kpi-label">${label}</span>` +
+      `<span class="tw-kpi-val${strongCls}${toneCls}">${val}</span></div>`
+    );
+  }
+
+  function markActiveRow(code) {
+    document.querySelectorAll(".timing-wb-table tr.clickable-row").forEach((tr) => {
+      tr.classList.toggle("is-active", tr.getAttribute("data-code") === code);
+    });
   }
 
   async function loadDates() {
@@ -139,10 +162,10 @@
         metric("Run", run.run_code || activeRunCode),
         metric("回测区间", `${run.start_date} ~ ${run.end_date}`),
         metric("成功率", fmtPct(run.win_rate)),
-        metric("平均收益", fmtPct(run.avg_return)),
-        metric("等权收益", fmtPct(run.total_return), true),
-        metric("买入持有", fmtPct(run.bench_return)),
-        metric("最大回撤", fmtPct(run.max_drawdown)),
+        metric("平均收益", fmtPct(run.avg_return), false, tonePct(run.avg_return)),
+        metric("等权收益", fmtPct(run.total_return), true, tonePct(run.total_return)),
+        metric("买入持有", fmtPct(run.bench_return), false, tonePct(run.bench_return)),
+        metric("最大回撤", fmtPct(run.max_drawdown), false, "tone-down"),
         metric("夏普", fmt(run.sharpe, 2)),
         metric("Calmar", fmt(run.calmar, 2)),
         metric("盈亏比", fmt(run.profit_factor, 2)),
@@ -245,10 +268,10 @@
       .map((r) => {
         return (
           `<tr data-code="${r.industry_code}" class="clickable-row">` +
-          `<td class="${signalClass(r.signal_type)}"><strong>${labelSignal(r.signal_type)}</strong></td>` +
-          `<td>${r.industry_name || r.industry_code}</td>` +
-          `<td>${r.content_type || "—"}</td>` +
-          `<td>${fmt(r.score)}</td>` +
+          `<td>${signalBadge(r.signal_type)}</td>` +
+          `<td><strong>${r.industry_name || r.industry_code}</strong></td>` +
+          `<td class="muted">${r.content_type || "—"}</td>` +
+          `<td><strong>${fmt(r.score)}</strong></td>` +
           `<td>${fmt(r.score_trend)}</td>` +
           `<td>${fmt(r.score_fund)}</td>` +
           `<td>${fmt(r.score_vp)}</td>` +
@@ -262,6 +285,7 @@
     elSigBody.querySelectorAll("tr[data-code]").forEach((tr) => {
       tr.addEventListener("click", () => openDetail(tr.getAttribute("data-code")));
     });
+    if (currentCode) markActiveRow(currentCode);
   }
 
   async function loadRank() {
@@ -288,15 +312,15 @@
       .map((r, i) => {
         return (
           `<tr data-code="${r.industry_code}" class="clickable-row">` +
-          `<td>${r.rank_score != null ? r.rank_score : i + 1}</td>` +
-          `<td>${r.industry_name || r.industry_code}</td>` +
-          `<td>${r.content_type || "—"}</td>` +
+          `<td class="muted">${r.rank_score != null ? r.rank_score : i + 1}</td>` +
+          `<td><strong>${r.industry_name || r.industry_code}</strong></td>` +
+          `<td class="muted">${r.content_type || "—"}</td>` +
           `<td><strong>${fmt(r.score)}</strong></td>` +
-          `<td>${labelState(r.position_state)}</td>` +
+          `<td>${statePill(r.position_state)}</td>` +
           `<td class="${tonePct(r.bt_total_return)}">${fmtPct(r.bt_total_return)}</td>` +
           `<td>${fmtPct(r.bt_win_rate)}</td>` +
           `<td>${r.bt_trade_count != null ? r.bt_trade_count : "—"}</td>` +
-          `<td>${fmtPct(r.bt_max_drawdown)}</td>` +
+          `<td class="tone-down">${fmtPct(r.bt_max_drawdown)}</td>` +
           `</tr>`
         );
       })
@@ -305,6 +329,7 @@
     elRankBody.querySelectorAll("tr[data-code]").forEach((tr) => {
       tr.addEventListener("click", () => openDetail(tr.getAttribute("data-code")));
     });
+    if (currentCode) markActiveRow(currentCode);
   }
 
   function renderDetailHeader(payload) {
@@ -316,15 +341,15 @@
     elDetailMetrics.innerHTML = [
       metric("综合分", fmt(t.score), true),
       metric("状态", labelState(t.position_state)),
-      metric("信号", labelSignal(t.signal_type)),
-      metric("收益率", fmtPct(bt.total_return), true),
-      metric("买入持有", fmtPct(bt.bench_return)),
-      metric("超额", fmtPct(bt.excess_return)),
+      metric("信号", labelSignal(t.signal_type), false, signalClass(t.signal_type)),
+      metric("收益率", fmtPct(bt.total_return), true, tonePct(bt.total_return)),
+      metric("买入持有", fmtPct(bt.bench_return), false, tonePct(bt.bench_return)),
+      metric("超额", fmtPct(bt.excess_return), false, tonePct(bt.excess_return)),
       metric("成功率", fmtPct(bt.win_rate)),
       metric("夏普", fmt(bt.sharpe, 2)),
       metric("Calmar", fmt(bt.calmar, 2)),
       metric("盈亏比", fmt(bt.profit_factor, 2)),
-      metric("回撤", fmtPct(bt.max_drawdown)),
+      metric("回撤", fmtPct(bt.max_drawdown), false, "tone-down"),
       metric("连亏", bt.max_loss_streak != null ? String(bt.max_loss_streak) : "—"),
       metric("交易数", bt.trade_count != null ? String(bt.trade_count) : "—"),
       metric("成交", payload.exec_model || "t1_open"),
@@ -362,7 +387,7 @@
         return (
           `<tr>` +
           `<td>${s.trade_date || "—"}</td>` +
-          `<td class="${signalClass(s.signal_type)}">${labelSignal(s.signal_type)}</td>` +
+          `<td>${signalBadge(s.signal_type)}</td>` +
           `<td>${fmt(s.score)}</td>` +
           `<td class="muted">${s.signal_reason || "—"}</td>` +
           `</tr>`
@@ -391,6 +416,7 @@
   async function openDetail(code) {
     if (!code) return;
     currentCode = code;
+    markActiveRow(code);
     const td = selectedDate();
     const url =
       `/api/v1/timing/boards/${encodeURIComponent(code)}/kline?days=${klineDays}` +
