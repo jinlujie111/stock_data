@@ -22,7 +22,7 @@ def init_vp_routes(templates: Jinja2Templates) -> None:
 
 @page_router.get("/dc/volume-price", response_class=HTMLResponse)
 def volume_price_page(request: Request, user: dict = Depends(require_user)):
-    raise HTTPException(status_code=404, detail="板块量价已下线（决策链路已移除）")
+    raise HTTPException(status_code=404, detail="该功能已下线")
 
 
 @api_router.get("/trade-dates")

@@ -52,7 +52,7 @@ class StockFavoriteBody(BaseModel):
 
 @page_router.get("/dc/sectors", response_class=HTMLResponse)
 def sectors_page(request: Request, user: dict = Depends(require_user)):
-    raise HTTPException(status_code=404, detail="行业板块页已下线（决策链路已移除）")
+    raise HTTPException(status_code=404, detail="该功能已下线")
 
 
 @page_router.get("/favorites/boards", response_class=HTMLResponse)
@@ -252,31 +252,14 @@ def api_list_stock_favorites(
     trade_date: str | None = Query(None),
     user: dict = Depends(require_user),
 ):
-    try:
-        td = _resolve_fav_trade_date(trade_date)
-        return {"items": fav_svc.list_stock_favorites(user["id"], td), "trade_date": td}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    raise HTTPException(status_code=404, detail="股票自选已下线")
 
 
 @fav_router.post("/stocks")
 def api_add_stock_favorite(body: StockFavoriteBody, user: dict = Depends(require_user)):
-    try:
-        return fav_svc.add_stock_favorite(user["id"], body.ts_code, body.stock_name)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    raise HTTPException(status_code=404, detail="股票自选已下线")
 
 
 @fav_router.delete("/stocks/{ts_code}")
 def api_remove_stock_favorite(ts_code: str, user: dict = Depends(require_user)):
-    try:
-        ok = fav_svc.remove_stock_favorite(user["id"], ts_code)
-        if not ok:
-            raise HTTPException(status_code=404, detail="未找到自选股票")
-        return {"ok": True}
-    except SQLAlchemyError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    raise HTTPException(status_code=404, detail="股票自选已下线")

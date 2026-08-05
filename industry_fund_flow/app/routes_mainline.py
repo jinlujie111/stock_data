@@ -23,7 +23,7 @@ def init_mainline_routes(templates: Jinja2Templates) -> None:
 
 @page_router.get("/dc/mainline", response_class=HTMLResponse)
 def mainline_page(request: Request, user: dict = Depends(require_user)):
-    raise HTTPException(status_code=404, detail="主线板块已下线（决策链路已移除）")
+    raise HTTPException(status_code=404, detail="该功能已下线")
 
 
 @api_router.get("/trade-dates")

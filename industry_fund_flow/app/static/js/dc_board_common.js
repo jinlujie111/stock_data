@@ -128,7 +128,7 @@
     );
   }
 
-  // ---------- 决策漏斗 Context：选板块 → 选股票 ----------
+  // ---------- 上下文（localStorage；页面顶栏「决策链路」已移除） ----------
   const CTX_KEY = "iff_decision_ctx";
 
   function getDecisionCtx() {
@@ -142,13 +142,11 @@
   function setDecisionCtx(patch) {
     const next = Object.assign({}, getDecisionCtx(), patch || {}, { updated_at: Date.now() });
     localStorage.setItem(CTX_KEY, JSON.stringify(next));
-    renderDecisionBar();
     return next;
   }
 
   function clearDecisionCtx() {
     localStorage.removeItem(CTX_KEY);
-    renderDecisionBar();
   }
 
   function pickBoard(code, name, tradeDate) {
@@ -287,56 +285,17 @@
   }
 
   function renderDecisionBar() {
+    // 决策链路顶栏已下线：隐藏残留节点
     const el = document.getElementById("decision-ctx-bar");
-    if (!el) return;
-    const ctx = getDecisionCtx();
-    const hasBoard = !!ctx.industry_code;
-    const hasStock = !!ctx.ts_code;
-    if (!hasBoard && !hasStock) {
-      el.innerHTML =
-        `<div class="decision-ctx-inner decision-ctx-inner--empty">` +
-        `<span class="decision-ctx-label">决策链路</span>` +
-        `<span class="muted">资金/主线 → 量价确认 → 龙头/成分 → K线 · 尚未选择板块</span>` +
-        `</div>`;
-      el.classList.remove("hidden");
-      return;
+    if (el) {
+      el.innerHTML = "";
+      el.classList.add("hidden");
+      el.style.display = "none";
     }
-    const tdIso = normalizeIsoDate(ctx.trade_date) || ctx.trade_date || "";
-    const boardText = hasBoard
-      ? `<strong>${escAttr(ctx.industry_name || ctx.industry_code)}</strong>` +
-        `<span class="muted"> ${escAttr(ctx.industry_code)}</span>`
-      : `<span class="muted">未选板块</span>`;
-    const stockText = hasStock
-      ? `<strong>${escAttr(ctx.stock_name || ctx.ts_code)}</strong>` +
-        `<span class="muted"> ${escAttr(ctx.ts_code)}</span>`
-      : `<span class="muted">未选股票</span>`;
-
-    const tdQ = ctx.trade_date ? `&trade_date=${encodeURIComponent(ctx.trade_date)}` : "";
-    const boardLinks = hasBoard
-      ? `<a class="funnel-link" href="/dc/volume-price?industry_code=${encodeURIComponent(ctx.industry_code)}&industry_name=${encodeURIComponent(ctx.industry_name || "")}${tdQ}">量价</a>` +
-        `<a class="funnel-link" href="/dc/dragon?industry_code=${encodeURIComponent(ctx.industry_code)}&industry_name=${encodeURIComponent(ctx.industry_name || "")}${tdQ}">龙头</a>` +
-        `<a class="funnel-link" href="/dc/sectors?industry_code=${encodeURIComponent(ctx.industry_code)}&industry_name=${encodeURIComponent(ctx.industry_name || "")}${tdQ}">成分</a>`
-      : "";
-    const stockLink = hasStock
-      ? `<a class="funnel-link funnel-link--primary" href="${klineHref("stock", ctx.ts_code, ctx.trade_date)}">K线</a>`
-      : "";
-
-    el.innerHTML =
-      `<div class="decision-ctx-inner">` +
-      `<span class="decision-ctx-label">当前选择</span>` +
-      `<span class="decision-ctx-item"><span class="decision-ctx-step">板块</span>${boardText}</span>` +
-      `<span class="decision-ctx-sep">→</span>` +
-      `<span class="decision-ctx-item"><span class="decision-ctx-step">股票</span>${stockText}</span>` +
-      (tdIso ? `<span class="muted decision-ctx-date">${escAttr(tdIso)}</span>` : "") +
-      `<span class="decision-ctx-actions">${boardLinks}${stockLink}` +
-      `<button type="button" class="btn btn-ghost btn-sm" id="btn-clear-decision-ctx">清除</button></span>` +
-      `</div>`;
-    el.classList.remove("hidden");
-    const btn = document.getElementById("btn-clear-decision-ctx");
-    if (btn) btn.onclick = () => clearDecisionCtx();
   }
 
   function bindDecisionPickClicks() {
+    // 保留 data-pick-* 写入 localStorage，但不渲染链路条
     if (document.documentElement.dataset.decisionPickBound) return;
     document.documentElement.dataset.decisionPickBound = "1";
     document.addEventListener("click", (e) => {
