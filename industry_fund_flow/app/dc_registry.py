@@ -134,8 +134,27 @@ DC_DIMENSIONS: dict[str, DimensionDef] = {
 
 CONTENT_TYPES = ["行业", "概念"]
 
-# 已下线 Web 入口（ETL/数仓仍保留）
-DISABLED_DC_SLUGS = frozenset({"trend-strength", "market-heat", "prosperity", "diffusion"})
+# 已下线 Web 入口（ODS 同步仍保留；相关 DWM 日批已停）
+DISABLED_DC_SLUGS = frozenset(
+    {
+        "fund-flow",
+        "trend-strength",
+        "market-heat",
+        "prosperity",
+        "diffusion",
+    }
+)
+
+# 决策链路整段下线（页面 404）；板块择时保留；timing-kline 302 → board-timing
+RETIRED_DC_PAGES = frozenset(
+    {
+        "mainline",
+        "dragon",
+        "sectors",
+        "kline",
+        "volume-price",
+    }
+)
 
 # 非东财维度页的 /dc/* 路径（由独立 page_router 处理，勿落入 /dc/{slug}）
 RESERVED_DC_PAGE_SLUGS = frozenset(
@@ -150,20 +169,10 @@ RESERVED_DC_PAGE_SLUGS = frozenset(
     }
 )
 
-# 决策链路：资金 → 主线 → 量价确认 → 择时(买卖+回测) → 龙头/成分 → K线
-# 已下线：板块情绪页（保留 sentiment API）/ 涨停分析 / 热点股预览 / 量化选股 / 量化选板块
-# 择时K线已合并进「板块择时」工作台（/dc/timing-kline 仍 302 兼容）
+# 产品主脊：板块择时（买卖点+回测）。决策链路/龙头已下线；ODS 同步不停。
 _NAV_RAW: list[dict[str, str]] = [
-    {"slug": "fund-flow", "label": "资金强度", "href": "/dc/fund-flow", "section": "决策链路"},
-    {"slug": "mainline", "label": "主线板块", "href": "/dc/mainline", "section": "决策链路"},
-    {"slug": "volume-price", "label": "板块量价", "href": "/dc/volume-price", "section": "决策链路"},
-    {"slug": "board-timing", "label": "板块择时", "href": "/dc/board-timing", "section": "决策链路"},
-    {"slug": "dragon", "label": "板块龙头", "href": "/dc/dragon", "section": "决策链路"},
-    {"slug": "sectors", "label": "行业板块", "href": "/dc/sectors", "section": "决策链路"},
-    {"slug": "kline", "label": "K线分析", "href": "/dc/kline", "section": "决策链路"},
-    # 自选
+    {"slug": "board-timing", "label": "板块择时", "href": "/dc/board-timing", "section": "板块择时"},
     {"slug": "board-favorites", "label": "板块自选", "href": "/favorites/boards", "section": "我的自选"},
-    {"slug": "stock-favorites", "label": "股票自选", "href": "/favorites/stocks", "section": "我的自选"},
 ]
 
 

@@ -52,17 +52,7 @@ class StockFavoriteBody(BaseModel):
 
 @page_router.get("/dc/sectors", response_class=HTMLResponse)
 def sectors_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "dc_sectors.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "sectors",
-            "content_types": CONTENT_TYPES,
-            "title": "行业板块",
-        },
-    )
+    raise HTTPException(status_code=404, detail="行业板块页已下线（决策链路已移除）")
 
 
 @page_router.get("/favorites/boards", response_class=HTMLResponse)
@@ -83,17 +73,7 @@ def board_favorites_page(request: Request, user: dict = Depends(require_user)):
 
 @page_router.get("/favorites/stocks", response_class=HTMLResponse)
 def stock_favorites_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "favorites_stock.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "stock-favorites",
-            "title": "股票自选",
-            "favorites_kind": "stock",
-        },
-    )
+    raise HTTPException(status_code=404, detail="股票自选已下线")
 
 
 @api_router.get("/trade-dates")

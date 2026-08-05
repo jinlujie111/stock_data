@@ -104,21 +104,16 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 
 | 步骤 | 任务 | 依赖 | 产品 |
 |------|------|------|------|
-| ① | `run_data_sync` | `status=1` 的 ODS（个股行情/指标/资金流、东财板块、`limit_list`、`index_daily`、`moneyflow_hsgt`、`dc_hot`、`fina_indicator`、`report_rc`、`adj_factor`、`stk_limit`、ETF 等） | 全部 |
-| ② | `run_dwm_market_breadth` | `ods_stock_detail_di`、`ods_limit_list_di` | 首页广度 / 情绪 |
-| ③ | `run_dwm_dc_industry_fund_flow` | 东财行业资金流 ODS | 需求1 五维 |
-| ④ | `run_dwm_dc_industry_trend_strength` | 东财板块日线 + `ods_index_daily_di` | 需求1 五维 |
-| ⑤ | `run_dwm_dc_industry_market_heat` | `ods_dc_*` + `ods_dc_hot_di` | 需求1 五维 |
-| ⑥ | `run_dwm_dc_industry_diffusion` | 东财成分 + 涨停 + 广度 | 需求1 五维 |
-| ⑦ | `run_dwm_dc_industry_prosperity` | 东财成分 + `ods_fina_indicator` + `ods_report_rc_di` | 需求1 五维 |
-| ⑧ | `run_dws_dc_industry_mainline_score` + `monitor` | 上述全部 DWM | **需求1 主线榜** |
-| ⑨ | `run_vp_batch` | 板块/个股 ODS | 需求5 量价 |
-| ⑩ | `run_sector_dragon_batch` | 资金 DWM + 个股 ODS | 需求2 龙头 |
-| ⑪ | `run_board_timing_batch` | 东财日线/资金流/涨停/成分 ODS | 板块四因子择时（K 线买卖点） |
-| ⑪b | `run_board_timing_backtest` | ⑪ 信号表 + `ods_dc_daily_di` | 择时回测（T+1 开盘 · 收益率/成功率） |
-| ⑫ | `run_ods_completeness_monitor` | — | ODS 完整度（已停表 `enabled=false`） |
+| ① | `run_data_sync` | `status=1` 的 ODS | **全部（ODS 不停）** |
+| ② | `run_dwm_market_breadth` | 个股/涨停 ODS | 首页广度 / 情绪 |
+| ③ | `run_dwm_dc_industry_market_heat` | `ods_dc_*` + hot | 择时过热门禁（页已下线） |
+| ④ | `run_board_timing_batch` | 东财日线/资金流 ODS | **板块择时买卖点** |
+| ⑤ | `run_board_timing_backtest` | ④ + `ods_dc_daily_di` | **择时回测 T+1** |
+| ⑥ | `run_ods_completeness_monitor` | — | ODS 完整度 |
 
-> **已删除链路**：同花顺 / 申万 DWM·DWS、AI 核心池、量化主线（需求3）、量化选股、量化选板块。停同步见 `mysql_tables/migrations/20260715_pause_unused_sync.sql`；`rotation_*` 业务表删除见 `20260723_drop_rotation_sector_selection.sql`（**不影响** `sw_daily` 等 ODS 同步）。  
+> **日批已停（脚本保留可手工补跑）**：资金/趋势/扩散/景气 DWM、主线 DWS、量价 VP、板块龙头。  
+> **Web 已下线**：决策链路（资金/主线/量价/行业/K线）与板块龙头；导航仅「板块择时 + 自选」。  
+> **已删除产品**：同花顺/申万 DWM·DWS、AI 核心池、量化选股/选板块。ODS 仍由 `db_sync_task.status=1` 驱动。  
 
 **需求1 落库表（步骤 ⑧）**
 
@@ -306,21 +301,19 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | 页面 | URL | 日批步骤 | 主要读表 |
 |------|-----|----------|----------|
 | 首页（市场广度 / 情绪） | `/` | ② + HSGT ODS | `dwm_market_breadth_di` 等 |
-| **资金强度** | `/dc/fund-flow` | ③ | `dwm_dc_industry_fund_flow_di` |
-| **主线板块**（需求1） | `/dc/mainline` | ⑧ | `dws_dc_industry_mainline_monitor_di` |
-| **板块量价**（需求5） | `/dc/vp` | ⑨ | `dwm_industry_vp_score_di` 等 |
-| **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
-| **板块择时**（买卖点+回测工作台） | `/dc/board-timing` | ⑪ + ⑪b | `dwm_board_timing_signal_di` + `dwm_board_timing_bt_*` |
-| **择时K线**（已合并，302 到择时页） | `/dc/timing-kline` → `/dc/board-timing` | ⑪ + ⑪b | 同上 |
+| **板块择时**（买卖点+回测） | `/dc/board-timing` | ④ + ⑤ | `dwm_board_timing_signal_di` + `dwm_board_timing_bt_*` |
+| **择时K线**（302） | `/dc/timing-kline` → `/dc/board-timing` | ④ + ⑤ | 同上 |
+| 自选 | `/favorites/*` | — | `data_industry` |
 | 登录 / 注册 | `/login` `/register` | — | `data_industry.app_user` |
+| ~~资金/主线/量价/龙头/行业/K线~~ | 已下线 404 | 日批已停 | — |
 
-导航栏与各 `/dc/{slug}` 页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册（五维单页可已下架导航，ETL 仍写库供主线）。
+导航仅「板块择时 + 自选」：[`dc_registry.py`](industry_fund_flow/app/dc_registry.py)。
 
 **推荐访问顺序（收盘后）**
 
 1. 等日批 `xxl_daily_batch.sh` 跑完（或 XXL-JOB `stock_daily_all` 成功）
 2. 浏览器打开 `http://<host>:8082/login` 登录
-3. 首页看情绪/广度 → 资金强度 → 主线板块 → 板块量价 → 板块择时 → 板块龙头
+3. 首页看情绪/广度 → **板块择时**（买卖信号 + 回测）
 
 ### 8.4 API 速查（需登录 Cookie）
 

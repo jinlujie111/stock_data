@@ -74,10 +74,7 @@ def list_trade_dates(limit: int = 120) -> list[str]:
 def _latest_bt_run(run_code: str = DEFAULT_RUN_CODE) -> dict | None:
     row = fetch_one_stock(
         f"""
-        SELECT id, run_code, name, start_date, end_date, content_types,
-               exec_model, cost_bps, params_json, status,
-               trade_count, board_count, win_rate, avg_return, total_return,
-               max_drawdown, avg_hold_days, profit_factor, finished_at
+        SELECT *
         FROM {BT_RUN}
         WHERE run_code = :code AND status = 'done'
         ORDER BY end_date DESC, id DESC
@@ -88,11 +85,66 @@ def _latest_bt_run(run_code: str = DEFAULT_RUN_CODE) -> dict | None:
     return _serialize_row(row)
 
 
+def list_backtest_runs(limit: int = 20) -> dict:
+    rows = fetch_all_stock(
+        f"""
+        SELECT *
+        FROM {BT_RUN}
+        WHERE status = 'done'
+        ORDER BY end_date DESC, id DESC
+        LIMIT :lim
+        """,
+        {"lim": limit},
+    )
+    return {"items": [_serialize_row(r) for r in rows], "count": len(rows)}
+
+
+def get_timing_config(run_code: str = DEFAULT_RUN_CODE) -> dict:
+    """默认参数 + 最近一次 run 的 params 快照（可复现）。"""
+    import json
+
+    defaults = {
+        "weight_trend": 0.30,
+        "weight_fund": 0.30,
+        "weight_vp": 0.25,
+        "weight_sentiment": 0.15,
+        "buy_score": 70.0,
+        "sell_score": 40.0,
+        "gate_trend": 60.0,
+        "gate_fund": 55.0,
+        "gate_vp": 50.0,
+        "sell_trend": 45.0,
+        "stop_loss_pct": 0.08,
+        "cost_bps": 3.0,
+        "exec_model": EXEC_MODEL,
+        "backtest_lookback_days": 120,
+        "content_types": ["行业", "概念"],
+    }
+    run = _latest_bt_run(run_code)
+    params = None
+    if run and run.get("params_json"):
+        raw = run["params_json"]
+        if isinstance(raw, str):
+            try:
+                params = json.loads(raw)
+            except json.JSONDecodeError:
+                params = None
+        elif isinstance(raw, dict):
+            params = raw
+    return {
+        "exec_model": EXEC_MODEL,
+        "defaults": defaults,
+        "active_params": params or defaults,
+        "run": run,
+    }
+
+
 def get_backtest_summary(run_code: str = DEFAULT_RUN_CODE) -> dict:
     return {
         "exec_model": EXEC_MODEL,
         "retention_days": RETENTION_DAYS,
         "run": _latest_bt_run(run_code),
+        "config": get_timing_config(run_code),
     }
 
 
@@ -381,6 +433,7 @@ def get_board_trades(
     *,
     run_code: str = DEFAULT_RUN_CODE,
     limit: int = 100,
+    bars: list[dict] | None = None,
 ) -> dict:
     run = _latest_bt_run(run_code)
     if not run:
@@ -390,6 +443,8 @@ def get_board_trades(
             "count": 0,
             "metrics": None,
             "equity_curve": [],
+            "buyhold_curve": [],
+            "executions": [],
             "exec_model": EXEC_MODEL,
         }
     bare = industry_code.strip().replace(".DC", "")
@@ -430,12 +485,53 @@ def get_board_trades(
                 "is_open": int(r.get("is_open") or 0),
             }
         )
+
+    # 买入持有曲线（对齐 bars 或按成交区间）
+    buyhold_curve: list[dict] = []
+    if bars:
+        closes = [
+            (b.get("trade_date"), float(b["close"]))
+            for b in bars
+            if b.get("close") is not None and b.get("trade_date")
+        ]
+        if closes:
+            base = closes[0][1]
+            if base > 0:
+                buyhold_curve = [
+                    {"trade_date": d, "equity": c / base}
+                    for d, c in closes
+                ]
+
+    # 图上成交点：T+1 开盘实际进出
+    executions = []
+    for r in chron:
+        executions.append(
+            {
+                "kind": "entry",
+                "signal_date": _serialize(r.get("buy_signal_date")),
+                "trade_date": _serialize(r.get("entry_date")),
+                "price": float(r["entry_price"]) if r.get("entry_price") is not None else None,
+            }
+        )
+        if r.get("exit_date") is not None:
+            executions.append(
+                {
+                    "kind": "exit",
+                    "signal_date": _serialize(r.get("sell_signal_date")),
+                    "trade_date": _serialize(r.get("exit_date")),
+                    "price": float(r["exit_price"]) if r.get("exit_price") is not None else None,
+                    "is_open": int(r.get("is_open") or 0),
+                }
+            )
+
     return {
         "run": run,
         "exec_model": EXEC_MODEL,
         "metrics": _serialize_row(metrics),
         "items": [_serialize_row(r) for r in rows],
         "equity_curve": curve,
+        "buyhold_curve": buyhold_curve,
+        "executions": executions,
         "count": len(rows),
     }
 
@@ -503,7 +599,7 @@ def get_board_kline(
         series.append(row if row else {"trade_date": d})
 
     last_timing = next((t for t in reversed(series) if t and t.get("score") is not None), None)
-    bt = get_board_trades(code)
+    bt = get_board_trades(code, bars=bars)
 
     return {
         **chart,
@@ -524,5 +620,7 @@ def get_board_kline(
             "metrics": bt.get("metrics"),
             "trades": bt.get("items"),
             "equity_curve": bt.get("equity_curve"),
+            "buyhold_curve": bt.get("buyhold_curve"),
+            "executions": bt.get("executions"),
         },
     }

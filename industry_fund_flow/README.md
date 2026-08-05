@@ -1,12 +1,13 @@
 # 行业资金流网站
 
-基于 FastAPI 的 Web 应用：用户登录 + 东财板块数据展示（资金强度、主线榜、量价、板块择时、龙头、行业板块、K 线、自选等）。
+基于 FastAPI 的 Web 应用：用户登录 + **板块择时（买卖点 + T+1 回测）** + 自选。  
+决策链路（资金/主线/量价/行业/K线）与板块龙头 **Web 已下线**；**ODS 同步日批保留**。
 
 **启动方式**：见仓库根目录 [XXL-JOB执行顺序.md §八](../XXL-JOB执行顺序.md)（**不纳入日批 / func.sh 封装**）。
 
 ## 数据库
 
-网站用户数据在 **`data_industry`** 库；板块/主线读 **`stock_data`** 库（只读授权）。
+网站用户数据在 **`data_industry`** 库；板块/择时读 **`stock_data`** 库（只读授权）。
 
 ```bash
 # 1) root 建库并授权（仅首次）
@@ -31,14 +32,10 @@ export IFF_JWT_SECRET='请改为随机长字符串'   # 生产环境必设
 |------|------|
 | `/login` `/register` | 登录 / 注册 |
 | `/` | 登录后首页（市场广度 / 大盘情绪） |
-| `/dc/fund-flow` | 资金强度 |
-| `/dc/mainline` | 需求1 东财主线榜 |
-| `/dc/volume-price` | 需求5 板块量价 |
-| `/dc/board-timing` | 板块择时（买卖点 + T+1 回测；旧 `/dc/timing-kline` 已合并） |
-| `/dc/dragon` | 需求2 板块龙头 |
-| `/dc/sectors` | 行业板块 |
-| `/dc/kline` | K 线分析 |
-| `/favorites/boards` `/favorites/stocks` | 板块/股票自选 |
+| `/dc/board-timing` | **板块择时**（买卖点 + T+1 回测；`/dc/timing-kline` 302 到此） |
+| `/favorites/boards` | 板块自选 |
+| `/favorites/stocks` | **已下线 404** |
+| `/dc/fund-flow` `/dc/mainline` `/dc/volume-price` `/dc/dragon` `/dc/sectors` `/dc/kline` | **已下线 404** |
 | `POST /logout` | 退出 |
 
 ## API（需 Cookie `iff_token`）

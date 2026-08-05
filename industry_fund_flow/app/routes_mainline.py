@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.deps import require_user
-from app.dc_registry import CONTENT_TYPES, NAV_ITEMS
+from app.dc_registry import NAV_ITEMS
 from app.dc_service import parse_csv_list
 from app import mainline_service as ml_svc
 
@@ -23,17 +23,7 @@ def init_mainline_routes(templates: Jinja2Templates) -> None:
 
 @page_router.get("/dc/mainline", response_class=HTMLResponse)
 def mainline_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "dc_mainline.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "mainline",
-            "content_types": CONTENT_TYPES,
-            "title": "主线板块",
-        },
-    )
+    raise HTTPException(status_code=404, detail="主线板块已下线（决策链路已移除）")
 
 
 @api_router.get("/trade-dates")

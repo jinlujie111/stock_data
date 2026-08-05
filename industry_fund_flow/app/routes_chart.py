@@ -32,17 +32,7 @@ def init_chart_routes(templates: Jinja2Templates) -> None:
 
 @page_router.get("/dc/kline", response_class=HTMLResponse)
 def kline_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "dc_kline.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "kline",
-            "title": "K线分析",
-            "indicator_options": INDICATOR_OPTIONS,
-        },
-    )
+    raise HTTPException(status_code=404, detail="K线分析页已下线，请使用板块择时")
 
 
 @api_router.get("/kline")

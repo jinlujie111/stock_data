@@ -26,6 +26,41 @@
   <div id="bt-summary" class="vp-detail-metrics"></div>
 </div>
 
+<div class="card">
+  <h2 class="card-section-title">回测参数（可复现）</h2>
+  <p class="muted" style="margin:0 0 12px">信号日收盘确认 · T+1 开盘成交。改参数只重跑成交配对，不重算买卖信号。</p>
+  <div class="filters vp-filters" id="bt-param-form">
+    <label class="filter-field">
+      <span>Run</span>
+      <select id="bt-run-code"></select>
+    </label>
+    <label class="filter-field">
+      <span>成本(bp)</span>
+      <input type="number" id="bt-cost-bps" step="0.5" min="0" max="50" value="3" />
+    </label>
+    <label class="filter-field">
+      <span>回看交易日</span>
+      <input type="number" id="bt-lookback" step="1" min="20" max="500" value="120" />
+    </label>
+    <label class="filter-field">
+      <span>买入阈值</span>
+      <input type="number" id="bt-buy-score" step="1" min="50" max="90" value="70" />
+    </label>
+    <label class="filter-field">
+      <span>卖出阈值</span>
+      <input type="number" id="bt-sell-score" step="1" min="20" max="60" value="40" />
+    </label>
+    <label class="filter-field">
+      <span>止损</span>
+      <input type="number" id="bt-stop-loss" step="0.01" min="0.02" max="0.2" value="0.08" />
+    </label>
+    <div class="filter-actions">
+      <button type="button" class="btn btn-primary" id="btn-bt-run">按参数回测</button>
+    </div>
+  </div>
+  <div id="bt-params-view" class="vp-detail-metrics"></div>
+</div>
+
 <div class="card filters-card vp-filters-card">
   <div class="filters vp-filters">
     <label class="filter-field">
@@ -38,25 +73,6 @@
         <option value="行业,概念">行业+概念</option>
         <option value="行业">行业</option>
         <option value="概念">概念</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>主线过滤</span>
-      <select id="mainline-filter">
-        <option value="">全部</option>
-        <option value="超级主线,主线">超级主线+主线</option>
-        <option value="超级主线">超级主线</option>
-        <option value="主线">主线</option>
-        <option value="轮动热点">轮动热点</option>
-      </select>
-    </label>
-    <label class="filter-field">
-      <span>量价状态</span>
-      <select id="vp-status-filter">
-        <option value="">全部</option>
-        <option value="mainline_burst,trend_up">爆发/上行</option>
-        <option value="mainline_burst">板块爆发</option>
-        <option value="trend_up">趋势上行</option>
       </select>
     </label>
     <label class="filter-field">
@@ -127,8 +143,6 @@
           <th>成功率</th>
           <th>交易数</th>
           <th>回撤</th>
-          <th>主线</th>
-          <th>量价状态</th>
         </tr>
       </thead>
       <tbody id="rank-body"></tbody>
@@ -161,8 +175,9 @@
     </div>
   </div>
   <div id="timing-kline-chart" class="kline-chart-host timing-kline-chart" style="min-height:520px"></div>
-  <h3>回测权益（T+1 开盘 · 复利）</h3>
-  <div id="timing-equity-chart" class="kline-chart-host" style="min-height:220px"></div>
+  <h3>回测权益（策略 vs 买入持有 · 基期=100）</h3>
+  <div id="timing-equity-chart" class="kline-chart-host" style="min-height:240px"></div>
+  <p class="muted">三角=信号日；圆点=T+1 开盘成交。虚线=同期买入持有。</p>
   <h3>回测成交明细</h3>
   <div class="table-wrap">
     <table class="data-table">
@@ -191,6 +206,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260714b"></script>
-<script src="/static/js/dc_kline_chart.js?v=20260805a"></script>
-<script src="/static/js/dc_board_timing.js?v=20260805a"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260805c"></script>
+<script src="/static/js/dc_board_timing.js?v=20260805c"></script>
 {% endblock %}

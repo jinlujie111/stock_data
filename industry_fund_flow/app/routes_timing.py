@@ -119,6 +119,83 @@ def api_timing_bt_summary(
         raise HTTPException(status_code=500, detail=f"查询回测摘要失败: {exc}") from exc
 
 
+@api_router.get("/backtest/runs")
+def api_timing_bt_runs(
+    limit: int = Query(20, ge=1, le=100),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return timing_svc.list_backtest_runs(limit)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询回测运行失败: {exc}") from exc
+
+
+@api_router.get("/config")
+def api_timing_config(
+    run_code: str = Query("daily_default"),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return timing_svc.get_timing_config(run_code)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询参数失败: {exc}") from exc
+
+
+@api_router.post("/backtest/run")
+def api_timing_bt_run(
+    trade_date: str | None = Query(None, description="结束日 YYYYMMDD，默认信号最新日"),
+    run_code: str = Query("web_custom"),
+    cost_bps: float | None = Query(None),
+    lookback_days: int | None = Query(None, ge=20, le=500),
+    buy_score: float | None = Query(None),
+    sell_score: float | None = Query(None),
+    stop_loss_pct: float | None = Query(None),
+    _user: dict = Depends(require_user),
+):
+    """按参数触发一次回测写入（params_json 可复现）。不重算信号，仅重配对成交。"""
+    import sys
+    from datetime import datetime
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    for p in (root, root / "dw-utils"):
+        sp = str(p)
+        if sp not in sys.path:
+            sys.path.insert(0, sp)
+    try:
+        from etl.board_timing.backtest import run_backtest
+        from etl.board_timing.db_util import TimingConfig, parse_trade_date
+        from dataclasses import replace
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=f"无法加载回测引擎: {exc}") from exc
+
+    try:
+        if trade_date:
+            end = parse_trade_date(trade_date)
+        else:
+            latest = timing_svc.latest_trade_date()
+            if not latest:
+                raise ValueError("无择时信号日期")
+            end = parse_trade_date(str(latest).replace("-", ""))
+        cfg = TimingConfig()
+        if cost_bps is not None:
+            cfg = replace(cfg, cost_bps=float(cost_bps))
+        if lookback_days is not None:
+            cfg = replace(cfg, backtest_lookback_days=int(lookback_days))
+        if buy_score is not None:
+            cfg = replace(cfg, buy_score=float(buy_score))
+        if sell_score is not None:
+            cfg = replace(cfg, sell_score=float(sell_score))
+        if stop_loss_pct is not None:
+            cfg = replace(cfg, stop_loss_pct=float(stop_loss_pct))
+        out = run_backtest(end, cfg=cfg, run_code=run_code or "web_custom")
+        return {"ok": True, "result": out, "params": cfg.to_dict()}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"回测失败: {exc}") from exc
+
+
 @api_router.get("/backtest/metrics")
 def api_timing_bt_metrics(
     run_code: str = Query("daily_default"),

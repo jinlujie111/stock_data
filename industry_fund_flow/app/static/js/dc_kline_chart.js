@@ -910,14 +910,55 @@
       const low = ohlc[i] ? ohlc[i][2] : null;
       const high = ohlc[i] ? ohlc[i][3] : null;
       markPoints.push({
-        name: isBuy ? "买" : "卖",
+        name: isBuy ? "信号买" : "信号卖",
         coord: [dates[i], isBuy ? low : high],
         value: isBuy ? "买" : "卖",
         symbol: "triangle",
         symbolRotate: isBuy ? 0 : 180,
-        symbolSize: 12,
+        symbolSize: 14,
         itemStyle: { color: isBuy ? "#16a34a" : "#dc2626" },
-        label: { show: true, formatter: isBuy ? "买" : "卖", fontSize: 10, color: "#fff" },
+        label: {
+          show: true,
+          formatter: isBuy ? "买" : "卖",
+          fontSize: 10,
+          color: "#fff",
+          position: isBuy ? "bottom" : "top",
+        },
+      });
+    });
+
+    // T+1 开盘成交点（圆点）：来自回测 executions
+    const executions = (payload.backtest && payload.backtest.executions) || [];
+    const dateIndex = new Map(dates.map((d, i) => [d, i]));
+    executions.forEach((ex) => {
+      const di = dateIndex.get(ex.trade_date);
+      if (di == null) return;
+      const isEntry = ex.kind === "entry";
+      const px =
+        ex.price != null
+          ? Number(ex.price)
+          : ohlc[di]
+            ? ohlc[di][0]
+            : null;
+      if (px == null) return;
+      markPoints.push({
+        name: isEntry ? "成交买" : "成交卖",
+        coord: [dates[di], px],
+        value: isEntry ? "成买" : ex.is_open ? "盯市" : "成卖",
+        symbol: "circle",
+        symbolSize: 10,
+        itemStyle: {
+          color: isEntry ? "#22c55e" : "#f97316",
+          borderColor: "#fff",
+          borderWidth: 1,
+        },
+        label: {
+          show: true,
+          formatter: isEntry ? "T+1买" : ex.is_open ? "盯市" : "T+1卖",
+          fontSize: 9,
+          color: isEntry ? "#16a34a" : "#c2410c",
+          position: "right",
+        },
       });
     });
 
@@ -986,13 +1027,25 @@
             if (idx < 0) return "";
             const b = bars[idx] || {};
             const t = timing[idx] || {};
+            const d = dates[idx];
+            const exOnDay = executions.filter((e) => e.trade_date === d);
+            const exTip = exOnDay
+              .map((e) => {
+                const lab = e.kind === "entry" ? "T+1开盘买入" : e.is_open ? "窗口末盯市" : "T+1开盘卖出";
+                return `${lab} @ ${fmtN(e.price, 2)}（信号日 ${e.signal_date || "—"}）`;
+              })
+              .join("<br/>");
             return [
-              `<strong>${dates[idx]}</strong>`,
+              `<strong>${d}</strong>`,
               `开 ${fmtN(b.open, 2)} 高 ${fmtN(b.high, 2)} 低 ${fmtN(b.low, 2)} 收 ${fmtN(b.close, 2)} (${fmtN(b.pct_change, 2)}%)`,
               `成交量 ${fmtN(b.vol, 0)} · 成交额 ${fmtN(Number(b.amount || 0) / 1e8, 2)} 亿`,
               `Score ${fmtN(t.score)} · ${labelTradeSignal(t.signal_type)} · ${labelPos(t.position_state)}`,
+              t.signal_type === "buy" || t.signal_type === "sell"
+                ? `信号日收盘确认 → 下一交易日开盘成交`
+                : "",
               `趋势 ${fmtN(t.score_trend)} / 资金 ${fmtN(t.score_fund)} / 量价 ${fmtN(t.score_vp)} / 情绪 ${fmtN(t.score_sentiment)}`,
               t.signal_reason ? `原因 ${t.signal_reason}` : "",
+              exTip,
             ]
               .filter(Boolean)
               .join("<br/>");
@@ -1084,33 +1137,94 @@
     return chart;
   }
 
-  /** 回测权益曲线 */
+  /** 回测权益曲线：策略 vs 买入持有 */
   function renderTimingEquityChart(chartEl, curve, options) {
     if (!window.echarts || !chartEl) return null;
     const opts = options || {};
     let chart = opts.chartInst || null;
     if (!chart) chart = echarts.init(chartEl);
     const pts = curve || [];
-    if (!pts.length) {
+    const buyhold = opts.buyholdCurve || [];
+    if (!pts.length && !buyhold.length) {
       chart.clear();
       return chart;
     }
+
+    // 对齐日期：优先策略曲线日期，买入持有按日映射
+    const dates = pts.length ? pts.map((p) => p.trade_date) : buyhold.map((p) => p.trade_date);
+    const bhMap = new Map(buyhold.map((p) => [p.trade_date, Number(p.equity)]));
+    const stMap = new Map(pts.map((p) => [p.trade_date, Number(p.equity)]));
+    // 策略是步进点：前向填充到 buyhold 日轴更直观；若只有策略点则用策略轴
+    let xDates = dates;
+    let strategyData;
+    let buyholdData;
+    if (buyhold.length && pts.length) {
+      xDates = buyhold.map((p) => p.trade_date);
+      let lastSt = 1;
+      const sortedPts = pts.slice().sort((a, b) => String(a.trade_date).localeCompare(String(b.trade_date)));
+      let pi = 0;
+      strategyData = xDates.map((d) => {
+        while (pi < sortedPts.length && String(sortedPts[pi].trade_date) <= String(d)) {
+          lastSt = Number(sortedPts[pi].equity);
+          pi += 1;
+        }
+        return lastSt;
+      });
+      buyholdData = xDates.map((d) => bhMap.get(d));
+    } else if (pts.length) {
+      strategyData = pts.map((p) => Number(p.equity));
+      buyholdData = null;
+    } else {
+      strategyData = null;
+      buyholdData = buyhold.map((p) => Number(p.equity));
+    }
+
+    const series = [];
+    if (strategyData) {
+      series.push({
+        name: "策略权益",
+        type: "line",
+        data: strategyData,
+        showSymbol: pts.length <= 40,
+        symbolSize: 6,
+        lineStyle: { width: 2, color: "#38bdf8" },
+        areaStyle: { color: "rgba(56,189,248,0.12)" },
+      });
+    }
+    if (buyholdData) {
+      series.push({
+        name: "买入持有",
+        type: "line",
+        data: buyholdData,
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: "#94a3b8", type: "dashed" },
+      });
+    }
+
     chart.setOption(
       {
         animation: false,
-        grid: { left: 48, right: 16, top: 24, bottom: 28 },
+        legend: {
+          top: 0,
+          right: 8,
+          textStyle: { color: "#94a3b8", fontSize: 11 },
+        },
+        grid: { left: 48, right: 16, top: 28, bottom: 28 },
         tooltip: {
           trigger: "axis",
           formatter(params) {
-            const p = params && params[0];
-            if (!p) return "";
-            const eq = Number(p.value);
-            return `${p.axisValue}<br/>权益 ${(eq * 100).toFixed(1)}%（相对 100）`;
+            if (!params || !params.length) return "";
+            const lines = [`<strong>${params[0].axisValue}</strong>`];
+            params.forEach((p) => {
+              if (p.value == null || Number.isNaN(Number(p.value))) return;
+              lines.push(`${p.seriesName} ${(Number(p.value) * 100).toFixed(1)}（基期=100）`);
+            });
+            return lines.join("<br/>");
           },
         },
         xAxis: {
           type: "category",
-          data: pts.map((p) => p.trade_date),
+          data: xDates,
           axisLabel: { color: "#64748b", fontSize: 10 },
         },
         yAxis: {
@@ -1122,16 +1236,7 @@
           },
           splitLine: { lineStyle: { color: "#1e293b" } },
         },
-        series: [
-          {
-            name: "权益",
-            type: "line",
-            data: pts.map((p) => Number(p.equity)),
-            showSymbol: false,
-            lineStyle: { width: 2, color: "#38bdf8" },
-            areaStyle: { color: "rgba(56,189,248,0.12)" },
-          },
-        ],
+        series,
       },
       true
     );

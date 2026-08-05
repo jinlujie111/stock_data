@@ -7,25 +7,20 @@ from app.dc_registry import NAV_ITEMS, NAV_SECTIONS
 from app.main import app
 
 
-def test_favorites_menu_items_and_routes_exist():
+def test_favorites_menu_board_only():
     paths = {route.path for route in app.router.routes}
     assert "/favorites/boards" in paths
-    assert "/favorites/stocks" in paths
+    assert "/favorites/stocks" in paths  # 仍注册，handler 返回 404
     assert "/api/v1/favorites/boards" in paths
-    assert "/api/v1/favorites/boards/table" in paths
-    assert "/api/v1/favorites/stocks" in paths
+
+    nav_slugs = {item["slug"] for item in NAV_ITEMS}
+    assert nav_slugs == {"board-timing", "board-favorites"}
+    assert "stock-favorites" not in nav_slugs
 
     nav_labels = {item["label"] for item in NAV_ITEMS}
     assert "板块自选" in nav_labels
-    assert "股票自选" in nav_labels
+    assert "股票自选" not in nav_labels
 
     section_titles = {section["title"] for section in NAV_SECTIONS}
-    assert "板块分析" in section_titles
     assert "我的自选" in section_titles
-    sector_slugs = {
-        item["slug"]
-        for section in NAV_SECTIONS
-        if section["title"] == "板块分析"
-        for item in section["items"]
-    }
-    assert "sectors" in sector_slugs
+    assert "板块择时" in section_titles

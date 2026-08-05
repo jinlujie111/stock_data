@@ -2,6 +2,10 @@
 # =============================================================================
 # stock_data 日批一键脚本（XXL-JOB / crontab 入口）
 #
+# 产品主脊：ODS 同步 →（可选热度）→ 板块择时信号 → 择时回测
+# 已停：决策链路 DWM/DWS（资金/趋势/扩散/景气/主线）、量价、龙头
+# ODS 层同步与完整度监控保留。
+#
 # 用法:
 #   bash dw-utils/xxl_daily_batch.sh              # 默认今天
 #   bash dw-utils/xxl_daily_batch.sh 20260616     # 指定业务日 YYYYMMDD
@@ -71,44 +75,23 @@ _run_step() {
   return "${rc}"
 }
 
-# --- 1) ODS ---
+# --- 1) ODS（全量 status=1 同步，不停）---
 _run_step "run_data_sync" run_data_sync "${n_date}"
 
-# --- 2) DWM：广度 ---
+# --- 2) 首页广度（非决策链路；首页仍用）---
 _run_step "run_dwm_market_breadth" run_dwm_market_breadth "${n_date}"
 
-# --- 3) DWM：资金强度 ---
-_run_step "run_dwm_dc_industry_fund_flow" run_dwm_dc_industry_fund_flow "${n_date}"
-
-# --- 4) DWM：趋势强度 ---
-_run_step "run_dwm_dc_industry_trend_strength" run_dwm_dc_industry_trend_strength "${n_date}"
-
-# --- 5) DWM：市场热度 ---
+# --- 3) 市场热度（Web 已下线；择时过热门禁仍读此表）---
 _run_step "run_dwm_dc_industry_market_heat" run_dwm_dc_industry_market_heat "${n_date}"
 
-# --- 6) DWM：扩散效应 ---
-_run_step "run_dwm_dc_industry_diffusion" run_dwm_dc_industry_diffusion "${n_date}"
-
-# --- 7) DWM：产业景气 ---
-_run_step "run_dwm_dc_industry_prosperity" run_dwm_dc_industry_prosperity "${n_date}"
-
-# --- 8) DWS：主线评分 + 监控（仅东财）---
-_run_step "run_dws_dc_industry_mainline_score" run_dws_dc_industry_mainline_score "${n_date}"
-_run_step "run_dws_dc_industry_mainline_monitor" run_dws_dc_industry_mainline_monitor "${n_date}"
-
-# --- 9) 板块量价 VP（需求5）---
-_run_step "run_vp_batch" run_vp_batch "${n_date}"
-
-# --- 10) 板块龙头 MVP（需求2）---
-_run_step "run_sector_dragon_batch" run_sector_dragon_batch "${n_date}"
-
-# --- 11) 板块四因子择时（K 线买卖点）---
+# --- 4) 板块四因子择时（K 线买卖点）---
 _run_step "run_board_timing_batch" run_board_timing_batch "${n_date}"
 
-# --- 11b) 板块择时回测（T+1 开盘 · 收益率/成功率）---
+# --- 5) 板块择时回测（T+1 开盘 · 收益率/成功率）---
 _run_step "run_board_timing_backtest" run_board_timing_backtest "${n_date}"
 
-# --- 12) ODS 完整度监控（有 ALERT 则 exit 1）---
+# --- 6) ODS 完整度监控 ---
 _run_step "run_ods_completeness_monitor" run_ods_completeness_monitor "${n_date}"
 
 echo "======== stock_data 日批完成 ${n_date} $(date '+%F %T') ========"
+echo "已停日批（脚本仍保留，可手工补跑）: fund_flow / trend / diffusion / prosperity / mainline / vp / dragon"

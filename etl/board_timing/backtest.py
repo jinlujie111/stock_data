@@ -323,18 +323,89 @@ def _compound(returns: list[float]) -> float | None:
     return eq - 1.0
 
 
-def aggregate_metrics(trades: list[dict]) -> tuple[list[dict], dict]:
+def _sharpe(returns: list[float]) -> float | None:
+    """交易级夏普：均值 / 标准差（不做年化）。"""
+    if len(returns) < 2:
+        return None
+    import statistics
+
+    try:
+        mu = statistics.mean(returns)
+        sd = statistics.stdev(returns)
+    except statistics.StatisticsError:
+        return None
+    if sd <= 1e-12:
+        return None
+    return mu / sd
+
+
+def _max_loss_streak(returns: list[float]) -> int:
+    best = 0
+    cur = 0
+    for r in returns:
+        if r < 0:
+            cur += 1
+            best = max(best, cur)
+        else:
+            cur = 0
+    return best
+
+
+def _calmar(total_return: float | None, max_dd: float | None) -> float | None:
+    if total_return is None or max_dd is None or max_dd <= 1e-12:
+        return None
+    return float(total_return) / float(max_dd)
+
+
+def _board_buyhold(
+    ohlc_by_code: dict[str, pd.DataFrame],
+    code: str,
+    start: date,
+    end: date,
+) -> float | None:
+    g = ohlc_by_code.get(code)
+    if g is None or g.empty:
+        return None
+    win = g[(g["trade_date"] >= start) & (g["trade_date"] <= end)]
+    if len(win) < 2:
+        return None
+    c0 = _f(win.iloc[0]["close"])
+    c1 = _f(win.iloc[-1]["close"])
+    if c0 is None or c1 is None or c0 <= 0:
+        return None
+    return c1 / c0 - 1.0
+
+
+def aggregate_metrics(
+    trades: list[dict],
+    *,
+    ohlc: pd.DataFrame | None = None,
+    window_start: date | None = None,
+    window_end: date | None = None,
+) -> tuple[list[dict], dict]:
     """返回 (per_board_metrics, run_summary)。"""
+    empty = {
+        "trade_count": 0,
+        "board_count": 0,
+        "win_rate": None,
+        "avg_return": None,
+        "total_return": None,
+        "max_drawdown": None,
+        "avg_hold_days": None,
+        "profit_factor": None,
+        "sharpe": None,
+        "calmar": None,
+        "max_loss_streak": 0,
+        "bench_return": None,
+    }
     if not trades:
-        return [], {
-            "trade_count": 0,
-            "board_count": 0,
-            "win_rate": None,
-            "avg_return": None,
-            "total_return": None,
-            "max_drawdown": None,
-            "avg_hold_days": None,
-            "profit_factor": None,
+        return [], empty
+
+    ohlc_by_code: dict[str, pd.DataFrame] = {}
+    if ohlc is not None and not ohlc.empty:
+        ohlc_by_code = {
+            str(c): g.reset_index(drop=True)
+            for c, g in ohlc.groupby("industry_code", sort=False)
         }
 
     by_board: dict[str, list[dict]] = {}
@@ -348,19 +419,30 @@ def aggregate_metrics(trades: list[dict]) -> tuple[list[dict], dict]:
     closed_n = 0
     gross_profit = 0.0
     gross_loss = 0.0
+    bench_list: list[float] = []
 
     for code, ts in by_board.items():
         ts_sorted = sorted(ts, key=lambda x: (x["entry_date"], x.get("exit_date") or date.min))
         closed = [x for x in ts_sorted if not x.get("is_open")]
-        # 指标含盯市笔（用户要看完整表现）；胜率仅已平仓
         rets_all = [float(x["return_pct"]) for x in ts_sorted if x.get("return_pct") is not None]
         rets_closed = [float(x["return_pct"]) for x in closed if x.get("return_pct") is not None]
         holds = [int(x["hold_days"]) for x in ts_sorted if x.get("hold_days") is not None]
         wins = sum(1 for r in rets_closed if r > 0)
         gp = sum(r for r in rets_closed if r > 0)
         gl = sum(-r for r in rets_closed if r < 0)
+        total_ret = _compound(rets_all)
+        max_dd = _max_drawdown(rets_all)
+        pf = (gp / gl) if gl > 0 else None
         name = ts_sorted[0].get("industry_name")
         ctype = ts_sorted[0].get("content_type")
+        w0 = window_start or ts_sorted[0]["entry_date"]
+        w1 = window_end or (ts_sorted[-1].get("exit_date") or ts_sorted[-1]["entry_date"])
+        bench = _board_buyhold(ohlc_by_code, code, w0, w1)
+        if bench is not None:
+            bench_list.append(bench)
+        excess = None
+        if total_ret is not None and bench is not None:
+            excess = float(total_ret) - float(bench)
         board_rows.append(
             {
                 "industry_code": code,
@@ -371,18 +453,18 @@ def aggregate_metrics(trades: list[dict]) -> tuple[list[dict], dict]:
                 "win_count": wins,
                 "win_rate": (wins / len(rets_closed)) if rets_closed else None,
                 "avg_return": (sum(rets_all) / len(rets_all)) if rets_all else None,
-                "total_return": _compound(rets_all),
-                "max_drawdown": _max_drawdown(rets_all),
+                "total_return": total_ret,
+                "max_drawdown": max_dd,
                 "avg_hold_days": (sum(holds) / len(holds)) if holds else None,
-                "profit_factor": (gp / gl) if gl > 0 else (None if gp <= 0 else None),
+                "profit_factor": pf,
                 "last_return": rets_all[-1] if rets_all else None,
+                "sharpe": _sharpe(rets_closed),
+                "calmar": _calmar(total_ret, max_dd),
+                "max_loss_streak": _max_loss_streak(rets_closed),
+                "bench_return": bench,
+                "excess_return": excess,
             }
         )
-        # profit_factor: if gl==0 and gp>0 → treat as None or large; use None when no losses
-        if gl > 0:
-            board_rows[-1]["profit_factor"] = gp / gl
-        elif gp > 0 and rets_closed:
-            board_rows[-1]["profit_factor"] = None
 
         all_closed_rets.extend(rets_closed)
         all_hold.extend(holds)
@@ -391,8 +473,6 @@ def aggregate_metrics(trades: list[dict]) -> tuple[list[dict], dict]:
         gross_profit += gp
         gross_loss += gl
 
-    # 等权：各板块 total_return 再平均（近似）；回撤用各板块复利序列拼接不稳，
-    # 改用全部已平仓按时间排序的复利曲线
     timed = sorted(
         [t for t in trades if t.get("return_pct") is not None and not t.get("is_open")],
         key=lambda x: (x.get("exit_date") or x["entry_date"], x["industry_code"]),
@@ -403,16 +483,23 @@ def aggregate_metrics(trades: list[dict]) -> tuple[list[dict], dict]:
         for b in board_rows
         if b.get("total_return") is not None
     ]
+    total_return = (sum(board_compounds) / len(board_compounds)) if board_compounds else None
+    max_dd = _max_drawdown(timed_rets)
+    bench_avg = (sum(bench_list) / len(bench_list)) if bench_list else None
 
     summary = {
         "trade_count": len(trades),
         "board_count": len(by_board),
         "win_rate": (win_n / closed_n) if closed_n else None,
         "avg_return": (sum(all_closed_rets) / len(all_closed_rets)) if all_closed_rets else None,
-        "total_return": (sum(board_compounds) / len(board_compounds)) if board_compounds else None,
-        "max_drawdown": _max_drawdown(timed_rets),
+        "total_return": total_return,
+        "max_drawdown": max_dd,
         "avg_hold_days": (sum(all_hold) / len(all_hold)) if all_hold else None,
         "profit_factor": (gross_profit / gross_loss) if gross_loss > 0 else None,
+        "sharpe": _sharpe(all_closed_rets),
+        "calmar": _calmar(total_return, max_dd),
+        "max_loss_streak": _max_loss_streak(timed_rets),
+        "bench_return": bench_avg,
     }
     return board_rows, summary
 
@@ -482,6 +569,10 @@ def _finish_run(conn, run_id: int, summary: dict, *, status: str = "done", error
                 max_drawdown=:max_drawdown,
                 avg_hold_days=:avg_hold_days,
                 profit_factor=:profit_factor,
+                sharpe=:sharpe,
+                calmar=:calmar,
+                max_loss_streak=:max_loss_streak,
+                bench_return=:bench_return,
                 error_msg=:error_msg,
                 finished_at=CURRENT_TIMESTAMP
             WHERE id=:id
@@ -498,6 +589,10 @@ def _finish_run(conn, run_id: int, summary: dict, *, status: str = "done", error
             "max_drawdown": summary.get("max_drawdown"),
             "avg_hold_days": summary.get("avg_hold_days"),
             "profit_factor": summary.get("profit_factor"),
+            "sharpe": summary.get("sharpe"),
+            "calmar": summary.get("calmar"),
+            "max_loss_streak": summary.get("max_loss_streak"),
+            "bench_return": summary.get("bench_return"),
             "error_msg": error,
         },
     )
@@ -554,16 +649,42 @@ def _insert_metrics(conn, run_id: int, metrics: list[dict]) -> None:
             run_id, industry_code, industry_name, content_type,
             trade_count, closed_count, win_count, win_rate,
             avg_return, total_return, max_drawdown, avg_hold_days,
-            profit_factor, last_return
+            profit_factor, last_return,
+            sharpe, calmar, max_loss_streak, bench_return, excess_return
         ) VALUES (
             :run_id, :industry_code, :industry_name, :content_type,
             :trade_count, :closed_count, :win_count, :win_rate,
             :avg_return, :total_return, :max_drawdown, :avg_hold_days,
-            :profit_factor, :last_return
+            :profit_factor, :last_return,
+            :sharpe, :calmar, :max_loss_streak, :bench_return, :excess_return
         )
         """
     )
-    rows = [{**m, "run_id": run_id} for m in metrics]
+    rows = []
+    for m in metrics:
+        rows.append(
+            {
+                "run_id": run_id,
+                "industry_code": m["industry_code"],
+                "industry_name": m.get("industry_name"),
+                "content_type": m.get("content_type"),
+                "trade_count": m.get("trade_count") or 0,
+                "closed_count": m.get("closed_count") or 0,
+                "win_count": m.get("win_count") or 0,
+                "win_rate": m.get("win_rate"),
+                "avg_return": m.get("avg_return"),
+                "total_return": m.get("total_return"),
+                "max_drawdown": m.get("max_drawdown"),
+                "avg_hold_days": m.get("avg_hold_days"),
+                "profit_factor": m.get("profit_factor"),
+                "last_return": m.get("last_return"),
+                "sharpe": m.get("sharpe"),
+                "calmar": m.get("calmar"),
+                "max_loss_streak": m.get("max_loss_streak"),
+                "bench_return": m.get("bench_return"),
+                "excess_return": m.get("excess_return"),
+            }
+        )
     for i in range(0, len(rows), 300):
         conn.execute(sql, rows[i : i + 300])
 
@@ -616,7 +737,12 @@ def run_backtest(
 
         ohlc = load_ohlc(engine, codes, start, end_date)
         trades = pair_trades(signals, ohlc, end=end_date, cost_bps=cfg.cost_bps)
-        metrics, summary = aggregate_metrics(trades)
+        metrics, summary = aggregate_metrics(
+            trades,
+            ohlc=ohlc,
+            window_start=start,
+            window_end=end_date,
+        )
 
         with engine.begin() as conn:
             _insert_trades(conn, run_id, trades)
@@ -648,6 +774,10 @@ def run_backtest(
                     "max_drawdown": None,
                     "avg_hold_days": None,
                     "profit_factor": None,
+                    "sharpe": None,
+                    "calmar": None,
+                    "max_loss_streak": 0,
+                    "bench_return": None,
                 },
                 status="failed",
                 error=str(exc)[:500],

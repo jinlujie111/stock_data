@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.deps import require_user
-from app.dc_registry import CONTENT_TYPES, NAV_ITEMS
+from app.dc_registry import NAV_ITEMS
 from app import dragon_service as dragon_svc
 
 api_router = APIRouter(prefix="/api/v1/dragon", tags=["dragon-api"])
@@ -22,17 +22,7 @@ def init_dragon_routes(templates: Jinja2Templates) -> None:
 
 @page_router.get("/dc/dragon", response_class=HTMLResponse)
 def dragon_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "dc_dragon.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "dragon",
-            "content_types": CONTENT_TYPES,
-            "title": "板块龙头",
-        },
-    )
+    raise HTTPException(status_code=404, detail="板块龙头已下线")
 
 
 @api_router.get("/trade-dates")

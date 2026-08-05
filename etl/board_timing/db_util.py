@@ -37,8 +37,8 @@ class TimingConfig:
     retention_days: int = 730
     # 成交模型：t1_open = 信号日确认，下一交易日开盘成交
     exec_model: str = "t1_open"
-    # 单边交易成本（基点），买卖各扣一次
-    cost_bps: float = 0.0
+    # 单边交易成本（基点），买卖各扣一次；默认 3bp 更接近实盘
+    cost_bps: float = 3.0
     # 日批默认回测回看交易日数（不足则取全部可得）
     backtest_lookback_days: int = 120
 
