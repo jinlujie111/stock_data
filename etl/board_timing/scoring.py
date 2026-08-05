@@ -23,6 +23,9 @@ def apply_signals(
 
     买入：硬门禁 + Score 上穿 buy_score
     卖出：任一卖出规则，或 Score 下穿 sell_score，或相对 last_buy 止损
+
+    成交约定：本函数在「信号日收盘」确认事件；实盘/回测成交为 T+1 开盘
+    （见 TimingConfig.exec_model=t1_open）。止损比较用信号日收盘 vs last_buy_close。
     """
     cfg = cfg or TimingConfig()
     if panel.empty:

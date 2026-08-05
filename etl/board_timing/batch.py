@@ -148,14 +148,49 @@ def _chunk_insert(conn, sql: str, rows: list[dict], size: int = 300) -> None:
             conn.execute(text(sql), chunk)
 
 
-def purge_old(engine, keep_days: int) -> int:
+def archive_then_purge(engine, keep_days: int) -> dict:
+    """
+    热表过期前写入 archive，再删除热表旧行。
+    回测可读 hot ∪ arch，避免长周期评价断层。
+    """
     cutoff = date.today() - timedelta(days=keep_days)
     with engine.begin() as conn:
-        res = conn.execute(
+        arch = conn.execute(
+            text(
+                """
+                INSERT IGNORE INTO dwm_board_timing_signal_arch (
+                    trade_date, industry_code, industry_name, content_type,
+                    close, ma20, ma60, score, score_trend, score_fund, score_vp, score_sentiment,
+                    signal_type, signal_reason, position_state,
+                    mom20, flow5, net_inflow_days, amount_ratio20, up_ratio, limit_up_ratio,
+                    sentiment_overheat, last_buy_close, rank_score, created_at, updated_at
+                )
+                SELECT
+                    trade_date, industry_code, industry_name, content_type,
+                    close, ma20, ma60, score, score_trend, score_fund, score_vp, score_sentiment,
+                    signal_type, signal_reason, position_state,
+                    mom20, flow5, net_inflow_days, amount_ratio20, up_ratio, limit_up_ratio,
+                    sentiment_overheat, last_buy_close, rank_score, created_at, updated_at
+                FROM dwm_board_timing_signal_di
+                WHERE trade_date < :c
+                """
+            ),
+            {"c": cutoff},
+        )
+        deleted = conn.execute(
             text("DELETE FROM dwm_board_timing_signal_di WHERE trade_date < :c"),
             {"c": cutoff},
         )
-        return int(res.rowcount or 0)
+        return {
+            "cutoff": str(cutoff),
+            "archived": int(arch.rowcount or 0),
+            "purged": int(deleted.rowcount or 0),
+        }
+
+
+def purge_old(engine, keep_days: int) -> int:
+    """兼容旧调用：归档后清理，返回删除行数。"""
+    return int(archive_then_purge(engine, keep_days).get("purged") or 0)
 
 
 def _month_chunks(start: date, end: date) -> list[tuple[date, date]]:
@@ -269,12 +304,13 @@ def run_batch(
         total_sell += int(part.get("sell") or 0)
 
     # 仅日批做保留期清理；长回填不在中途把刚写入的历史删掉
-    deleted = 0
+    purge_info: dict = {"archived": 0, "purged": 0}
     if start_date is None or span <= 3:
-        deleted = purge_old(engine, cfg.retention_days)
+        purge_info = archive_then_purge(engine, cfg.retention_days)
+        logger.info("archive+purge %s", purge_info)
     else:
         logger.info(
-            "跳过 purge（区间回填）；表默认保留约 %d 天，过旧数据请另跑日批清理",
+            "跳过 purge（区间回填）；热表默认保留约 %d 天，过期先归档再清理",
             cfg.retention_days,
         )
 
@@ -285,8 +321,11 @@ def run_batch(
         "rows": total_rows,
         "buy": total_buy,
         "sell": total_sell,
-        "purged": deleted,
+        "archived": purge_info.get("archived", 0),
+        "purged": purge_info.get("purged", 0),
         "content_types": ctypes,
+        "exec_model": cfg.exec_model,
+        "retention_days": cfg.retention_days,
     }
     logger.info("board_timing done %s", summary)
     return summary

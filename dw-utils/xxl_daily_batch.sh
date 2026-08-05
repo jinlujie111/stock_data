@@ -105,6 +105,9 @@ _run_step "run_sector_dragon_batch" run_sector_dragon_batch "${n_date}"
 # --- 11) 板块四因子择时（K 线买卖点）---
 _run_step "run_board_timing_batch" run_board_timing_batch "${n_date}"
 
+# --- 11b) 板块择时回测（T+1 开盘 · 收益率/成功率）---
+_run_step "run_board_timing_backtest" run_board_timing_backtest "${n_date}"
+
 # --- 12) ODS 完整度监控（有 ALERT 则 exit 1）---
 _run_step "run_ods_completeness_monitor" run_ods_completeness_monitor "${n_date}"
 

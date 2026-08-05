@@ -862,10 +862,288 @@
     return chart;
   }
 
+  /** 四因子择时 K 线：主图买卖三角 + 量能 + 四因子副图 */
+  function renderTimingKlineChart(chartEl, payload, options) {
+    if (!window.echarts || !chartEl) return null;
+    const opts = options || {};
+    const volMode = opts.volMode === "amount" ? "amount" : "vol";
+    let chart = opts.chartInst || null;
+    if (!chart) chart = echarts.init(chartEl);
+
+    const bars = payload.bars || [];
+    const timing = payload.timing || [];
+    const dates = bars.map((b) => b.trade_date);
+    const ohlc = bars.map((b) => [Number(b.open), Number(b.close), Number(b.low), Number(b.high)]);
+    const vols = bars.map((b) => Number(b.vol || 0));
+    const amounts = bars.map((b) => Number(b.amount || 0) / 1e8);
+    const ma20 = timing.map((t) => (t && t.ma20 != null ? Number(t.ma20) : null));
+    const ma60 = timing.map((t) => (t && t.ma60 != null ? Number(t.ma60) : null));
+    const scoreTrend = timing.map((t) => (t && t.score_trend != null ? Number(t.score_trend) : null));
+    const scoreFund = timing.map((t) => (t && t.score_fund != null ? Number(t.score_fund) : null));
+    const scoreVp = timing.map((t) => (t && t.score_vp != null ? Number(t.score_vp) : null));
+    const scoreSent = timing.map((t) =>
+      t && t.score_sentiment != null ? Number(t.score_sentiment) : null
+    );
+
+    function fmtN(n, d) {
+      if (n == null || n === "") return "—";
+      const x = Number(n);
+      if (Number.isNaN(x)) return "—";
+      return x.toFixed(d == null ? 1 : d);
+    }
+    function labelTradeSignal(s) {
+      if (s === "buy") return "买入";
+      if (s === "sell") return "卖出";
+      return "观望";
+    }
+    function labelPos(s) {
+      if (s === "long") return "持有";
+      if (s === "watch") return "观望";
+      if (s === "flat") return "空仓";
+      return s || "—";
+    }
+
+    const markPoints = [];
+    timing.forEach((t, i) => {
+      if (!t || (t.signal_type !== "buy" && t.signal_type !== "sell")) return;
+      const isBuy = t.signal_type === "buy";
+      const low = ohlc[i] ? ohlc[i][2] : null;
+      const high = ohlc[i] ? ohlc[i][3] : null;
+      markPoints.push({
+        name: isBuy ? "买" : "卖",
+        coord: [dates[i], isBuy ? low : high],
+        value: isBuy ? "买" : "卖",
+        symbol: "triangle",
+        symbolRotate: isBuy ? 0 : 180,
+        symbolSize: 12,
+        itemStyle: { color: isBuy ? "#16a34a" : "#dc2626" },
+        label: { show: true, formatter: isBuy ? "买" : "卖", fontSize: 10, color: "#fff" },
+      });
+    });
+
+    const volSeriesData = volMode === "amount" ? amounts : vols;
+    const volName = volMode === "amount" ? "成交金额(亿)" : "成交量";
+    const volColors = bars.map((b) =>
+      Number(b.close) >= Number(b.open) ? "rgba(239,68,68,0.65)" : "rgba(34,197,94,0.65)"
+    );
+
+    const grids = [
+      { left: 56, right: 28, top: "4%", height: "30%" },
+      { left: 56, right: 28, top: "38%", height: "9%" },
+      { left: 56, right: 28, top: "50%", height: "9%" },
+      { left: 56, right: 28, top: "62%", height: "9%" },
+      { left: 56, right: 28, top: "74%", height: "9%" },
+      { left: 56, right: 28, top: "86%", height: "9%" },
+    ];
+
+    function scoreSeries(name, data, color, gi) {
+      return {
+        name,
+        type: "line",
+        data,
+        xAxisIndex: gi,
+        yAxisIndex: gi,
+        showSymbol: false,
+        lineStyle: { width: 1.5, color },
+        areaStyle: { color: color + "22" },
+        markLine: {
+          symbol: "none",
+          silent: true,
+          data: [
+            { yAxis: 70, lineStyle: { color: "#16a34a", type: "dashed", width: 1 } },
+            { yAxis: 40, lineStyle: { color: "#dc2626", type: "dashed", width: 1 } },
+          ],
+          label: { show: false },
+        },
+      };
+    }
+
+    function subLabel(text, top) {
+      return {
+        type: "text",
+        left: 8,
+        top,
+        style: { text, fill: "#64748b", fontSize: 10 },
+      };
+    }
+
+    chart.setOption(
+      {
+        animation: false,
+        backgroundColor: "transparent",
+        legend: {
+          top: 0,
+          right: 20,
+          textStyle: { color: "#94a3b8", fontSize: 11 },
+          data: ["K线", "MA20", "MA60", volName, "趋势", "资金", "量价", "情绪"],
+        },
+        axisPointer: { link: [{ xAxisIndex: "all" }] },
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "cross" },
+          formatter(params) {
+            const idx = params && params[0] ? params[0].dataIndex : -1;
+            if (idx < 0) return "";
+            const b = bars[idx] || {};
+            const t = timing[idx] || {};
+            return [
+              `<strong>${dates[idx]}</strong>`,
+              `开 ${fmtN(b.open, 2)} 高 ${fmtN(b.high, 2)} 低 ${fmtN(b.low, 2)} 收 ${fmtN(b.close, 2)} (${fmtN(b.pct_change, 2)}%)`,
+              `成交量 ${fmtN(b.vol, 0)} · 成交额 ${fmtN(Number(b.amount || 0) / 1e8, 2)} 亿`,
+              `Score ${fmtN(t.score)} · ${labelTradeSignal(t.signal_type)} · ${labelPos(t.position_state)}`,
+              `趋势 ${fmtN(t.score_trend)} / 资金 ${fmtN(t.score_fund)} / 量价 ${fmtN(t.score_vp)} / 情绪 ${fmtN(t.score_sentiment)}`,
+              t.signal_reason ? `原因 ${t.signal_reason}` : "",
+            ]
+              .filter(Boolean)
+              .join("<br/>");
+          },
+        },
+        grid: grids,
+        xAxis: grids.map((_, i) => ({
+          type: "category",
+          data: dates,
+          gridIndex: i,
+          axisLabel: { show: i === grids.length - 1, color: "#64748b", fontSize: 10 },
+          axisLine: { lineStyle: { color: "#334155" } },
+        })),
+        yAxis: [
+          { scale: true, gridIndex: 0, splitLine: { lineStyle: { color: "#1e293b" } }, axisLabel: { color: "#94a3b8" } },
+          { scale: true, gridIndex: 1, splitLine: { show: false }, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+          { min: 0, max: 100, scale: false, gridIndex: 2, splitLine: { show: false }, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+          { min: 0, max: 100, scale: false, gridIndex: 3, splitLine: { show: false }, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+          { min: 0, max: 100, scale: false, gridIndex: 4, splitLine: { show: false }, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+          { min: 0, max: 100, scale: false, gridIndex: 5, splitLine: { show: false }, axisLabel: { color: "#94a3b8", fontSize: 10 } },
+        ],
+        dataZoom: [
+          { type: "inside", xAxisIndex: [0, 1, 2, 3, 4, 5] },
+          {
+            type: "slider",
+            xAxisIndex: [0, 1, 2, 3, 4, 5],
+            bottom: 2,
+            height: 16,
+            borderColor: "#1e293b",
+            fillerColor: "rgba(56,189,248,0.2)",
+          },
+        ],
+        series: [
+          {
+            name: "K线",
+            type: "candlestick",
+            data: ohlc,
+            xAxisIndex: 0,
+            yAxisIndex: 0,
+            itemStyle: {
+              color: "#ef4444",
+              color0: "#22c55e",
+              borderColor: "#ef4444",
+              borderColor0: "#22c55e",
+            },
+            markPoint: markPoints.length ? { data: markPoints } : undefined,
+          },
+          {
+            name: "MA20",
+            type: "line",
+            data: ma20,
+            xAxisIndex: 0,
+            yAxisIndex: 0,
+            showSymbol: false,
+            lineStyle: { width: 1, color: "#f59e0b" },
+          },
+          {
+            name: "MA60",
+            type: "line",
+            data: ma60,
+            xAxisIndex: 0,
+            yAxisIndex: 0,
+            showSymbol: false,
+            lineStyle: { width: 1, color: "#a855f7" },
+          },
+          {
+            name: volName,
+            type: "bar",
+            data: volSeriesData,
+            xAxisIndex: 1,
+            yAxisIndex: 1,
+            itemStyle: { color: (p) => volColors[p.dataIndex] || "#64748b" },
+          },
+          scoreSeries("趋势", scoreTrend, "#3b82f6", 2),
+          scoreSeries("资金", scoreFund, "#22c55e", 3),
+          scoreSeries("量价", scoreVp, "#f59e0b", 4),
+          scoreSeries("情绪", scoreSent, "#ec4899", 5),
+        ],
+        graphic: [
+          subLabel("成交量/额", "38%"),
+          subLabel("趋势", "50%"),
+          subLabel("资金", "62%"),
+          subLabel("量价", "74%"),
+          subLabel("情绪", "86%"),
+        ],
+      },
+      true
+    );
+    return chart;
+  }
+
+  /** 回测权益曲线 */
+  function renderTimingEquityChart(chartEl, curve, options) {
+    if (!window.echarts || !chartEl) return null;
+    const opts = options || {};
+    let chart = opts.chartInst || null;
+    if (!chart) chart = echarts.init(chartEl);
+    const pts = curve || [];
+    if (!pts.length) {
+      chart.clear();
+      return chart;
+    }
+    chart.setOption(
+      {
+        animation: false,
+        grid: { left: 48, right: 16, top: 24, bottom: 28 },
+        tooltip: {
+          trigger: "axis",
+          formatter(params) {
+            const p = params && params[0];
+            if (!p) return "";
+            const eq = Number(p.value);
+            return `${p.axisValue}<br/>权益 ${(eq * 100).toFixed(1)}%（相对 100）`;
+          },
+        },
+        xAxis: {
+          type: "category",
+          data: pts.map((p) => p.trade_date),
+          axisLabel: { color: "#64748b", fontSize: 10 },
+        },
+        yAxis: {
+          type: "value",
+          scale: true,
+          axisLabel: {
+            color: "#94a3b8",
+            formatter: (v) => `${(Number(v) * 100).toFixed(0)}`,
+          },
+          splitLine: { lineStyle: { color: "#1e293b" } },
+        },
+        series: [
+          {
+            name: "权益",
+            type: "line",
+            data: pts.map((p) => Number(p.equity)),
+            showSymbol: false,
+            lineStyle: { width: 2, color: "#38bdf8" },
+            areaStyle: { color: "rgba(56,189,248,0.12)" },
+          },
+        ],
+      },
+      true
+    );
+    return chart;
+  }
+
   window.DcKline = {
     renderSnapshotHeader,
     renderKlineChart,
     renderVpKlineChart,
+    renderTimingKlineChart,
+    renderTimingEquityChart,
     renderLevelPanel,
     cellCls,
     fmtPct,

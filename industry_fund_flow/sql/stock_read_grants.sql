@@ -69,6 +69,14 @@ GRANT SELECT ON stock_data.dwm_industry_vp_score_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.dwm_industry_vp_score_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.dwm_board_timing_signal_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.dwm_board_timing_signal_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_board_timing_signal_arch TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_board_timing_signal_arch TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_board_timing_bt_run TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_board_timing_bt_run TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_board_timing_bt_trade TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_board_timing_bt_trade TO 'app_user'@'%';
+GRANT SELECT ON stock_data.dwm_board_timing_bt_metrics TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.dwm_board_timing_bt_metrics TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_stock_basic_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_stock_basic_di TO 'app_user'@'%';
 

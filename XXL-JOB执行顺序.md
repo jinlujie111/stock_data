@@ -115,6 +115,7 @@ XXL-JOB 管理台可建多个 Job，也可合并为单个日批（见第三节�
 | ⑨ | `run_vp_batch` | 板块/个股 ODS | 需求5 量价 |
 | ⑩ | `run_sector_dragon_batch` | 资金 DWM + 个股 ODS | 需求2 龙头 |
 | ⑪ | `run_board_timing_batch` | 东财日线/资金流/涨停/成分 ODS | 板块四因子择时（K 线买卖点） |
+| ⑪b | `run_board_timing_backtest` | ⑪ 信号表 + `ods_dc_daily_di` | 择时回测（T+1 开盘 · 收益率/成功率） |
 | ⑫ | `run_ods_completeness_monitor` | — | ODS 完整度（已停表 `enabled=false`） |
 
 > **已删除链路**：同花顺 / 申万 DWM·DWS、AI 核心池、量化主线（需求3）、量化选股、量化选板块。停同步见 `mysql_tables/migrations/20260715_pause_unused_sync.sql`；`rotation_*` 业务表删除见 `20260723_drop_rotation_sector_selection.sql`（**不影响** `sw_daily` 等 ODS 同步）。  
@@ -213,6 +214,7 @@ bash dw-dwm/pro_dwm_dc_industry_market_heat_di.sh 20250101 20260615
 | DWM / DWS 主线（⑧） | **需求1 要** | 不做 `/dc/mainline` 可不跑 |
 | `run_vp_batch` / `run_sector_dragon_batch` | 需求5 / 2 要 | 量价 / 龙头页 |
 | `run_board_timing_batch` | 择时页要 | 四因子买卖点 `/dc/board-timing` |
+| `run_board_timing_backtest` | 回测指标要 | T+1 开盘收益率/成功率（`dwm_board_timing_bt_*`） |
 | `xxl_weekly_batch` | 建议 | 提升「机构化」命中率 |
 | `run_ods_completeness_monitor` | 建议 | 生产环境 ODS 完整度告警 |
 
@@ -308,8 +310,8 @@ curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:8082/login"
 | **主线板块**（需求1） | `/dc/mainline` | ⑧ | `dws_dc_industry_mainline_monitor_di` |
 | **板块量价**（需求5） | `/dc/vp` | ⑨ | `dwm_industry_vp_score_di` 等 |
 | **板块龙头**（需求2） | `/dc/dragon` | ⑩ | `dwm_sector_stock_dragon_score_di` 等 |
-| **板块择时**（四因子买卖点） | `/dc/board-timing` | ⑪ | `dwm_board_timing_signal_di` |
-| **择时K线** | `/dc/timing-kline` | ⑪ | `dwm_board_timing_signal_di` + `ods_dc_daily_di` |
+| **板块择时**（买卖点+回测工作台） | `/dc/board-timing` | ⑪ + ⑪b | `dwm_board_timing_signal_di` + `dwm_board_timing_bt_*` |
+| **择时K线**（已合并，302 到择时页） | `/dc/timing-kline` → `/dc/board-timing` | ⑪ + ⑪b | 同上 |
 | 登录 / 注册 | `/login` `/register` | — | `data_industry.app_user` |
 
 导航栏与各 `/dc/{slug}` 页共用 [`dc_registry.py`](industry_fund_flow/app/dc_registry.py) 注册（五维单页可已下架导航，ETL 仍写库供主线）。
@@ -359,6 +361,7 @@ UNION ALL SELECT 'timing', COUNT(*) FROM dwm_board_timing_signal_di WHERE trade_
 | 板块龙头 | 日批 ⑩ 未跑；成分 `<3` 的板块被跳过 |
 | 板块量价 | 日批 ⑨ 未跑 |
 | 板块择时 | 日批 ⑪ 未跑；表未建（执行 `20260723_create_board_timing_signal.sql`） |
+| 择时回测为空 | 日批 ⑪b 未跑；表未建（执行 `20260805_board_timing_backtest.sql`）；或信号区间过短 |
 
 Web 日志：`${STOCK_LOG_DIR:-/opt/stock_data/log/stock_log}/web/industry_fund_flow.log`
 

@@ -1,13 +1,18 @@
 (function () {
   const board = window.DcBoard || {};
+  const kline = window.DcKline || {};
   const { normalizeIsoDate, toApiTradeDate } = board;
 
   const elDate = document.getElementById("trade-date");
   const elTypes = document.getElementById("content-types");
+  const elMainline = document.getElementById("mainline-filter");
+  const elVpStatus = document.getElementById("vp-status-filter");
   const elSigFilter = document.getElementById("signal-filter");
+  const elSort = document.getElementById("sort-key");
   const elSearch = document.getElementById("board-search");
   const btnQuery = document.getElementById("btn-query");
   const elError = document.getElementById("page-error");
+  const elBtSummary = document.getElementById("bt-summary");
   const elSigBody = document.getElementById("signal-body");
   const elSigEmpty = document.getElementById("signal-empty");
   const elRankBody = document.getElementById("rank-body");
@@ -16,13 +21,19 @@
   const elDetailTitle = document.getElementById("detail-title");
   const elDetailMetrics = document.getElementById("detail-metrics");
   const elHistBody = document.getElementById("hist-signal-body");
+  const elBtTradeBody = document.getElementById("bt-trade-body");
   const elChart = document.getElementById("timing-kline-chart");
+  const elEquity = document.getElementById("timing-equity-chart");
   const elPresets = document.getElementById("kline-range-presets");
+  const elVolChips = document.getElementById("vol-mode-chips");
   const btnKline = document.getElementById("btn-kline-refresh");
 
   let chartInst = null;
+  let equityInst = null;
   let currentCode = "";
   let klineDays = 60;
+  let volMode = "vol";
+  let lastPayload = null;
 
   function showError(msg) {
     if (!elError) return;
@@ -49,6 +60,13 @@
     return x.toFixed(d == null ? 1 : d);
   }
 
+  function fmtPct(n, d) {
+    if (n == null || n === "") return "—";
+    const x = Number(n);
+    if (Number.isNaN(x)) return "—";
+    return `${(x * 100).toFixed(d == null ? 1 : d)}%`;
+  }
+
   function labelSignal(s) {
     if (s === "buy") return "买入";
     if (s === "sell") return "卖出";
@@ -68,8 +86,17 @@
     return "";
   }
 
+  function tonePct(n) {
+    if (n == null || Number.isNaN(Number(n))) return "";
+    return Number(n) >= 0 ? "tone-up" : "tone-down";
+  }
+
+  function metric(label, val, strong) {
+    return `<div class="vp-metric"><span class="vp-metric-label">${label}</span><span class="vp-metric-val${strong ? " strong" : ""}">${val}</span></div>`;
+  }
+
   async function loadDates() {
-    const data = await fetchJson("/api/v1/timing/trade-dates?limit=120");
+    const data = await fetchJson("/api/v1/timing/trade-dates?limit=240");
     const dates = data.dates || [];
     elDate.innerHTML = dates
       .map((d) => {
@@ -85,13 +112,37 @@
     return elDate.value || "";
   }
 
+  async function loadBtSummary() {
+    if (!elBtSummary) return;
+    try {
+      const data = await fetchJson("/api/v1/timing/backtest/summary");
+      const run = data.run;
+      if (!run) {
+        elBtSummary.innerHTML = metric("回测", "未跑 · 请执行 run_board_timing_backtest");
+        return;
+      }
+      elBtSummary.innerHTML = [
+        metric("成交模型", data.exec_model || "t1_open", true),
+        metric("回测区间", `${run.start_date} ~ ${run.end_date}`),
+        metric("成功率", fmtPct(run.win_rate)),
+        metric("平均收益", fmtPct(run.avg_return)),
+        metric("等权收益", fmtPct(run.total_return)),
+        metric("最大回撤", fmtPct(run.max_drawdown)),
+        metric("交易笔数", run.trade_count != null ? String(run.trade_count) : "—"),
+        metric("板块数", run.board_count != null ? String(run.board_count) : "—"),
+      ].join("");
+    } catch (e) {
+      elBtSummary.innerHTML = metric("回测", e.message || "加载失败");
+    }
+  }
+
   async function loadSignals() {
     const td = selectedDate();
     if (!td) return;
     const sig = elSigFilter.value;
     const types = encodeURIComponent(elTypes.value);
     let url = `/api/v1/timing/signals?trade_date=${td}&content_types=${types}&top=100`;
-    if (sig) url += `&signal_type=${sig}`;
+    if (sig === "buy" || sig === "sell") url += `&signal_type=${sig}`;
     const data = await fetchJson(url);
     const items = data.items || [];
     elSigBody.innerHTML = items
@@ -122,7 +173,17 @@
     if (!td) return;
     const types = encodeURIComponent(elTypes.value);
     const kw = (elSearch.value || "").trim();
-    let url = `/api/v1/timing/rank?trade_date=${td}&content_types=${types}&top=50&sort=score`;
+    const sort = encodeURIComponent(elSort.value || "score");
+    const sig = elSigFilter.value;
+    let url =
+      `/api/v1/timing/rank?trade_date=${td}&content_types=${types}&top=80&sort=${sort}&with_metrics=true`;
+    if (sig === "buy" || sig === "sell") url += `&signal_type=${sig}`;
+    if (elMainline && elMainline.value) {
+      url += `&mainline_levels=${encodeURIComponent(elMainline.value)}`;
+    }
+    if (elVpStatus && elVpStatus.value) {
+      url += `&vp_status=${encodeURIComponent(elVpStatus.value)}`;
+    }
     const data = await fetchJson(url);
     let items = data.items || [];
     if (kw) {
@@ -142,10 +203,12 @@
           `<td>${r.content_type || "—"}</td>` +
           `<td><strong>${fmt(r.score)}</strong></td>` +
           `<td>${labelState(r.position_state)}</td>` +
-          `<td>${fmt(r.score_trend)}</td>` +
-          `<td>${fmt(r.score_fund)}</td>` +
-          `<td>${fmt(r.score_vp)}</td>` +
-          `<td>${fmt(r.score_sentiment)}</td>` +
+          `<td class="${tonePct(r.bt_total_return)}">${fmtPct(r.bt_total_return)}</td>` +
+          `<td>${fmtPct(r.bt_win_rate)}</td>` +
+          `<td>${r.bt_trade_count != null ? r.bt_trade_count : "—"}</td>` +
+          `<td>${fmtPct(r.bt_max_drawdown)}</td>` +
+          `<td>${r.mainline_level || "—"}</td>` +
+          `<td>${r.vp_status || "—"}</td>` +
           `</tr>`
         );
       })
@@ -156,138 +219,50 @@
     });
   }
 
-  async function openDetail(code) {
-    if (!code) return;
-    const td = selectedDate();
-    const iso = elDate.options[elDate.selectedIndex]
-      ? elDate.options[elDate.selectedIndex].textContent.trim()
-      : "";
-    const qs = new URLSearchParams({
-      code: code,
-      trade_date: td || "",
-      days: "60",
-    });
-    if (iso) qs.set("end", iso);
-    window.location.href = `/dc/timing-kline?${qs.toString()}`;
+  function renderDetailHeader(payload) {
+    const name = payload.name || payload.industry_code || currentCode;
+    const code = payload.display_code || payload.industry_code || currentCode;
+    const t = payload.latest_timing || {};
+    const bt = (payload.backtest && payload.backtest.metrics) || {};
+    elDetailTitle.textContent = `${name} · ${code}`;
+    elDetailMetrics.innerHTML = [
+      metric("综合分", fmt(t.score), true),
+      metric("状态", labelState(t.position_state)),
+      metric("信号", labelSignal(t.signal_type)),
+      metric("收益率", fmtPct(bt.total_return), true),
+      metric("成功率", fmtPct(bt.win_rate)),
+      metric("交易数", bt.trade_count != null ? String(bt.trade_count) : "—"),
+      metric("回撤", fmtPct(bt.max_drawdown)),
+      metric("均持仓", bt.avg_hold_days != null ? fmt(bt.avg_hold_days, 1) : "—"),
+      metric("成交", payload.exec_model || "t1_open"),
+    ].join("");
   }
 
-  function renderChart(payload) {
-    if (!window.echarts || !elChart) return;
-    if (!chartInst) chartInst = echarts.init(elChart);
-    const bars = payload.bars || [];
-    const timing = payload.timing || [];
-    const dates = bars.map((b) => b.trade_date);
-    const ohlc = bars.map((b) => [b.open, b.close, b.low, b.high]);
-    const scores = timing.map((t) => (t && t.score != null ? Number(t.score) : null));
-    const flows = timing.map((t) => (t && t.flow5 != null ? Number(t.flow5) / 1e8 : null));
-    const markPoints = [];
-    timing.forEach((t, i) => {
-      if (!t || (t.signal_type !== "buy" && t.signal_type !== "sell")) return;
-      const high = ohlc[i] ? ohlc[i][3] : null;
-      const low = ohlc[i] ? ohlc[i][2] : null;
-      const isBuy = t.signal_type === "buy";
-      markPoints.push({
-        name: isBuy ? "买" : "卖",
-        coord: [dates[i], isBuy ? low : high],
-        value: isBuy ? "买" : "卖",
-        symbol: "triangle",
-        symbolRotate: isBuy ? 0 : 180,
-        symbolSize: 14,
-        itemStyle: { color: isBuy ? "#16a34a" : "#dc2626" },
-        label: { show: true, formatter: isBuy ? "买" : "卖", fontSize: 10, color: "#fff" },
-      });
-    });
+  function renderTrades(payload) {
+    const trades = (payload.backtest && payload.backtest.trades) || [];
+    elBtTradeBody.innerHTML = trades
+      .map((t) => {
+        return (
+          `<tr>` +
+          `<td>${t.buy_signal_date || "—"}</td>` +
+          `<td>${t.entry_date || "—"}</td>` +
+          `<td>${fmt(t.entry_price, 2)}</td>` +
+          `<td>${t.sell_signal_date || "—"}</td>` +
+          `<td>${t.exit_date || "—"}</td>` +
+          `<td>${fmt(t.exit_price, 2)}</td>` +
+          `<td class="${tonePct(t.return_pct)}">${fmtPct(t.return_pct)}</td>` +
+          `<td>${t.hold_days != null ? t.hold_days : "—"}</td>` +
+          `<td>${t.is_open ? "盯市" : "已平"}</td>` +
+          `<td class="muted">${t.exit_reason || "—"}</td>` +
+          `</tr>`
+        );
+      })
+      .join("");
+  }
 
-    chartInst.setOption(
-      {
-        animation: false,
-        legend: { data: ["K线", "Score", "flow5(亿)"], top: 0, textStyle: { color: "#94a3b8" } },
-        tooltip: {
-          trigger: "axis",
-          axisPointer: { type: "cross" },
-          formatter(params) {
-            const idx = params && params[0] ? params[0].dataIndex : -1;
-            if (idx < 0) return "";
-            const b = bars[idx] || {};
-            const t = timing[idx] || {};
-            return [
-              `<strong>${dates[idx]}</strong>`,
-              `收 ${fmt(b.close, 2)} (${fmt(b.pct_change, 2)}%)`,
-              `Score ${fmt(t.score)} · ${labelSignal(t.signal_type)} · ${labelState(t.position_state)}`,
-              `趋势 ${fmt(t.score_trend)} / 资金 ${fmt(t.score_fund)} / 量价 ${fmt(t.score_vp)} / 情绪 ${fmt(t.score_sentiment)}`,
-              t.signal_reason ? `原因 ${t.signal_reason}` : "",
-            ]
-              .filter(Boolean)
-              .join("<br/>");
-          },
-        },
-        axisPointer: { link: [{ xAxisIndex: "all" }] },
-        grid: [
-          { left: 56, right: 24, top: 36, height: "48%" },
-          { left: 56, right: 24, top: "62%", height: "14%" },
-          { left: 56, right: 24, top: "80%", height: "14%" },
-        ],
-        xAxis: [
-          { type: "category", data: dates, gridIndex: 0, axisLabel: { show: false } },
-          { type: "category", data: dates, gridIndex: 1, axisLabel: { show: false } },
-          { type: "category", data: dates, gridIndex: 2 },
-        ],
-        yAxis: [
-          { scale: true, gridIndex: 0, splitLine: { lineStyle: { color: "#1e293b" } } },
-          { scale: true, gridIndex: 1, splitLine: { show: false } },
-          { scale: true, gridIndex: 2, splitLine: { show: false } },
-        ],
-        dataZoom: [
-          { type: "inside", xAxisIndex: [0, 1, 2] },
-          { type: "slider", xAxisIndex: [0, 1, 2], bottom: 4, height: 18 },
-        ],
-        series: [
-          {
-            name: "K线",
-            type: "candlestick",
-            data: ohlc,
-            xAxisIndex: 0,
-            yAxisIndex: 0,
-            itemStyle: {
-              color: "#ef4444",
-              color0: "#22c55e",
-              borderColor: "#ef4444",
-              borderColor0: "#22c55e",
-            },
-            markPoint: markPoints.length ? { data: markPoints } : undefined,
-          },
-          {
-            name: "Score",
-            type: "line",
-            data: scores,
-            xAxisIndex: 1,
-            yAxisIndex: 1,
-            showSymbol: false,
-            lineStyle: { width: 2, color: "#38bdf8" },
-            markLine: {
-              symbol: "none",
-              data: [
-                { yAxis: 70, lineStyle: { color: "#16a34a", type: "dashed" } },
-                { yAxis: 40, lineStyle: { color: "#dc2626", type: "dashed" } },
-              ],
-            },
-          },
-          {
-            name: "flow5(亿)",
-            type: "bar",
-            data: flows,
-            xAxisIndex: 2,
-            yAxisIndex: 2,
-            itemStyle: {
-              color: (p) => (p.value >= 0 ? "#16a34a" : "#dc2626"),
-            },
-          },
-        ],
-      },
-      true
-    );
-
-    elHistBody.innerHTML = (payload.signals || [])
+  function renderHist(payload) {
+    const sigs = payload.signals || [];
+    elHistBody.innerHTML = sigs
       .slice()
       .reverse()
       .map((s) => {
@@ -303,45 +278,95 @@
       .join("");
   }
 
-  async function loadKline() {
-    if (!currentCode) return;
-    const td = selectedDate();
-    const url = `/api/v1/timing/boards/${encodeURIComponent(currentCode)}/kline?trade_date=${td}&days=${klineDays}`;
-    const data = await fetchJson(url);
-    renderChart(data);
+  function renderCharts(payload) {
+    if (kline.renderTimingKlineChart) {
+      chartInst = kline.renderTimingKlineChart(elChart, payload, {
+        chartInst,
+        volMode,
+      });
+    }
+    const curve = (payload.backtest && payload.backtest.equity_curve) || [];
+    if (kline.renderTimingEquityChart) {
+      equityInst = kline.renderTimingEquityChart(elEquity, curve, { chartInst: equityInst });
+    }
   }
 
-  async function refreshAll() {
-    showError("");
+  async function openDetail(code) {
+    if (!code) return;
+    currentCode = code;
+    const td = selectedDate();
+    const url =
+      `/api/v1/timing/boards/${encodeURIComponent(code)}/kline?days=${klineDays}` +
+      (td ? `&trade_date=${td}` : "");
     try {
-      await loadSignals();
-      await loadRank();
+      showError("");
+      const payload = await fetchJson(url);
+      lastPayload = payload;
+      elDetailCard.classList.remove("hidden");
+      renderDetailHeader(payload);
+      renderCharts(payload);
+      renderTrades(payload);
+      renderHist(payload);
+      elDetailCard.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       showError(e.message || String(e));
     }
   }
 
-  btnQuery.addEventListener("click", refreshAll);
-  elDate.addEventListener("change", refreshAll);
-  elTypes.addEventListener("change", refreshAll);
-  elSigFilter.addEventListener("change", refreshAll);
-  elSearch.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") refreshAll();
-  });
-  btnKline.addEventListener("click", () => loadKline().catch((e) => showError(e.message)));
-  if (elPresets) {
-    elPresets.querySelectorAll(".chip").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        elPresets.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
-        btn.classList.add("active");
-        klineDays = Number(btn.getAttribute("data-days") || 60);
-        loadKline().catch((e) => showError(e.message));
-      });
-    });
+  async function refreshAll() {
+    showError("");
+    await Promise.all([loadBtSummary(), loadSignals(), loadRank()]);
   }
-  window.addEventListener("resize", () => chartInst && chartInst.resize());
+
+  function applyQueryParams() {
+    const qs = new URLSearchParams(window.location.search);
+    const code = qs.get("code");
+    const days = Number(qs.get("days") || 0);
+    if (days === 20 || days === 60 || days === 120) {
+      klineDays = days;
+      if (elPresets) {
+        elPresets.querySelectorAll(".chip").forEach((c) => {
+          c.classList.toggle("active", Number(c.getAttribute("data-days")) === klineDays);
+        });
+      }
+    }
+    if (code) {
+      setTimeout(() => openDetail(code), 0);
+    }
+  }
+
+  btnQuery && btnQuery.addEventListener("click", () => refreshAll().catch((e) => showError(e.message)));
+  elDate && elDate.addEventListener("change", () => refreshAll().catch((e) => showError(e.message)));
+  btnKline &&
+    btnKline.addEventListener("click", () => {
+      if (currentCode) openDetail(currentCode);
+    });
+  elPresets &&
+    elPresets.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".chip");
+      if (!btn) return;
+      klineDays = Number(btn.getAttribute("data-days")) || 60;
+      elPresets.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+      btn.classList.add("active");
+      if (currentCode) openDetail(currentCode);
+    });
+  elVolChips &&
+    elVolChips.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".chip");
+      if (!btn) return;
+      volMode = btn.getAttribute("data-vol") || "vol";
+      elVolChips.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+      btn.classList.add("active");
+      if (lastPayload) renderCharts(lastPayload);
+    });
+
+  window.addEventListener("resize", () => {
+    chartInst && chartInst.resize();
+    equityInst && equityInst.resize();
+  });
 
   loadDates()
-    .then(refreshAll)
+    .then(() => refreshAll())
+    .then(() => applyQueryParams())
     .catch((e) => showError(e.message || String(e)));
 })();

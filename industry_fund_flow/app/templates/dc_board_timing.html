@@ -7,8 +7,8 @@
 <div class="card vp-guide-card">
   <div class="vp-guide-head">
     <div>
-      <h2 class="vp-guide-title">四因子买卖点</h2>
-      <p class="vp-guide-sub">趋势 30% · 资金 30% · 量价 25% · 情绪 15% · 收盘信号 · T+1 开盘参考</p>
+      <h2 class="vp-guide-title">买卖点 + 回测工作台</h2>
+      <p class="vp-guide-sub">趋势 30% · 资金 30% · 量价 25% · 情绪 15% · 收盘确认信号 · <strong>T+1 开盘成交</strong></p>
     </div>
     <div class="vp-weight-bar" aria-label="权重">
       <span class="vp-weight-chip" style="--w-color:#3b82f6">趋势 30%</span>
@@ -18,19 +18,12 @@
     </div>
   </div>
   <dl class="vp-def-grid">
-    <div class="vp-def-item"><dt>综合分 Score</dt><dd>0–100；买入区 ≥70，卖出区 ≤40，中间观望不画新箭头</dd></div>
-    <div class="vp-def-item"><dt>买入 ↑</dt><dd>趋势≥60、资金≥55、量价≥50、情绪未过热，且 Score 上穿 70</dd></div>
-    <div class="vp-def-item"><dt>卖出 ↓</dt><dd>跌破 MA20 且趋势弱 / 资金转负连降 / 放量砸盘 / 回撤≥8% / Score 下穿 40</dd></div>
-    <div class="vp-def-item"><dt>数据</dt><dd>东财行业+概念；先跑 <code>run_board_timing_batch</code></dd></div>
+    <div class="vp-def-item"><dt>交易信号</dt><dd>buy / sell（唯一买卖事件）；量价页的「主升/退潮」是状态，不是买卖点</dd></div>
+    <div class="vp-def-item"><dt>买入 ↑</dt><dd>趋势≥60、资金≥55、量价≥50、情绪未过热，且 Score 上穿 70 → 次日开盘买</dd></div>
+    <div class="vp-def-item"><dt>卖出 ↓</dt><dd>破 MA20+趋势弱 / 资金连降 / 砸盘 / 回撤≥8% / Score 下穿 40 → 次日开盘卖</dd></div>
+    <div class="vp-def-item"><dt>回测</dt><dd>日批 <code>run_board_timing_backtest</code>；成功率=盈利笔数/已平仓；未平仓按末日收盘盯市</dd></div>
   </dl>
-  <div class="vp-guide-foot">
-    <h3 class="vp-guide-foot-title">怎么用</h3>
-    <ul class="vp-guide-steps">
-      <li><span class="vp-step-num">1</span>看当日买卖信号与综合分排行。</li>
-      <li><span class="vp-step-num">2</span>点击板块进入 <a href="/dc/timing-kline">择时 K 线</a>：主图买卖点 + 成交量/额 + 四因子副图。</li>
-      <li><span class="vp-step-num">3</span>无数据时先跑 <code>run_board_timing_batch</code>。</li>
-    </ul>
-  </div>
+  <div id="bt-summary" class="vp-detail-metrics"></div>
 </div>
 
 <div class="card filters-card vp-filters-card">
@@ -48,11 +41,40 @@
       </select>
     </label>
     <label class="filter-field">
+      <span>主线过滤</span>
+      <select id="mainline-filter">
+        <option value="">全部</option>
+        <option value="超级主线,主线">超级主线+主线</option>
+        <option value="超级主线">超级主线</option>
+        <option value="主线">主线</option>
+        <option value="轮动热点">轮动热点</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>量价状态</span>
+      <select id="vp-status-filter">
+        <option value="">全部</option>
+        <option value="mainline_burst,trend_up">爆发/上行</option>
+        <option value="mainline_burst">板块爆发</option>
+        <option value="trend_up">趋势上行</option>
+      </select>
+    </label>
+    <label class="filter-field">
       <span>信号</span>
       <select id="signal-filter">
-        <option value="">全部买卖</option>
+        <option value="">排行不限</option>
         <option value="buy">仅买入</option>
         <option value="sell">仅卖出</option>
+      </select>
+    </label>
+    <label class="filter-field">
+      <span>排序</span>
+      <select id="sort-key">
+        <option value="score">综合分</option>
+        <option value="total_return">回测收益率</option>
+        <option value="win_rate">成功率</option>
+        <option value="trade_count">交易次数</option>
+        <option value="max_drawdown">最大回撤(小优先)</option>
       </select>
     </label>
     <label class="filter-field filter-field--grow">
@@ -91,7 +113,7 @@
 </div>
 
 <div class="card">
-  <h2 class="card-section-title">综合分排行</h2>
+  <h2 class="card-section-title">综合分 / 回测排行</h2>
   <div class="table-wrap">
     <table class="data-table" id="rank-table">
       <thead>
@@ -101,16 +123,18 @@
           <th>类型</th>
           <th>Score</th>
           <th>状态</th>
-          <th>趋势</th>
-          <th>资金</th>
-          <th>量价</th>
-          <th>情绪</th>
+          <th>收益率</th>
+          <th>成功率</th>
+          <th>交易数</th>
+          <th>回撤</th>
+          <th>主线</th>
+          <th>量价状态</th>
         </tr>
       </thead>
       <tbody id="rank-body"></tbody>
     </table>
   </div>
-  <p id="rank-empty" class="muted hidden">暂无数据，请先运行 run_board_timing_batch</p>
+  <p id="rank-empty" class="muted hidden">暂无数据，请先运行 run_board_timing_batch / run_board_timing_backtest</p>
 </div>
 
 <div class="card hidden" id="detail-card">
@@ -125,12 +149,34 @@
         <button type="button" class="chip" data-days="120">120日</button>
       </div>
     </div>
+    <div class="filter-field">
+      <span>量能</span>
+      <div class="chip-group" id="vol-mode-chips">
+        <button type="button" class="chip active" data-vol="vol">成交量</button>
+        <button type="button" class="chip" data-vol="amount">成交额</button>
+      </div>
+    </div>
     <div class="filter-actions">
-      <button type="button" class="btn btn-primary" id="btn-kline-refresh">刷新 K 线</button>
+      <button type="button" class="btn btn-primary" id="btn-kline-refresh">刷新</button>
     </div>
   </div>
-  <div id="timing-kline-chart" class="kline-chart-host vp-kline-chart"></div>
-  <h3>历史买卖点</h3>
+  <div id="timing-kline-chart" class="kline-chart-host timing-kline-chart" style="min-height:520px"></div>
+  <h3>回测权益（T+1 开盘 · 复利）</h3>
+  <div id="timing-equity-chart" class="kline-chart-host" style="min-height:220px"></div>
+  <h3>回测成交明细</h3>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>信号买</th><th>成交买</th><th>买价</th>
+          <th>信号卖</th><th>成交卖</th><th>卖价</th>
+          <th>收益</th><th>持仓日</th><th>状态</th><th>原因</th>
+        </tr>
+      </thead>
+      <tbody id="bt-trade-body"></tbody>
+    </table>
+  </div>
+  <h3>历史买卖点（信号日）</h3>
   <div class="table-wrap">
     <table class="data-table">
       <thead>
@@ -145,5 +191,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="/static/js/dc_board_common.js?v=20260714b"></script>
-<script src="/static/js/dc_board_timing.js?v=20260723a"></script>
+<script src="/static/js/dc_kline_chart.js?v=20260805a"></script>
+<script src="/static/js/dc_board_timing.js?v=20260805a"></script>
 {% endblock %}

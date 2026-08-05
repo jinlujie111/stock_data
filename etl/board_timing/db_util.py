@@ -1,8 +1,16 @@
-"""四因子择时：配置与库工具。"""
+"""四因子择时：配置与库工具。
+
+成交约定（冻结）：
+  - 信号在交易日收盘后确认（signal_type 写在信号日）
+  - 实盘/回测成交：T+1 开盘（exec_model=t1_open）
+  - 未平仓头寸在回测窗口末日按收盘盯市
+"""
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass, fields
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy.engine import Engine
 
@@ -25,7 +33,40 @@ class TimingConfig:
     overheat_limit_up_ratio: float = 0.12
     lookback_days: int = 90
     content_types: tuple[str, ...] = ("行业", "概念")
-    retention_days: int = 183
+    # 热表保留日历天；更早行在 purge 前写入 archive
+    retention_days: int = 730
+    # 成交模型：t1_open = 信号日确认，下一交易日开盘成交
+    exec_model: str = "t1_open"
+    # 单边交易成本（基点），买卖各扣一次
+    cost_bps: float = 0.0
+    # 日批默认回测回看交易日数（不足则取全部可得）
+    backtest_lookback_days: int = 120
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["content_types"] = list(self.content_types)
+        return d
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "TimingConfig":
+        if not raw:
+            return cls()
+        allowed = {f.name for f in fields(cls)}
+        kwargs: dict[str, Any] = {}
+        for k, v in raw.items():
+            if k not in allowed:
+                continue
+            if k == "content_types":
+                if isinstance(v, str):
+                    kwargs[k] = tuple(x.strip() for x in v.split(",") if x.strip())
+                else:
+                    kwargs[k] = tuple(v)
+            else:
+                kwargs[k] = v
+        return cls(**kwargs)
 
 
 def parse_trade_date(s: str) -> date:

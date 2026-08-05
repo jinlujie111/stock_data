@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -37,21 +37,17 @@ def board_timing_page(request: Request, user: dict = Depends(require_user)):
 
 @page_router.get("/dc/timing-kline", response_class=HTMLResponse)
 def timing_kline_page(request: Request, user: dict = Depends(require_user)):
-    return _templates.TemplateResponse(
-        request,
-        "dc_timing_kline.html",
-        {
-            "user": user,
-            "nav_items": NAV_ITEMS,
-            "active_nav": "timing-kline",
-            "title": "择时K线",
-        },
-    )
+    """兼容旧入口：合并进板块择时工作台。"""
+    qs = request.url.query
+    target = "/dc/board-timing"
+    if qs:
+        target = f"{target}?{qs}"
+    return RedirectResponse(url=target, status_code=302)
 
 
 @api_router.get("/trade-dates")
 def api_timing_trade_dates(
-    limit: int = Query(120, ge=1, le=183),
+    limit: int = Query(120, ge=1, le=730),
     _user: dict = Depends(require_user),
 ):
     try:
@@ -69,6 +65,9 @@ def api_timing_rank(
     signal_type: str | None = Query(None),
     top: int = Query(50, ge=1, le=200),
     sort: str = Query("score"),
+    mainline_levels: str | None = Query(None, description="主线等级过滤,逗号分隔"),
+    vp_status: str | None = Query(None, description="量价状态过滤,逗号分隔"),
+    with_metrics: bool = Query(True),
     _user: dict = Depends(require_user),
 ):
     try:
@@ -78,6 +77,9 @@ def api_timing_rank(
             signal_type=signal_type,
             top=top,
             sort=sort,
+            mainline_levels=mainline_levels,
+            vp_status=vp_status,
+            with_metrics=with_metrics,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -104,6 +106,36 @@ def api_timing_signals(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail=f"查询信号失败: {exc}") from exc
+
+
+@api_router.get("/backtest/summary")
+def api_timing_bt_summary(
+    run_code: str = Query("daily_default"),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return timing_svc.get_backtest_summary(run_code)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询回测摘要失败: {exc}") from exc
+
+
+@api_router.get("/backtest/metrics")
+def api_timing_bt_metrics(
+    run_code: str = Query("daily_default"),
+    content_types: str = Query("行业,概念"),
+    top: int = Query(50, ge=1, le=200),
+    sort: str = Query("total_return"),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return timing_svc.list_board_metrics(
+            run_code=run_code,
+            content_types=content_types,
+            top=top,
+            sort=sort,
+        )
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询回测指标失败: {exc}") from exc
 
 
 @api_router.get("/boards/search")
@@ -139,6 +171,21 @@ def api_timing_board_detail(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail=f"查询详情失败: {exc}") from exc
+
+
+@api_router.get("/boards/{industry_code}/trades")
+def api_timing_board_trades(
+    industry_code: str,
+    run_code: str = Query("daily_default"),
+    limit: int = Query(100, ge=1, le=500),
+    _user: dict = Depends(require_user),
+):
+    try:
+        return timing_svc.get_board_trades(
+            industry_code, run_code=run_code, limit=limit
+        )
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail=f"查询成交明细失败: {exc}") from exc
 
 
 @api_router.get("/boards/{industry_code}/kline")

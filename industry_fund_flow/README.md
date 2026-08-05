@@ -34,7 +34,7 @@ export IFF_JWT_SECRET='请改为随机长字符串'   # 生产环境必设
 | `/dc/fund-flow` | 资金强度 |
 | `/dc/mainline` | 需求1 东财主线榜 |
 | `/dc/volume-price` | 需求5 板块量价 |
-| `/dc/board-timing` | 板块择时 |
+| `/dc/board-timing` | 板块择时（买卖点 + T+1 回测；旧 `/dc/timing-kline` 已合并） |
 | `/dc/dragon` | 需求2 板块龙头 |
 | `/dc/sectors` | 行业板块 |
 | `/dc/kline` | K 线分析 |

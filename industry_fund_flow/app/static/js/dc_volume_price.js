@@ -77,6 +77,7 @@
   };
 
   function labelSignal(v) {
+    // 量价 signal_type 是状态标签(regime)，不是买卖点；买卖事件见 /dc/board-timing
     if (!v || v === "none") return "—";
     return SIGNAL_LABEL[v] || v;
   }
@@ -262,7 +263,7 @@
       ["VP 综合分", fmt(s.vp_score, 1), scoreTier(s.vp_score)],
       ["排名", s.rank_vp != null ? "#" + s.rank_vp : "—", rankTone(s.rank_vp)],
       ["状态", STATUS_LABEL[s.vp_status] || s.vp_status, statusTone(s.vp_status), true],
-      ["信号", labelSignal(s.signal_type), signalTone(s.signal_type), true],
+      ["量价标签", labelSignal(s.signal_type), signalTone(s.signal_type), true],
       ["行业量比", fmt(s.industry_vol_ratio_20, 2), volRatioTone(s.industry_vol_ratio_20)],
       ["上涨占比", pct(s.rising_ratio), ratioPctTone(s.rising_ratio)],
       ["突破占比", pct(s.breakout_ratio), breakoutPctTone(s.breakout_ratio)],
@@ -620,7 +621,7 @@
 
   function renderRank(items) {
     elThead.innerHTML =
-      "<tr><th>#</th><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>信号</th>" +
+      "<tr><th>#</th><th>板块</th><th>类型</th><th>VP分</th><th>状态</th><th>量价标签</th>" +
       "<th>行业量比</th><th>上涨占比</th><th>突破占比</th><th>连续强度</th><th>20日趋势</th><th>龙头</th><th>下一步</th><th>操作</th></tr>";
     elBody.innerHTML = "";
     if (!items.length) {

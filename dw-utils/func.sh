@@ -273,6 +273,15 @@ run_board_timing_batch() {
     bash "${runner}" "$@"
 }
 
+run_board_timing_backtest() {
+    local runner="${DW_ROOT}/dw-dwm/pro_dwm_board_timing_backtest.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_vp_backfill() {
     local runner="${DW_ROOT}/dw-dwm/backfill_vp_batch.sh"
     if [[ ! -f "${runner}" ]]; then
