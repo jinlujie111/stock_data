@@ -52,6 +52,8 @@ GRANT SELECT ON stock_data.ods_report_rc_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_report_rc_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_dc_daily_di TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_dc_daily_di TO 'app_user'@'%';
+GRANT SELECT ON stock_data.ods_em_stock_monitor_di TO 'app_user'@'localhost';
+GRANT SELECT ON stock_data.ods_em_stock_monitor_di TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_fina_indicator TO 'app_user'@'localhost';
 GRANT SELECT ON stock_data.ods_fina_indicator TO 'app_user'@'%';
 GRANT SELECT ON stock_data.ods_stock_company_di TO 'app_user'@'localhost';

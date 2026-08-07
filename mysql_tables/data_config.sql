@@ -70,7 +70,7 @@ INSERT INTO db_llm_token (
 -- db_sync_task
 CREATE TABLE IF NOT EXISTS db_sync_task (
     id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
-    proxy_source          VARCHAR(32)  NOT NULL COMMENT 'akshare / tushare',
+    proxy_source          VARCHAR(32)  NOT NULL COMMENT 'akshare / tushare / eastmoney',
     source_table          VARCHAR(64)  NOT NULL COMMENT '接口方法名',
     target_database       VARCHAR(64)  NOT NULL DEFAULT 'stock_data',
     target_table          VARCHAR(128) NOT NULL,
@@ -1276,6 +1276,29 @@ INSERT INTO db_sync_task (
         )
     ),
     1, '交易所重点提示证券日快照(Tushare stk_alert；约6000积分；trade_date=同步日)'
+);
+
+-- 东财重点监控证券池 → ods_em_stock_monitor_di（监控开始/预计截止；当前池日快照）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'eastmoney', 'stock_monitor', 'stock_data', 'ods_em_stock_monitor_di', '东财重点监控证券', 'snapshot',
+    JSON_OBJECT(
+        'url', 'https://mobappconfig.securities.eastmoney.com/emcfg/stock_monitor.json',
+        'referer', 'https://vipmoney.eastmoney.com/',
+        'timeout', 20
+    ),
+    JSON_OBJECT(
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code', 'start_date', 'end_date'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'stk_code', 'name', 'market',
+            'start_date', 'end_date', 'link_url'
+        )
+    ),
+    1, '东财重点监控证券日快照(stock_monitor.json；含监控开始/预计截止；源为当前池)'
 );
 
 -- 存量清理：取消 fund_portfolio 同步（不再维护 ods_fund_hold_di）

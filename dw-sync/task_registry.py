@@ -1664,6 +1664,178 @@ def sync_cyq_chips(task: TaskDict, trade_date: date | None, dry_run: bool) -> Sy
     )
 
 
+_EM_MONITOR_MARKET = {"1": "SH", "0": "SZ", "B": "BJ"}
+_EM_MONITOR_DEFAULT_URL = (
+    "https://mobappconfig.securities.eastmoney.com/emcfg/stock_monitor.json"
+)
+
+
+def _em_monitor_ts_code(stk_code: str, market_raw: str) -> str | None:
+    code = str(stk_code or "").strip()
+    if not code:
+        return None
+    mkt = _EM_MONITOR_MARKET.get(str(market_raw or "").strip().upper())
+    if not mkt:
+        return None
+    return f"{code}.{mkt}"
+
+
+def fetch_em_stock_monitor(task: TaskDict) -> pd.DataFrame:
+    """拉取东财重点监控池 JSON → DataFrame。"""
+    import requests
+
+    cfg = get_fetch_config(task)
+    url = str(cfg.get("url") or _EM_MONITOR_DEFAULT_URL)
+    referer = str(cfg.get("referer") or "https://vipmoney.eastmoney.com/")
+    try:
+        timeout = float(cfg.get("timeout") or 20)
+    except (TypeError, ValueError):
+        timeout = 20.0
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Referer": referer,
+        "Accept": "application/json,text/plain,*/*",
+    }
+    resp = requests.get(url, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    payload = resp.json()
+    if payload is None:
+        return pd.DataFrame()
+    if not isinstance(payload, list):
+        raise TypeError(f"stock_monitor 返回非列表: {type(payload).__name__}")
+    if not payload:
+        return pd.DataFrame()
+    return pd.DataFrame(payload)
+
+
+def normalize_em_stock_monitor(df: pd.DataFrame, trade_date: date) -> pd.DataFrame:
+    """映射东财字段 → ODS 列。"""
+    if df.empty:
+        return pd.DataFrame(
+            columns=[
+                "trade_date",
+                "ts_code",
+                "stk_code",
+                "name",
+                "market",
+                "start_date",
+                "end_date",
+                "link_url",
+            ]
+        )
+
+    rows: list[dict[str, Any]] = []
+    for _, raw in df.iterrows():
+        stk = str(raw.get("STKCODE") or "").strip()
+        market_raw = str(raw.get("MARKET") or "").strip().upper()
+        ts_code = _em_monitor_ts_code(stk, market_raw)
+        if not ts_code:
+            logger.warning(
+                "stock_monitor 跳过无法映射市场的记录 code=%s market=%s",
+                stk,
+                market_raw,
+            )
+            continue
+        start = pd.to_datetime(raw.get("VALIDATESTARTDATE"), errors="coerce")
+        end = pd.to_datetime(raw.get("VALIDATEENDDATE"), errors="coerce")
+        if pd.isna(start) or pd.isna(end):
+            logger.warning(
+                "stock_monitor 跳过缺起止日记录 code=%s start=%s end=%s",
+                stk,
+                raw.get("VALIDATESTARTDATE"),
+                raw.get("VALIDATEENDDATE"),
+            )
+            continue
+        rows.append(
+            {
+                "trade_date": trade_date,
+                "ts_code": ts_code,
+                "stk_code": stk,
+                "name": (str(raw.get("STKNAME")).strip() if raw.get("STKNAME") is not None else None),
+                "market": _EM_MONITOR_MARKET[market_raw],
+                "start_date": start.date(),
+                "end_date": end.date(),
+                "link_url": (
+                    str(raw.get("LINK_URL")).strip()
+                    if raw.get("LINK_URL") not in (None, "")
+                    else None
+                ),
+            }
+        )
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out = out.drop_duplicates(subset=["trade_date", "ts_code"], keep="last")
+    return out
+
+
+@register("eastmoney", "stock_monitor")
+def sync_em_stock_monitor(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
+    """东财重点监控证券池日快照（含监控开始/预计截止）。"""
+    from sync_writer import write_dataframe
+
+    td = trade_date or date.today()
+    if td < date.today():
+        logger.warning(
+            "stock_monitor 源为当前池快照；trade_date=%s 早于今天，"
+            "写入内容仍是此刻名单，不能代表该历史日的真实池",
+            td.isoformat(),
+        )
+
+    raw = fetch_em_stock_monitor(task)
+    out = normalize_em_stock_monitor(raw, td)
+    logger.info(
+        "任务 id=%s stock_monitor 原始=%s 映射后=%s trade_date=%s",
+        task["id"],
+        len(raw),
+        len(out),
+        td.isoformat(),
+    )
+
+    if dry_run:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=len(out),
+            ok=True,
+            message="dry-run",
+        )
+
+    if out.empty:
+        return SyncResult(
+            task_id=task["id"],
+            source_table=task["source_table"],
+            target_table=task["target_table"],
+            rows_affected=0,
+            ok=False,
+            message="stock_monitor 返回 0 行，请检查东财 JSON 是否可访问",
+        )
+
+    transform_cfg = get_transform_config(task)
+    rows = write_dataframe(
+        database=task["target_database"],
+        table=task["target_table"],
+        df=out,
+        sync_mode=(task.get("sync_mode") or "snapshot").lower(),
+        trade_date=td,
+        snapshot_delete_column=transform_cfg.get("snapshot_delete_column") or "trade_date",
+    )
+    return SyncResult(
+        task_id=task["id"],
+        source_table=task["source_table"],
+        target_table=task["target_table"],
+        rows_affected=rows,
+        ok=True,
+    )
+
+
 def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> SyncResult:
     """通用同步：fetch_config → 拉数 → transform_config → 写库。"""
     from sync_writer import write_dataframe

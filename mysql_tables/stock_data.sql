@@ -516,6 +516,21 @@ CREATE TABLE IF NOT EXISTS ods_stk_alert_di (
     KEY idx_stk_alert_ts (ts_code, start_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='?????????(Tushare stk_alert)';
 
+CREATE TABLE IF NOT EXISTS ods_em_stock_monitor_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date    DATE           NOT NULL COMMENT 'sync business day',
+    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS code',
+    stk_code      VARCHAR(16)    NULL COMMENT 'raw code',
+    name          VARCHAR(64)    NULL COMMENT 'name',
+    market        VARCHAR(8)     NULL COMMENT 'SH/SZ/BJ',
+    start_date    DATE           NOT NULL COMMENT 'VALIDATESTARTDATE',
+    end_date      DATE           NOT NULL COMMENT 'VALIDATEENDDATE',
+    link_url      VARCHAR(512)   NULL COMMENT 'detail url',
+    UNIQUE KEY uk_em_stock_monitor (trade_date, ts_code),
+    KEY idx_em_monitor_window (ts_code, start_date, end_date),
+    KEY idx_em_monitor_end (end_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Eastmoney key monitored securities pool';
+
 -- ============================================================================
 -- 股票的预测信息
 -- ============================================================================
