@@ -1229,6 +1229,55 @@ INSERT INTO db_sync_task (
     1, '每日涨跌停价格日快照(Tushare stk_limit；约2000积分，盘前更新)'
 );
 
+-- Tushare stk_high_shock → ods_stk_high_shock_di（个股严重异常波动，约6000积分）
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'stk_high_shock', 'stock_data', 'ods_stk_high_shock_di', '个股严重异常波动', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'date_columns', JSON_OBJECT('trade_date', NULL),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'reason'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'name', 'trade_market', 'reason', 'period'
+        )
+    ),
+    1, '个股严重异常波动日快照(Tushare stk_high_shock；约6000积分)'
+);
+
+-- Tushare stk_alert → ods_stk_alert_di（交易所重点提示证券，约6000积分）
+-- 接口无 trade_date 输出字段，按同步日注入 trade_date；type 重命名为 alert_type
+INSERT INTO db_sync_task (
+    proxy_source, source_table, target_database, target_table, target_table_describe,
+    sync_mode, fetch_config, transform_config, status, remark
+) VALUES (
+    'tushare', 'stk_alert', 'stock_data', 'ods_stk_alert_di', '交易所重点提示证券', 'snapshot',
+    JSON_OBJECT(
+        'token_type', 'tushare',
+        'params', JSON_OBJECT('trade_date', '$trade_date'),
+        'inject_date_range', FALSE
+    ),
+    JSON_OBJECT(
+        'rename', JSON_OBJECT('type', 'alert_type'),
+        'inject_trade_date_column', 'trade_date',
+        'date_columns', JSON_OBJECT('start_date', NULL, 'end_date', NULL),
+        'snapshot_delete_column', 'trade_date',
+        'dedupe', JSON_ARRAY('trade_date', 'ts_code', 'start_date', 'end_date', 'alert_type'),
+        'dropna', JSON_ARRAY('trade_date', 'ts_code'),
+        'keep_columns', JSON_ARRAY(
+            'trade_date', 'ts_code', 'name', 'start_date', 'end_date', 'alert_type'
+        )
+    ),
+    1, '交易所重点提示证券日快照(Tushare stk_alert；约6000积分；trade_date=同步日)'
+);
+
 -- 存量清理：取消 fund_portfolio 同步（不再维护 ods_fund_hold_di）
 DELETE FROM db_sync_task WHERE source_table = 'fund_portfolio';
 -- 若表已创建，可在 stock_data 库执行：DROP TABLE IF EXISTS ods_fund_hold_di;

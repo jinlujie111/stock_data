@@ -1670,7 +1670,7 @@ def sync_generic(task: TaskDict, trade_date: date | None, dry_run: bool) -> Sync
 
     sync_mode = (task.get("sync_mode") or "snapshot").lower()
     df = fetch_task_dataframe(task, trade_date)
-    out = apply_transform(df, task)
+    out = apply_transform(df, task, trade_date=trade_date)
     write_td = write_trade_date_for_sync_mode(task, trade_date)
 
     logger.info(

@@ -145,7 +145,11 @@ def build_api_call_params_list(task: TaskDict, trade_date: date | None) -> list[
     return [_resolve_params(base_params, ctx)]
 
 
-def apply_transform(df: pd.DataFrame, task: TaskDict) -> pd.DataFrame:
+def apply_transform(
+    df: pd.DataFrame,
+    task: TaskDict,
+    trade_date: date | None = None,
+) -> pd.DataFrame:
     """按 transform_config 重命名、解析日期、筛选列、去重。"""
     if df.empty:
         return df
@@ -163,6 +167,11 @@ def apply_transform(df: pd.DataFrame, task: TaskDict) -> pd.DataFrame:
     if rename:
         out = out.rename(columns=rename)
 
+    # 接口无 trade_date 时，注入同步业务日（如 stk_alert）
+    inject_col = cfg.get("inject_trade_date_column")
+    if inject_col and trade_date is not None:
+        out[str(inject_col)] = trade_date
+
     date_columns = cfg.get("date_columns") or {}
     for col, fmt in date_columns.items():
         if col not in out.columns:
@@ -175,7 +184,6 @@ def apply_transform(df: pd.DataFrame, task: TaskDict) -> pd.DataFrame:
     constants = cfg.get("constants") or {}
     for col, val in constants.items():
         out[col] = val
-
     rank_cfg = cfg.get("rank_by")
     if rank_cfg:
         col = rank_cfg.get("column", "main_net_inflow")

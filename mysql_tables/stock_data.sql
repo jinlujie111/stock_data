@@ -492,6 +492,30 @@ CREATE TABLE IF NOT EXISTS ods_stk_limit_di (
     UNIQUE KEY uk_stk_limit (trade_date, ts_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日涨跌停价格(Tushare stk_limit)';
 
+CREATE TABLE IF NOT EXISTS ods_stk_high_shock_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date    DATE           NOT NULL COMMENT '??/????',
+    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS??',
+    name          VARCHAR(64)    NULL COMMENT '????',
+    trade_market  VARCHAR(32)    NULL COMMENT '???',
+    reason        VARCHAR(512)   NULL COMMENT '????',
+    period        VARCHAR(128)   NULL COMMENT '????',
+    UNIQUE KEY uk_stk_high_shock (trade_date, ts_code, reason(128)),
+    KEY idx_stk_high_shock_ts (ts_code, trade_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='????????(Tushare stk_high_shock)';
+
+CREATE TABLE IF NOT EXISTS ods_stk_alert_di (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    trade_date    DATE           NOT NULL COMMENT '?????(????)',
+    ts_code       VARCHAR(16)    NOT NULL COMMENT 'TS??',
+    name          VARCHAR(64)    NULL COMMENT '????',
+    start_date    DATE           NULL COMMENT '????????',
+    end_date      DATE           NULL COMMENT '??????????',
+    alert_type    VARCHAR(64)    NULL COMMENT '????(????type)',
+    UNIQUE KEY uk_stk_alert (trade_date, ts_code, start_date, end_date, alert_type),
+    KEY idx_stk_alert_ts (ts_code, start_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='?????????(Tushare stk_alert)';
+
 -- ============================================================================
 -- 股票的预测信息
 -- ============================================================================
