@@ -3,10 +3,13 @@
 --
 -- 用法：
 --   mysql -u root -p < mysql_tables/migrations/20260807_ods_stk_high_shock_alert.sql
--- 试跑：
+-- 试跑单日：
 --   source dw-utils/func.sh
 --   run_data_sync YYYYMMDD --source-table stk_high_shock
 --   run_data_sync YYYYMMDD --source-table stk_alert
+-- 回填 2025 年以来：
+--   source dw-utils/func.sh && run_backfill_stk_shock_alert
+--   # 或: bash dw-sync/backfill_stk_high_shock_alert.sh 20250101 20260807
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS stock_data.ods_stk_high_shock_di (

@@ -291,6 +291,16 @@ run_vp_backfill() {
     bash "${runner}" "$@"
 }
 
+# 回填个股严重异常波动 + 交易所重点提示（默认 20250101 ~ 今天）
+run_backfill_stk_shock_alert() {
+    local runner="${DW_ROOT}/dw-sync/backfill_stk_high_shock_alert.sh"
+    if [[ ! -f "${runner}" ]]; then
+        echo "ERROR: 未找到 ${runner}" >&2
+        return 1
+    fi
+    bash "${runner}" "$@"
+}
+
 run_sector_dragon_batch() {
     local runner="${DW_ROOT}/dw-dwm/pro_dwm_sector_dragon_score.sh"
     if [[ ! -f "${runner}" ]]; then
